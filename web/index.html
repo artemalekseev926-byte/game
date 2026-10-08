@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; font-src 'self'">
+<title>Pixel Conquest</title>
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== Главное меню ===== -->
+<section id="screen-menu" class="screen active">
+  <canvas id="menu-bg"></canvas>
+  <div class="menu-col">
+    <h1 class="logo">PIXEL<br><span>CONQUEST</span></h1>
+    <p class="subtitle">Захвати мир. Пиксель за пикселем.</p>
+    <div class="menu-buttons">
+      <button class="btn big" data-go="setup">Одиночная игра</button>
+      <button class="btn big" data-go="mp">Мультиплеер</button>
+      <button class="btn big" id="btn-load-menu">Загрузить игру</button>
+      <button class="btn big" data-modal="settings">Настройки</button>
+      <button class="btn big" data-modal="help">Как играть</button>
+      <button class="btn big danger" id="btn-quit">Выход</button>
+    </div>
+    <p class="footer">v<span id="ver"></span> · офлайн и Steam · <a href="#" id="theme-link">сменить тему</a></p>
+  </div>
+</section>
+
+<!-- ===== Одиночная игра ===== -->
+<section id="screen-setup" class="screen">
+  <div class="setup-layout">
+    <div class="box">
+      <h2>Карта</h2>
+      <div id="map-list" class="map-list"></div>
+      <label class="file-btn btn small">Загрузить свою карту (.json)<input type="file" id="custom-map-file" accept=".json,application/json" hidden></label>
+      <div id="custom-maps" class="map-list"></div>
+    </div>
+    <div class="box preview-box">
+      <canvas id="map-preview" width="480" height="240"></canvas>
+      <p id="map-desc" class="muted"></p>
+    </div>
+    <div class="box">
+      <h2>Параметры</h2>
+      <label>Ваше имя <input id="sp-name" maxlength="20"></label>
+      <label>Ботов: <b id="sp-bots-v">5</b><input type="range" id="sp-bots" min="1" max="11" value="5"></label>
+      <label>Сложность
+        <select id="sp-diff"><option value="easy">Лёгкая</option><option value="normal" selected>Нормальная</option><option value="hard">Сложная</option><option value="mixed">Смешанная</option></select>
+      </label>
+      <label>Победа при контроле: <b id="sp-vic-v">70%</b><input type="range" id="sp-vic" min="30" max="100" step="5" value="70"></label>
+      <label>Seed карты <span class="row"><input id="sp-seed" type="number"><button class="btn small" id="sp-reseed">СЛУЧ.</button></span></label>
+      <div class="row end">
+        <button class="btn" data-go="menu">Назад</button>
+        <button class="btn primary" id="sp-start">В бой!</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Мультиплеер ===== -->
+<section id="screen-mp" class="screen">
+  <div class="mp-layout">
+    <div class="box">
+      <h2>Steam — игра с друзьями</h2>
+      <p id="steam-status" class="muted">Проверка Steam...</p>
+      <button class="btn primary" id="steam-host">Создать лобби</button>
+      <p class="muted small">Друзья смогут зайти через приглашение Steam, «Присоединиться к игре» в списке друзей или по ID лобби.</p>
+      <label>ID лобби <span class="row"><input id="steam-lobby-id" placeholder="109775..."><button class="btn" id="steam-join">Войти</button></span></label>
+    </div>
+    <div class="box">
+      <h2>Локальная сеть / IP</h2>
+      <p class="muted small">Для игры по LAN, Radmin VPN, Hamachi или с пробросом порта.</p>
+      <label>Порт <span class="row"><input id="lan-port" type="number" value="27420"><button class="btn primary" id="lan-host">Создать сервер</button></span></label>
+      <label>Адрес хоста <span class="row"><input id="lan-addr" placeholder="192.168.0.10:27420"><button class="btn" id="lan-join">Подключиться</button></span></label>
+    </div>
+    <div class="box">
+      <label>Ваше имя <input id="mp-name" maxlength="20"></label>
+      <button class="btn" data-go="menu">Назад</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Лобби ===== -->
+<section id="screen-lobby" class="screen">
+  <div class="lobby-layout">
+    <div class="box">
+      <h2>Игроки</h2>
+      <ul id="lobby-slots" class="slots"></ul>
+      <div class="row host-only">
+        <select id="lobby-ai-diff"><option value="easy">Лёгкий</option><option value="normal" selected>Нормальный</option><option value="hard">Сложный</option></select>
+        <button class="btn small" id="lobby-add-ai">+ Бот</button>
+      </div>
+    </div>
+    <div class="box">
+      <h2>Партия</h2>
+      <div id="lobby-info" class="muted"></div>
+      <div class="host-only">
+        <label>Карта <select id="lobby-map"></select></label>
+        <label>Seed <span class="row"><input id="lobby-seed" type="number"><button class="btn small" id="lobby-reseed">СЛУЧ.</button></span></label>
+        <label>Победа при контроле: <b id="lobby-vic-v">70%</b><input type="range" id="lobby-vic" min="30" max="100" step="5" value="70"></label>
+      </div>
+      <div id="lobby-connect" class="connect-info"></div>
+      <div class="row end">
+        <button class="btn danger" id="lobby-leave">Выйти</button>
+        <button class="btn" id="lobby-invite" hidden>Пригласить друзей</button>
+        <button class="btn primary host-only" id="lobby-start">Начать</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Игра ===== -->
+<section id="screen-game" class="screen">
+  <canvas id="map"></canvas>
+  <header id="hud-top" class="hud-bar">
+    <div class="res" title="Казна (доход − содержание в секунду)"><img data-sprite="money"><b id="r-money">0</b><i id="r-money-rate"></i></div>
+    <div class="res" title="Людские резервы (прирост в секунду)"><img data-sprite="people"><b id="r-mp">0</b><i id="r-mp-rate"></i></div>
+    <div class="res" title="Провинции / нужно для победы"><span class="dot" id="r-color"></span><b id="r-provs">0</b><i id="r-goal"></i></div>
+    <div class="res clickable" id="r-research" title="Исследования (R)"><img data-sprite="flask"><b id="r-rs">—</b><span class="bar"><span id="r-rs-bar"></span></span></div>
+    <div class="spacer"></div>
+    <div class="speed" id="speed-ctrl">
+      <button class="btn tiny" data-speed="0" title="Пауза (Пробел)">❚❚</button>
+      <button class="btn tiny" data-speed="1" title="Скорость 1 (1)">▶</button>
+      <button class="btn tiny" data-speed="2" title="Скорость 2 (2)">▶▶</button>
+      <button class="btn tiny" data-speed="3" title="Скорость 3 (3)">▶▶▶</button>
+    </div>
+    <span id="game-time" class="muted">00:00</span>
+    <button class="btn tiny" id="btn-aa" title="Показать зоны ПВО (V)">ПВО</button>
+    <button class="btn tiny" id="btn-theme" title="Тема (T)">ТЕМА</button>
+    <button class="btn tiny" id="btn-menu" title="Меню (Esc)">МЕНЮ</button>
+  </header>
+  <aside id="board" class="box hud-box"></aside>
+  <aside id="panel" class="box hud-box" hidden></aside>
+  <div id="hint" class="hint" hidden></div>
+  <div id="log" class="log"></div>
+  <form id="chat-form" class="chat" hidden><input id="chat-input" maxlength="200" placeholder="Сообщение (Enter)"></form>
+  <div id="tip" class="tip" hidden></div>
+  <div id="toasts"></div>
+</section>
+
+<!-- ===== Модальные окна ===== -->
+<div id="modal-research" class="modal" hidden><div class="box modal-box wide">
+  <h2>Исследования</h2>
+  <div id="research-list" class="research-grid"></div>
+  <div class="row end"><button class="btn" data-close>Закрыть</button></div>
+</div></div>
+
+<div id="modal-pause" class="modal" hidden><div class="box modal-box">
+  <h2>Меню</h2>
+  <div class="menu-buttons">
+    <button class="btn" data-close>Продолжить</button>
+    <button class="btn offline-only" id="btn-save">Сохранить</button>
+    <button class="btn offline-only" id="btn-load-game">Загрузить</button>
+    <button class="btn" data-modal="settings">Настройки</button>
+    <button class="btn" data-modal="help">Как играть</button>
+    <button class="btn danger" id="btn-exit">Выйти в меню</button>
+  </div>
+</div></div>
+
+<div id="modal-load" class="modal" hidden><div class="box modal-box">
+  <h2 id="load-title">Сохранения</h2>
+  <ul id="save-slots" class="slots"></ul>
+  <div class="row end"><button class="btn" data-close>Закрыть</button></div>
+</div></div>
+
+<div id="modal-settings" class="modal" hidden><div class="box modal-box">
+  <h2>Настройки</h2>
+  <label>Тема
+    <select id="set-theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select>
+  </label>
+  <label>Громкость: <b id="set-vol-v">50%</b><input type="range" id="set-vol" min="0" max="100" value="50"></label>
+  <label>Масштаб интерфейса
+    <select id="set-ui"><option value="0.85">Мелкий</option><option value="1" selected>Обычный</option><option value="1.2">Крупный</option><option value="1.4">Огромный</option></select>
+  </label>
+  <label class="check"><input type="checkbox" id="set-edge"> Прокрутка карты у края экрана</label>
+  <label class="check native-only"><input type="checkbox" id="set-fs"> Полноэкранный режим (F11)</label>
+  <div class="row end"><button class="btn" data-close>Готово</button></div>
+</div></div>
+
+<div id="modal-help" class="modal" hidden><div class="box modal-box wide help">
+  <h2>Как играть</h2>
+  <div class="help-cols">
+    <div>
+      <h3>Цель</h3>
+      <p>Захватите заданную долю провинций мира или уничтожьте всех соперников.</p>
+      <h3>Управление</h3>
+      <p><b>ЛКМ</b> — выбрать провинцию<br><b>ПКМ</b> по другой провинции — отправить войска (доля — кнопки в панели или клавиши Z/X/C/B = 25/50/75/100%)<br><b>Колёсико</b> — масштаб, <b>перетаскивание</b> или WASD/стрелки — прокрутка<br><b>Пробел</b> — пауза, <b>1-3</b> — скорость<br><b>Home</b> — к столице, <b>R</b> — исследования, <b>V</b> — зоны ПВО, <b>T</b> — тема, <b>Enter</b> — чат, <b>Esc</b> — отмена/меню</p>
+      <h3>Армии</h3>
+      <p>Войска идут через ваши провинции и по морским путям (пунктир). Бой: атака против обороны (укрепления, рельеф, исследования). Артиллерия пробивает укрепления, танки сильны и быстры, пехота дешёвая.</p>
+    </div>
+    <div>
+      <h3>Экономика</h3>
+      <p>Доход = налоги с населения + фабрики. Расход = содержание войск и построек. Чем больше провинций, тем ниже эффективность управления. Захваченные провинции 60 с платят половину налогов. При долгах войска дезертируют!</p>
+      <h3>Постройки</h3>
+      <p>Укрепления, фабрики, жилые дома, ПВО, аэродромы БПЛА и ракетные шахты. Каждая следующая постройка того же типа дороже.</p>
+      <h3>БПЛА, ракеты и ПВО</h3>
+      <p>Исследуйте «БПЛА», постройте аэродром и наносите удары по войскам (ударные), постройкам (камикадзе) или массированно (рой). Ракеты из шахт бьют по войскам, постройкам и населению. ПВО перехватывает цели в радиусе, но перезаряжается — рой перегружает оборону.</p>
+    </div>
+  </div>
+  <div class="row end"><button class="btn" data-close>Понятно</button></div>
+</div></div>
+
+<div id="modal-end" class="modal" hidden><div class="box modal-box">
+  <h2 id="end-title">Победа!</h2>
+  <p id="end-text"></p>
+  <table id="end-stats" class="stats"></table>
+  <div class="row end">
+    <button class="btn" id="end-continue">Смотреть карту</button>
+    <button class="btn primary" id="end-menu">В меню</button>
+  </div>
+</div></div>
+
+<div id="modal-msg" class="modal" hidden><div class="box modal-box">
+  <h2 id="msg-title">Сообщение</h2>
+  <p id="msg-text"></p>
+  <div class="row end"><button class="btn primary" data-close>OK</button></div>
+</div></div>
+
+<script src="game.js"></script>
+</body>
+</html>

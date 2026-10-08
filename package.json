@@ -1,0 +1,70 @@
+{
+  "name": "pixel-conquest",
+  "productName": "Pixel Conquest",
+  "version": "1.0.0",
+  "description": "Pixel Conquest — пиксельная стратегия захвата мира для ПК: офлайн против ИИ и онлайн с друзьями через Steam",
+  "author": "NICE_STUD (artemalekseev926-byte)",
+  "license": "MIT",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "watch": "node tools/build.mjs --watch",
+    "start": "npm run build && electron .",
+    "web": "npm run build && node tools/serve.mjs",
+    "worldmap": "node tools/build-worldmap.mjs",
+    "test": "node --test test/*.test.mjs",
+    "dist": "npm run build && electron-builder --win portable nsis",
+    "maps": "node tools/make-maps.mjs",
+    "icon": "node tools/make-icon.mjs"
+  },
+  "dependencies": {
+    "steamworks.js": "^0.4.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@fontsource/press-start-2p": "^5.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  },
+  "build": {
+    "appId": "com.nicestud.pixelconquest",
+    "productName": "Pixel Conquest",
+    "files": [
+      "electron/**",
+      "web/**",
+      "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "steam_appid.txt",
+        "to": "steam_appid.txt"
+      },
+      {
+        "from": "maps",
+        "to": "maps"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/steamworks.js/**"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    },
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    }
+  }
+}

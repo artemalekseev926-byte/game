@@ -1,0 +1,5 @@
+node_modules/
+web/game.js.map
+dist/
+release/
+*.log
