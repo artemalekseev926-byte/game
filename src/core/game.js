@@ -1,88 +1,173 @@
-import {
-  TICK, VERSION, PLAYER_COLORS, TERRAIN, UNITS, UNIT_KEYS, ARMY_BASE_SPEED, BUILDINGS, BUILDING_KEYS,
-  RESEARCH, RESEARCH_KEYS, researchCost, researchTime, DRONES, DRONE_SPEED, droneRange, droneCooldown,
-  MISSILE, missileRange, missileTroopLoss, siloCooldown, aaRadius, aaCooldown, aaHitChance, ECON, DIFFICULTY,
-} from './config.js';
-import { makeRng } from './rng.js';
+import { ARMY, BUILDINGS, ECON, TICKS_PER_SEC, LAND_UNITS } from './config.js';
+import { hashState } from './state.js';
+import * as territory from './territory.js';
+import * as economy from './economy.js';
+import * as buildings from './buildings.js';
+import * as units from './units.js';
+import * as strikes from './strikes.js';
+import * as diplomacy from './diplomacy.js';
+import * as victory from './victory.js';
+import * as AI from './ai.js';
 
-export const emptyTroops = () => ({ inf: 0, tank: 0, art: 0 });
-export const troopCount = (t) => t.inf + t.tank + t.art;
-const emptyBuildings = () => Object.fromEntries(BUILDING_KEYS.map((k) => [k, 0]));
-const emptyResearch = () => Object.fromEntries(RESEARCH_KEYS.map((k) => [k, 0]));
+const HANDLERS = new Map();
+export const SYSTEMS = [];
 
-export function popCap(mp, prov) {
-  return (ECON.popBase + mp.size * ECON.popPerTile) * (1 + 0.35 * prov.b.house);
-}
-
-export function createState(map, opts) {
-  const rng = makeRng((opts.seed ^ 0x7777) >>> 0);
-  const players = opts.players.map((p, i) => ({
-    id: i,
-    name: p.name || `Игрок ${i + 1}`,
-    color: p.color || PLAYER_COLORS[i % PLAYER_COLORS.length],
-    ai: p.ai || null,
-    netId: p.netId || null,
-    alive: true,
-    money: ECON.startMoney,
-    mp: ECON.startManpower,
-    income: 0, upkeep: 0, mpRate: 0,
-    research: emptyResearch(),
-    rs: null,
-    stats: { captured: 0, lost: 0, kills: 0 },
-    aiT: rng.range(0, 1.5),
-  }));
-
-  const provs = map.provinces.map((mp) => {
-    const P = { o: -1, t: emptyTroops(), b: emptyBuildings(), pop: 0, unrest: 0, build: null, cd: 0, aacd: 0 };
-    P.pop = Math.round(popCap(mp, P) * 0.6);
-    P.t.inf = Math.round(3 + mp.size * ECON.neutralGarrison * TERRAIN[mp.terrain].def);
-    return P;
-  });
-
-  const candidates = map.provinces.filter((p) => p.adj.length >= 2 && p.size >= 15);
-  const pool = candidates.length >= players.length ? candidates : map.provinces;
-  const starts = [];
-  starts.push(pool[Math.floor(rng.next() * pool.length)].id);
-  while (starts.length < players.length) {
-    let best = null, bestD = -1;
-    for (const c of pool) {
-      if (starts.includes(c.id)) continue;
-      let d = Infinity;
-      for (const s of starts) d = Math.min(d, Math.hypot(c.cx - map.provinces[s].cx, c.cy - map.provinces[s].cy));
-      d += rng.next() * 3;
-      if (d > bestD) { bestD = d; best = c; }
-    }
-    starts.push(best.id);
+export function registerIntents(table) {
+  if (!table) return;
+  for (const k of Object.keys(table)) {
+    const h = table[k];
+    if (h && typeof h.check === 'function' && typeof h.run === 'function') HANDLERS.set(k, h);
   }
-  players.forEach((pl, i) => {
-    const P = provs[starts[i]];
-    P.o = pl.id;
-    P.t = { inf: 40, tank: 4, art: 2 };
-    P.b.fort = 1; P.b.factory = 1; P.b.house = 1;
-    P.pop = Math.round(popCap(map.provinces[starts[i]], P));
-  });
-
-  return {
-    version: VERSION,
-    time: 0,
-    tickN: 0,
-    nextId: 1,
-    rngState: (opts.seed * 2654435761) >>> 0,
-    mapDesc: map.desc,
-    victoryShare: opts.victoryShare || 0.7,
-    winner: null,
-    players,
-    provs,
-    armies: [],
-    shots: [],
-  };
 }
+
+export function registerSystem(fn, before) {
+  if (typeof fn !== 'function' || SYSTEMS.includes(fn)) return;
+  const at = before ? SYSTEMS.indexOf(before) : -1;
+  if (at >= 0) SYSTEMS.splice(at, 0, fn);
+  else SYSTEMS.push(fn);
+}
+
+export const intentNames = () => [...HANDLERS.keys()];
+
+const CORE_INTENTS = {
+  _ai: {
+    phase: 'any',
+    anyone: true,
+    check(game, pid, cmd) {
+      const t = cmd.pid === undefined ? pid : Number(cmd.pid);
+      if (!Number.isInteger(t) || !game.s.players[t]) return 'Неизвестный игрок';
+      return null;
+    },
+    run(game, pid, cmd) {
+      const t = cmd.pid === undefined ? pid : Number(cmd.pid);
+      const p = game.s.players[t];
+      const lvl = typeof cmd.level === 'string' && ['easy', 'normal', 'hard'].includes(cmd.level) ? cmd.level : 'normal';
+      p.ai = cmd.level === null ? null : lvl;
+      p.netId = null;
+      if (p.alive) game.msg(-1, `${p.name} передан под управление компьютера`, 'info');
+    },
+  },
+};
+
+registerIntents(CORE_INTENTS);
+for (const m of [territory, economy, buildings, units, strikes, diplomacy, victory]) registerIntents(m.INTENTS);
+for (const fn of [territory.tickTerritory, economy.tickEconomy, buildings.tickBuildings, units.tickUnits, strikes.tickStrikes, diplomacy.tickDiplomacy, victory.tickVictory]) registerSystem(fn);
+
+const extrasCache = new WeakMap();
+
+export function mapExtras(map) {
+  let ex = extrasCache.get(map);
+  if (ex) return ex;
+  const { W, H, terrain } = map;
+  const N = W * H;
+  const landId = new Int32Array(N).fill(-1);
+  const sizes = [];
+  let landN = 0;
+  for (let i = 0; i < N; i++) if (terrain[i] >= 2) landN++;
+  const landList = new Int32Array(landN);
+  let li = 0;
+  const stack = new Int32Array(Math.max(1, landN));
+  for (let s0 = 0; s0 < N; s0++) {
+    if (terrain[s0] >= 2) landList[li++] = s0;
+    if (terrain[s0] < 2 || landId[s0] >= 0) continue;
+    const id = sizes.length;
+    let sp = 0, n = 0;
+    stack[sp++] = s0; landId[s0] = id;
+    while (sp) {
+      const i = stack[--sp];
+      n++;
+      const x = i % W;
+      if (x > 0 && terrain[i - 1] >= 2 && landId[i - 1] < 0) { landId[i - 1] = id; stack[sp++] = i - 1; }
+      if (x < W - 1 && terrain[i + 1] >= 2 && landId[i + 1] < 0) { landId[i + 1] = id; stack[sp++] = i + 1; }
+      if (i >= W && terrain[i - W] >= 2 && landId[i - W] < 0) { landId[i - W] = id; stack[sp++] = i - W; }
+      if (i < N - W && terrain[i + W] >= 2 && landId[i + W] < 0) { landId[i + W] = id; stack[sp++] = i + W; }
+    }
+    sizes.push(n);
+  }
+  const oceanCoast = new Uint8Array(N);
+  const ocean = map.nav && map.nav.ocean;
+  if (ocean) {
+    for (let i = 0; i < N; i++) {
+      if (!map.coast[i]) continue;
+      const x = i % W;
+      if ((x > 0 && ocean[i - 1]) || (x < W - 1 && ocean[i + 1]) || (i >= W && ocean[i - W]) || (i < N - W && ocean[i + W])) oceanCoast[i] = 1;
+    }
+  }
+  ex = { landId, landSizes: Int32Array.from(sizes), landList, oceanCoast };
+  extrasCache.set(map, ex);
+  return ex;
+}
+
+const NO_REL = Object.freeze({ type: 'none', until: 0, embargo: false });
+const OK = Object.freeze({ ok: true });
+const fail = (error) => ({ ok: false, error });
+
+export const relKey = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
 
 export class Game {
   constructor(map, state) {
     this.map = map;
     this.s = state;
-    this.fx = [];
+    this.W = map.W;
+    this.H = map.H;
+    this.N = map.W * map.H;
+    this.events = [];
+    this.dirty = [];
+    this.lastError = null;
+    this.rebuild();
+  }
+
+  rebuild() {
+    const { W, N, s } = this;
+    const ex = mapExtras(this.map);
+    this.landId = ex.landId;
+    this.landSizes = ex.landSizes;
+    this.landList = ex.landList;
+    this.oceanCoast = ex.oceanCoast;
+    const P = s.players.length;
+    this.borders = [];
+    this.borderCache = [];
+    this.lmCount = [];
+    for (let p = 0; p < P; p++) {
+      this.borders.push(new Set());
+      this.borderCache.push(null);
+      this.lmCount.push(new Int32Array(this.landSizes.length));
+    }
+    this.isBorder = new Uint8Array(N);
+    this.mark = new Uint32Array(N);
+    this.mark2 = new Uint32Array(N);
+    this.stampN = 0;
+    const own = s.owner, land = this.landId;
+    const tiles = new Int32Array(P);
+    for (let i = 0; i < N; i++) {
+      const o = own[i];
+      if (!o) continue;
+      if (land[i] < 0 || o > P) { own[i] = 0; continue; }
+      tiles[o - 1]++;
+      this.lmCount[o - 1][land[i]]++;
+    }
+    for (let i = 0; i < N; i++) {
+      const o = own[i];
+      if (!o) continue;
+      const x = i % W;
+      if ((x > 0 && own[i - 1] !== o) || (x < W - 1 && own[i + 1] !== o) || (i >= W && own[i - W] !== o) || (i < N - W && own[i + W] !== o)) {
+        this.isBorder[i] = 1;
+        this.borders[o - 1].add(i);
+      }
+    }
+    for (let p = 0; p < P; p++) s.players[p].tiles = tiles[p];
+    this.bAt = new Int32Array(N).fill(-1);
+    this.bById = new Map();
+    for (const b of s.buildings) {
+      this.bAt[b.y * W + b.x] = b.id;
+      this.bById.set(b.id, b);
+    }
+    this.falloutList = [];
+    const fo = s.fallout;
+    for (let i = 0; i < N; i++) if (fo[i]) this.falloutList.push(i);
+    this.dirtyAcc = [];
+    this.dirtyAll = true;
+    this.tickCache = new Map();
   }
 
   rand() {
@@ -92,467 +177,313 @@ export class Game {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
-  emit(e) { this.fx.push(e); }
-  msg(to, text, kind = 'info') { this.fx.push({ k: 'msg', to, text, kind }); }
+  randInt(n) { return Math.floor(this.rand() * n); }
 
-  dist(a, b) {
-    const A = this.map.provinces[a], B = this.map.provinces[b];
-    return Math.hypot(A.cx - B.cx, A.cy - B.cy);
-  }
-  ownedCount(pid) {
-    let n = 0;
-    for (const P of this.s.provs) if (P.o === pid) n++;
-    return n;
-  }
-  buildingCount(pid, k) {
-    let n = 0;
-    for (const P of this.s.provs) if (P.o === pid) n += P.b[k] + (P.build && P.build.k === k ? 1 : 0);
-    return n;
-  }
-  buildCost(pid, k, nextLvl) {
-    return Math.round(BUILDINGS[k].cost * nextLvl * (1 + ECON.buildingScale * this.buildingCount(pid, k)));
-  }
-  researchMul(pid, key) {
-    if (pid < 0) return 1;
-    return 1 + 0.15 * this.s.players[pid].research[key];
-  }
-  attackPower(pid, t) {
-    let s = 0;
-    for (const k of UNIT_KEYS) s += t[k] * UNITS[k].atk * this.researchMul(pid, UNITS[k].research);
-    return s;
-  }
-  rawDefense(pid, t) {
-    let s = 0;
-    for (const k of UNIT_KEYS) s += t[k] * UNITS[k].def * this.researchMul(pid, UNITS[k].research);
-    return s;
-  }
-  fortMul(pIdx, attacker, attTroops) {
-    const P = this.s.provs[pIdx];
-    if (!P.b.fort) return 1;
-    const fortRes = P.o >= 0 ? this.s.players[P.o].research.fort : 0;
-    let pierce = 0;
-    if (attacker >= 0 && attTroops) {
-      const total = troopCount(attTroops);
-      if (total > 0) pierce = Math.min(0.9, (attTroops.art / total) * 2 * UNITS.art.fortPierce * (1 + 0.1 * this.s.players[attacker].research.art));
+  nextId() { return this.s.nextId++; }
+
+  nextStamp() {
+    this.stampN = (this.stampN + 1) >>> 0;
+    if (this.stampN === 0) {
+      this.mark.fill(0);
+      this.mark2.fill(0);
+      this.stampN = 1;
     }
-    return 1 + P.b.fort * 0.35 * (1 + 0.1 * fortRes) * (1 - pierce);
-  }
-  defensePower(pIdx, attacker = -1, attTroops = null) {
-    const P = this.s.provs[pIdx], mp = this.map.provinces[pIdx];
-    const militia = 1 + mp.size * 0.1;
-    return (this.rawDefense(P.o, P.t) + militia) * TERRAIN[mp.terrain].def * this.fortMul(pIdx, attacker, attTroops);
-  }
-  armySpeed(pid, t) {
-    let spd = Infinity;
-    for (const k of UNIT_KEYS) if (t[k] > 0) spd = Math.min(spd, UNITS[k].speed);
-    if (!isFinite(spd)) spd = 1;
-    return spd * ARMY_BASE_SPEED * (1 + 0.12 * this.s.players[pid].research.logistics);
-  }
-  canBuild(pid, pIdx, k) {
-    const P = this.s.provs[pIdx], B = BUILDINGS[k];
-    if (!B || P.o !== pid) return 'Не ваша провинция';
-    if (P.build) return 'Уже идёт строительство';
-    if (P.b[k] >= B.max) return 'Максимальный уровень';
-    if (B.req && this.s.players[pid].research[B.req[0]] < B.req[1]) return `Нужно исследование «${RESEARCH[B.req[0]].name}» ур. ${B.req[1]}`;
-    const cost = this.buildCost(pid, k, P.b[k] + 1);
-    if (this.s.players[pid].money < cost) return 'Недостаточно денег';
-    return null;
+    return this.stampN;
   }
 
-  findPath(pid, from, to) {
-    if (from === to) return null;
-    const provs = this.s.provs, adj = this.map.provinces;
-    const prev = new Int32Array(provs.length).fill(-2);
-    prev[from] = -1;
-    const q = [from];
-    for (let h = 0; h < q.length; h++) {
-      const c = q[h];
-      for (const n of adj[c].adj) {
-        if (prev[n] !== -2) continue;
-        prev[n] = c;
-        if (n === to) {
-          const path = [to];
-          let x = c;
-          while (x !== -1) { path.push(x); x = prev[x]; }
-          return path.reverse();
+  tileAt(x, y) {
+    const xi = Math.floor(Number(x)), yi = Math.floor(Number(y));
+    if (!Number.isFinite(xi) || !Number.isFinite(yi) || xi < 0 || yi < 0 || xi >= this.W || yi >= this.H) return -1;
+    return yi * this.W + xi;
+  }
+
+  isLandTile(i) { return i >= 0 && i < this.N && this.map.terrain[i] >= 2; }
+
+  tileOwner(i) { return this.s.owner[i] - 1; }
+
+  landmassOf(i) { return this.landId[i]; }
+
+  ownsOnLandmass(pid, lm) { return lm >= 0 && !!this.lmCount[pid] && this.lmCount[pid][lm] > 0; }
+
+  markDirty(i) {
+    this.dirty.push(i);
+    if (this.dirtyAll) return;
+    this.dirtyAcc.push(i);
+    if (this.dirtyAcc.length > 4000000) { this.dirtyAll = true; this.dirtyAcc = []; }
+  }
+
+  drainDirty() {
+    if (this.dirtyAll) {
+      this.dirtyAll = false;
+      this.dirtyAcc = [];
+      return { all: true, tiles: [] };
+    }
+    const tiles = this.dirtyAcc;
+    this.dirtyAcc = [];
+    return { all: false, tiles };
+  }
+
+  refreshBorder(j) {
+    const own = this.s.owner, W = this.W, N = this.N;
+    const o = own[j];
+    let b = 0;
+    if (o) {
+      const x = j % W;
+      b = (x > 0 && own[j - 1] !== o) || (x < W - 1 && own[j + 1] !== o) || (j >= W && own[j - W] !== o) || (j < N - W && own[j + W] !== o) ? 1 : 0;
+    }
+    if (b !== this.isBorder[j]) {
+      this.isBorder[j] = b;
+      if (b) this.borders[o - 1].add(j);
+      else this.borders[o - 1].delete(j);
+      this.borderCache[o - 1] = null;
+    }
+  }
+
+  setOwner(i, pid) {
+    const s = this.s, own = s.owner, W = this.W;
+    if (this.landId[i] < 0) return false;
+    const prev = own[i];
+    const next = pid >= 0 ? pid + 1 : 0;
+    if (prev === next) return false;
+    if (prev) {
+      const p = s.players[prev - 1];
+      p.tiles--;
+      this.lmCount[prev - 1][this.landId[i]]--;
+      if (this.isBorder[i]) {
+        this.isBorder[i] = 0;
+        this.borders[prev - 1].delete(i);
+        this.borderCache[prev - 1] = null;
+      }
+      if (p.capital === i) {
+        p.capital = -1;
+        if (next) {
+          this.emit({ k: 'capture', pid: next - 1, from: prev - 1, x: i % W, y: Math.floor(i / W), capital: true });
+          this.msg(prev - 1, `${s.players[next - 1].name} захватил вашу столицу!`, 'danger');
         }
-        if (provs[n].o === pid) q.push(n);
       }
     }
+    own[i] = next;
+    if (next) {
+      s.players[next - 1].tiles++;
+      this.lmCount[next - 1][this.landId[i]]++;
+    }
+    this.markDirty(i);
+    const x = i % W;
+    this.refreshBorder(i);
+    if (x > 0) this.refreshBorder(i - 1);
+    if (x < W - 1) this.refreshBorder(i + 1);
+    if (i >= W) this.refreshBorder(i - W);
+    if (i < this.N - W) this.refreshBorder(i + W);
+    if (this.bAt[i] >= 0) {
+      const b = this.bById.get(this.bAt[i]);
+      if (b) buildings.onTileOwnerChanged(this, b, prev - 1, next - 1);
+    }
+    return true;
+  }
+
+  setFallout(i, ticks) {
+    const fo = this.s.fallout;
+    const t = Math.min(65535, Math.max(0, Math.round(ticks)));
+    if (!t) return;
+    if (!fo[i]) this.falloutList.push(i);
+    if (t > fo[i]) fo[i] = t;
+    this.markDirty(i);
+  }
+
+  playerBorder(pid) { return this.borders[pid] || new Set(); }
+
+  borderList(pid) {
+    if (!this.borders[pid]) return [];
+    let c = this.borderCache[pid];
+    if (!c) {
+      c = Int32Array.from(this.borders[pid]).sort();
+      this.borderCache[pid] = c;
+    }
+    return c;
+  }
+
+  relation(a, b) {
+    if (a === b || a < 0 || b < 0) return NO_REL;
+    return this.s.relations[relKey(a, b)] || NO_REL;
+  }
+
+  isAllied(a, b) {
+    if (a === b) return true;
+    const t = this.relation(a, b).type;
+    return t === 'alliance';
+  }
+
+  isHostile(a, b) {
+    if (a === b) return false;
+    if (a < 0 || b < 0) return true;
+    const t = this.relation(a, b).type;
+    return t !== 'alliance' && t !== 'pact';
+  }
+
+  emit(ev) { this.events.push(ev); }
+
+  msg(to, text, kind = 'info') { this.events.push({ k: 'msg', to, text, kind }); }
+
+  buildingAt(i) {
+    const id = this.bAt[i];
+    return id >= 0 ? this.bById.get(id) || null : null;
+  }
+
+  buildingById(id) { return this.bById.get(Number(id)) || null; }
+
+  buildingsOf(pid, type) {
+    const out = [];
+    for (const b of this.s.buildings) if (b.owner === pid && (!type || b.type === type)) out.push(b);
+    return out;
+  }
+
+  buildingActive(b) { return !!b && (b.build === 0 || !!b.up); }
+
+  fortList(pid) {
+    const key = 'f' + pid;
+    let list = this.tickCache.get(key);
+    if (!list) {
+      list = [];
+      for (const b of this.s.buildings) {
+        if (b.owner === pid && b.type === 'fort' && this.buildingActive(b)) list.push(b.x, b.y, b.level);
+      }
+      this.tickCache.set(key, list);
+    }
+    return list;
+  }
+
+  attackMult(pid) {
+    const p = this.s.players[pid];
+    if (!p) return 1;
+    const r = p.research, c = p.composition;
+    return (1 + ARMY.infBonus * r.inf) * (1 + c.tank * ARMY.tankAtk * (1 + ARMY.armorBonus * r.armor) + c.art * ARMY.artAtk * (1 + ARMY.artBonus * r.art));
+  }
+
+  defenseMult(pid) {
+    const p = this.s.players[pid];
+    if (!p) return 1;
+    const r = p.research, c = p.composition;
+    return (1 + ARMY.infBonus * r.inf) * (1 + c.art * ARMY.artDef + ARMY.fortDef * r.fort);
+  }
+
+  goldRate(pid) {
+    const p = this.s.players[pid];
+    return p ? p.income - p.upkeep : 0;
+  }
+
+  addGold(pid, amount, earned = true) {
+    const p = this.s.players[pid];
+    if (!p || !Number.isFinite(amount)) return;
+    p.gold = Math.min(ECON.maxGold, p.gold + amount);
+    if (earned && amount > 0) {
+      p.eventAcc += amount;
+      p.stats.goldEarned += amount;
+    }
+  }
+
+  addTroops(pid, n) {
+    const p = this.s.players[pid];
+    if (p && p.alive && n > 0) p.troops += n;
+  }
+
+  spawnUnit(u) {
+    u.id = this.s.nextId++;
+    if (u.pi === undefined) u.pi = 0;
+    if (u.heading === undefined) u.heading = 0;
+    this.s.units.push(u);
+    return u;
+  }
+
+  unitById(id) {
+    for (const u of this.s.units) if (u.id === id) return u;
     return null;
   }
 
-  command(pid, cmd) {
-    const pl = this.s.players[pid];
-    if (!pl || !pl.alive || this.s.winner !== null) return { ok: false, error: 'Недоступно' };
-    const fn = this['cmd_' + cmd.c];
-    if (!fn) return { ok: false, error: 'Неизвестная команда' };
+  createAttack(pid, target, troops, landing = -1) {
+    return territory.startAttack(this, pid, target, troops, landing);
+  }
+
+  destroyBuilding(b, by = -1, silent = false) { buildings.destroyBuilding(this, b, by, silent); }
+
+  deliverCargo(u) { return buildings.deliverCargo(this, u); }
+
+  breakRelation(a, b, traitor = false) { diplomacy.breakRelation(this, a, b, traitor); }
+
+  markTraitor(pid) {
+    const p = this.s.players[pid];
+    if (p) p.traitorUntil = this.s.tick + diplomacy.TRAITOR_TICKS;
+  }
+
+  eliminate(pid, reason = '') { victory.eliminate(this, pid, reason); }
+
+  landUnitSpeed(type) { return LAND_UNITS[type] ? LAND_UNITS[type].speed : 0; }
+
+  bordersByLand(pid, i) { return territory.bordersByLand(this, pid, i); }
+
+  countryStats() {
+    const s = this.s;
+    const out = s.players.map((p) => ({
+      id: p.id, name: p.name, color: p.color, alive: p.alive, ai: p.ai,
+      tiles: p.tiles, pct: this.map.landCount ? (p.tiles * 100) / this.map.landCount : 0,
+      troops: p.troops, maxTroops: p.maxTroops, gold: p.gold, income: p.income, upkeep: p.upkeep,
+      house: 0, factory: 0, port: 0, fort: 0, sam: 0, airbase: 0, silo: 0, warship: 0, transport: 0, trade: 0,
+      composition: p.composition, research: p.research, traitor: p.traitorUntil > s.tick,
+    }));
+    for (const b of s.buildings) if (out[b.owner] && BUILDINGS[b.type]) out[b.owner][b.type]++;
+    for (const u of s.units) if (out[u.owner] && out[u.owner][u.type] !== undefined) out[u.owner][u.type]++;
+    return out;
+  }
+
+  validate(pid, cmd) {
+    if (!cmd || typeof cmd !== 'object' || typeof cmd.c !== 'string') return fail('Неверная команда');
+    const h = HANDLERS.get(cmd.c);
+    if (!h) return fail('Неизвестная команда');
+    const s = this.s;
+    if (!Number.isInteger(pid) || pid < 0 || pid >= s.players.length) return fail('Неизвестный игрок');
+    if (s.phase === 'over') return fail('Игра окончена');
+    if (!h.anyone && !s.players[pid].alive) return fail('Вы выбыли из игры');
+    const ph = h.phase || 'play';
+    if (ph === 'play' && s.phase !== 'play') return fail('Дождитесь окончания выбора места старта');
+    if (ph === 'spawn' && s.phase !== 'spawn') return fail('Выбор места старта уже завершён');
+    const err = h.check(this, pid, cmd);
+    return err ? fail(err) : OK;
+  }
+
+  apply(pid, cmd) {
+    const r = this.validate(pid, cmd);
+    if (!r.ok) return r;
     try {
-      const err = fn.call(this, pid, cmd);
-      return err ? { ok: false, error: err } : { ok: true };
+      HANDLERS.get(cmd.c).run(this, pid, cmd);
     } catch (e) {
-      return { ok: false, error: 'Ошибка команды: ' + e.message };
+      this.lastError = e;
+      return fail('Ошибка команды: ' + (e && e.message ? e.message : String(e)));
     }
+    return OK;
   }
 
-  validProv(p) { return Number.isInteger(p) && p >= 0 && p < this.s.provs.length; }
-
-  cmd_build(pid, { p, k }) {
-    if (!this.validProv(p)) return 'Неверная провинция';
-    const err = this.canBuild(pid, p, k);
-    if (err) return err;
-    const P = this.s.provs[p], lvl = P.b[k] + 1;
-    const cost = this.buildCost(pid, k, lvl);
-    this.s.players[pid].money -= cost;
-    P.build = { k, t: 0, total: BUILDINGS[k].time * lvl, cost };
-    return null;
-  }
-
-  cmd_cancelBuild(pid, { p }) {
-    if (!this.validProv(p)) return 'Неверная провинция';
-    const P = this.s.provs[p];
-    if (P.o !== pid || !P.build) return 'Нечего отменять';
-    this.s.players[pid].money += Math.round(P.build.cost * 0.5);
-    P.build = null;
-    return null;
-  }
-
-  cmd_recruit(pid, { p, u, n }) {
-    if (!this.validProv(p)) return 'Неверная провинция';
-    const P = this.s.provs[p], U = UNITS[u], pl = this.s.players[pid];
-    if (!U) return 'Неизвестный тип войск';
-    if (P.o !== pid) return 'Не ваша провинция';
-    if (U.needs && P.b[U.needs] < 1) return `Нужна постройка «${BUILDINGS[U.needs].name}»`;
-    n = Math.floor(Math.min(Number(n) || 0, 10000, pl.money / U.cost, pl.mp / U.mp));
-    if (n < 1) return 'Недостаточно денег или людских резервов';
-    pl.money -= n * U.cost;
-    pl.mp -= n * U.mp;
-    P.t[u] += n;
-    return null;
-  }
-
-  cmd_move(pid, { from, to, frac, units }) {
-    if (!this.validProv(from) || !this.validProv(to)) return 'Неверная провинция';
-    const P = this.s.provs[from];
-    if (P.o !== pid) return 'Не ваша провинция';
-    const path = this.findPath(pid, from, to);
-    if (!path) return 'Нет пути (нужен общий рубеж или морской путь)';
-    frac = Math.max(0, Math.min(1, Number(frac) || 0));
-    const t = emptyTroops();
-    for (const k of UNIT_KEYS) {
-      if (units && units[k] === false) continue;
-      t[k] = Math.floor(P.t[k] * frac + 1e-9);
-      if (frac >= 1) t[k] = P.t[k];
-    }
-    if (troopCount(t) < 1) return 'Нет войск для отправки';
-    for (const k of UNIT_KEYS) P.t[k] -= t[k];
-    this.s.armies.push({ id: this.s.nextId++, o: pid, path, i: 0, p: 0, t, spd: this.armySpeed(pid, t) });
-    return null;
-  }
-
-  cmd_research(pid, { k }) {
-    const pl = this.s.players[pid], R = RESEARCH[k];
-    if (!R) return 'Неизвестное исследование';
-    if (pl.rs) return 'Уже идёт исследование';
-    const lvl = pl.research[k];
-    if (lvl >= R.max) return 'Исследовано полностью';
-    const cost = researchCost(k, lvl);
-    if (pl.money < cost) return 'Недостаточно денег';
-    pl.money -= cost;
-    pl.rs = { k, t: 0, total: researchTime(lvl) };
-    return null;
-  }
-
-  cmd_drone(pid, { from, to, d }) {
-    if (!this.validProv(from) || !this.validProv(to)) return 'Неверная провинция';
-    const P = this.s.provs[from], pl = this.s.players[pid], D = DRONES[d];
-    if (!D) return 'Неизвестный тип БПЛА';
-    if (P.o !== pid) return 'Не ваша провинция';
-    if (P.b.airbase < 1) return 'Нужен аэродром БПЛА';
-    if (pl.research.drone < D.lvl) return `Нужно исследование «БПЛА» ур. ${D.lvl}`;
-    if (this.s.provs[to].o === pid) return 'Нельзя атаковать свою провинцию';
-    if (P.cd > 0) return `Перезарядка: ${Math.ceil(P.cd)} с`;
-    if (this.dist(from, to) > droneRange(P.b.airbase, pl.research.drone)) return 'Цель вне радиуса действия';
-    if (pl.money < D.cost) return 'Недостаточно денег';
-    pl.money -= D.cost;
-    P.cd = droneCooldown(P.b.airbase);
-    const A = this.map.provinces[from], B = this.map.provinces[to];
-    for (let i = 0; i < D.count; i++) {
-      const off = D.count > 1 ? (i - (D.count - 1) / 2) * 1.2 : 0;
-      this.s.shots.push({
-        id: this.s.nextId++, o: pid, kind: 'drone', d, from, to,
-        x: A.cx + 0.5 + off, y: A.cy + 0.5 - Math.abs(off) * 0.5, tx: B.cx + 0.5, ty: B.cy + 0.5,
-        sp: DRONE_SPEED * (1 - i * 0.03), lvl: pl.research.drone, hit: [],
-      });
-    }
-    this.emit({ k: 'launch', kind: 'drone', p: from, o: pid });
-    return null;
-  }
-
-  cmd_missile(pid, { from, to }) {
-    if (!this.validProv(from) || !this.validProv(to)) return 'Неверная провинция';
-    const P = this.s.provs[from], pl = this.s.players[pid];
-    if (P.o !== pid) return 'Не ваша провинция';
-    if (P.b.silo < 1) return 'Нужна ракетная шахта';
-    if (this.s.provs[to].o === pid) return 'Нельзя атаковать свою провинцию';
-    if (P.cd > 0) return `Перезарядка: ${Math.ceil(P.cd)} с`;
-    if (this.dist(from, to) > missileRange(pl.research.missile)) return 'Цель вне радиуса действия';
-    if (pl.money < MISSILE.cost) return 'Недостаточно денег';
-    pl.money -= MISSILE.cost;
-    P.cd = siloCooldown(P.b.silo);
-    const A = this.map.provinces[from], B = this.map.provinces[to];
-    this.s.shots.push({
-      id: this.s.nextId++, o: pid, kind: 'missile', from, to,
-      x: A.cx + 0.5, y: A.cy + 0.5, sx: A.cx + 0.5, sy: A.cy + 0.5, tx: B.cx + 0.5, ty: B.cy + 0.5,
-      sp: MISSILE.speed, lvl: pl.research.missile, hit: [],
-    });
-    this.emit({ k: 'launch', kind: 'missile', p: from, o: pid });
-    const target = this.s.provs[to].o;
-    if (target >= 0) this.msg(target, `${pl.name} запустил ракету по вашей территории!`, 'danger');
-    return null;
-  }
-
-  tick() {
+  tick(intents) {
     const s = this.s;
-    if (s.winner !== null) return;
-    this.fx = [];
-    const dt = TICK;
-    s.time += dt;
-    s.tickN++;
-    this.tickEconomy(dt);
-    this.tickProvinces(dt);
-    this.tickArmies(dt);
-    this.tickShots(dt);
-    if (s.tickN % 4 === 0) this.checkVictory();
-  }
-
-  tickEconomy(dt) {
-    const s = this.s;
-    const acc = s.players.map(() => ({ tax: 0, fac: 0, mp: 0, up: 0, n: 0, pop: 0 }));
-    s.provs.forEach((P) => {
-      if (P.o < 0) return;
-      const a = acc[P.o];
-      a.n++;
-      a.pop += P.pop;
-      a.tax += P.pop * ECON.taxPerPop * (P.unrest > 0 ? 0.5 : 1);
-      a.fac += P.b.factory * ECON.factoryIncome;
-      a.mp += P.pop * ECON.manpowerPerPop;
-      for (const k of UNIT_KEYS) a.up += P.t[k] * UNITS[k].upkeep;
-      for (const k of BUILDING_KEYS) a.up += P.b[k] * BUILDINGS[k].upkeep;
-    });
-    for (const A of s.armies) for (const k of UNIT_KEYS) acc[A.o].up += A.t[k] * UNITS[k].upkeep;
-
-    s.players.forEach((pl, i) => {
-      if (!pl.alive) return;
-      const a = acc[i];
-      const eff = 1 / (1 + Math.max(0, a.n - ECON.overextensionFree) * ECON.overextension);
-      const diff = pl.ai ? DIFFICULTY[pl.ai].income : 1;
-      const econ = 1 + 0.1 * pl.research.econ;
-      pl.income = (a.tax + a.fac) * eff * econ * diff;
-      pl.upkeep = a.up * (1 - 0.1 * pl.research.logistics);
-      pl.mpRate = a.mp * (pl.ai ? diff : 1);
-      pl.money = Math.min(ECON.maxMoney, pl.money + (pl.income - pl.upkeep) * dt);
-      pl.mp = Math.min(60 + a.pop * 3, pl.mp + pl.mpRate * dt);
-      if (pl.money < 0) {
-        const loss = ECON.debtDesertion * dt;
-        for (const P of s.provs) if (P.o === i) for (const k of UNIT_KEYS) P.t[k] = Math.floor(P.t[k] * (1 - loss));
-        for (const A of s.armies) if (A.o === i) for (const k of UNIT_KEYS) A.t[k] = Math.floor(A.t[k] * (1 - loss));
-        if (s.tickN % 40 === 0) this.msg(i, 'Казна пуста! Войска дезертируют — сократите армию или постройте фабрики.', 'danger');
-      }
-      if (pl.rs) {
-        pl.rs.t += dt;
-        if (pl.rs.t >= pl.rs.total) {
-          pl.research[pl.rs.k]++;
-          this.msg(i, `Исследовано: ${RESEARCH[pl.rs.k].name} ур. ${pl.research[pl.rs.k]}`, 'good');
-          this.emit({ k: 'research', o: i });
-          pl.rs = null;
-        }
-      }
-    });
-  }
-
-  tickProvinces(dt) {
-    this.s.provs.forEach((P, i) => {
-      const mp = this.map.provinces[i];
-      const cap = popCap(mp, P);
-      const g = ECON.growth * TERRAIN[mp.terrain].grow * (1 + 0.25 * P.b.house);
-      P.pop += (cap - P.pop) * g * dt;
-      if (P.unrest > 0) P.unrest = Math.max(0, P.unrest - dt);
-      if (P.cd > 0) P.cd = Math.max(0, P.cd - dt);
-      if (P.aacd > 0) P.aacd = Math.max(0, P.aacd - dt);
-      if (P.build) {
-        P.build.t += dt;
-        if (P.build.t >= P.build.total) {
-          P.b[P.build.k]++;
-          if (P.o >= 0) this.msg(P.o, `Построено: ${BUILDINGS[P.build.k].name} ур. ${P.b[P.build.k]}`, 'good');
-          this.emit({ k: 'built', p: i });
-          P.build = null;
-        }
-      }
-    });
-  }
-
-  tickArmies(dt) {
-    const s = this.s, provs = this.map.provinces;
-    const done = [];
-    for (const A of s.armies) {
-      if (troopCount(A.t) <= 0) { done.push(A); continue; }
-      const a = A.path[A.i], b = A.path[A.i + 1];
-      const sea = !provs[a].neighbors.includes(b);
-      const len = Math.max(1, this.dist(a, b));
-      A.p += (A.spd * (sea ? 0.6 : 1) * dt) / len;
-      if (A.p < 1) continue;
-      A.i++; A.p = 0;
-      const here = A.path[A.i];
-      const last = A.i >= A.path.length - 1;
-      if (!last && s.provs[here].o === A.o) continue;
-      this.arrive(A, here);
-      done.push(A);
-    }
-    if (done.length) s.armies = s.armies.filter((A) => !done.includes(A));
-  }
-
-  applyLoss(t, frac) {
-    let lost = 0;
-    for (const k of UNIT_KEYS) {
-      const n = Math.round(t[k] * (1 - frac));
-      lost += t[k] - n;
-      t[k] = Math.max(0, n);
-    }
-    return lost;
-  }
-
-  arrive(A, pIdx) {
-    const s = this.s, P = s.provs[pIdx];
-    if (P.o === A.o) {
-      for (const k of UNIT_KEYS) P.t[k] += A.t[k];
-      return;
-    }
-    const att = this.attackPower(A.o, A.t);
-    const def = this.defensePower(pIdx, A.o, A.t);
-    const mp = this.map.provinces[pIdx];
-    const attacker = s.players[A.o];
-    const defender = P.o;
-    this.emit({ k: 'battle', p: pIdx, x: mp.cx, y: mp.cy });
-    if (att > def) {
-      const lossFrac = Math.min(0.95, Math.pow(def / att, 1.3) * 0.9);
-      const lostA = this.applyLoss(A.t, lossFrac);
-      const lostD = troopCount(P.t);
-      if (defender >= 0) {
-        s.players[defender].stats.lost++;
-        s.players[defender].stats.kills += lostA;
-        this.msg(defender, `${attacker.name} захватил вашу провинцию!`, 'danger');
-      }
-      attacker.stats.captured++;
-      attacker.stats.kills += lostD;
-      P.o = A.o;
-      P.t = { ...A.t };
-      if (troopCount(P.t) === 0) P.t.inf = 1;
-      if (P.b.fort > 0) P.b.fort--;
-      P.pop *= 0.7;
-      P.unrest = ECON.unrestTime;
-      P.build = null;
-      P.cd = Math.max(P.cd, 10);
-      this.emit({ k: 'capture', p: pIdx, o: A.o, from: defender });
-    } else {
-      const lossFrac = Math.min(0.95, Math.pow(att / def, 1.3) * 0.9);
-      const lostD = this.applyLoss(P.t, lossFrac);
-      attacker.stats.kills += lostD;
-      if (defender >= 0) {
-        s.players[defender].stats.kills += troopCount(A.t);
-        this.msg(defender, `Атака ${attacker.name} отбита!`, 'good');
-      }
-      this.msg(A.o, 'Атака отбита — не хватило сил.', 'danger');
-      this.emit({ k: 'repelled', p: pIdx, o: A.o });
-    }
-  }
-
-  tickShots(dt) {
-    const s = this.s;
-    const done = new Set();
-    const aaSites = [];
-    s.provs.forEach((P, i) => { if (P.o >= 0 && P.b.aa > 0) aaSites.push(i); });
-    for (const S of s.shots) {
-      const dx = S.tx - S.x, dy = S.ty - S.y, d = Math.hypot(dx, dy);
-      const step = S.sp * dt;
-      if (d <= step) {
-        S.x = S.tx; S.y = S.ty;
-        this.impact(S);
-        done.add(S.id);
-        continue;
-      }
-      S.x += (dx / d) * step; S.y += (dy / d) * step;
-      for (const i of aaSites) {
-        const P = s.provs[i];
-        if (P.o === S.o || P.aacd > 0 || S.hit.includes(i)) continue;
-        const mp = this.map.provinces[i];
-        if (Math.hypot(mp.cx + 0.5 - S.x, mp.cy + 0.5 - S.y) > aaRadius(P.b.aa)) continue;
-        const res = s.players[P.o].research.aa;
-        S.hit.push(i);
-        P.aacd = aaCooldown(P.b.aa, res);
-        this.emit({ k: 'aafire', p: i, x: S.x, y: S.y });
-        if (this.rand() < aaHitChance(S.kind, P.b.aa, res)) {
-          this.emit({ k: 'intercept', x: S.x, y: S.y, kind: S.kind });
-          if (S.kind === 'missile') this.msg(P.o, 'ПВО сбила вражескую ракету!', 'good');
-          done.add(S.id);
-          break;
-        }
+    this.events = [];
+    this.dirty = [];
+    if (s.phase === 'over') return;
+    this.tickCache.clear();
+    if (intents && intents.length) {
+      for (const it of intents) {
+        if (!it || !it.cmd) continue;
+        const pid = Number(it.pid);
+        const r = this.apply(pid, it.cmd);
+        if (!r.ok && s.players[pid] && !s.players[pid].ai) this.msg(pid, r.error, 'danger');
       }
     }
-    if (done.size) s.shots = s.shots.filter((S) => !done.has(S.id));
+    if (typeof AI.runAI === 'function') AI.runAI(this);
+    for (const fn of SYSTEMS) {
+      fn(this);
+      if (s.phase === 'over') break;
+    }
+    s.tick++;
   }
 
-  impact(S) {
-    const s = this.s, P = s.provs[S.to], mp = this.map.provinces[S.to];
-    if (P.o === S.o) return;
-    const victim = P.o;
-    if (S.kind === 'drone') {
-      const D = DRONES[S.d];
-      const dmg = D.dmg * (1 + 0.25 * (S.lvl - 1)) / (1 + 0.1 * P.b.fort);
-      const raw = this.rawDefense(P.o, P.t);
-      const frac = raw > 0 ? Math.min(1, dmg / raw) : 0;
-      const killed = this.applyLoss(P.t, frac);
-      s.players[S.o].stats.kills += killed;
-      if (D.bldg) this.damageBuilding(P, ['aa', 'silo', 'airbase', 'factory', 'fort', 'house']);
-      this.emit({ k: 'boom', x: S.tx, y: S.ty, big: false });
-    } else {
-      const killed = this.applyLoss(P.t, missileTroopLoss(S.lvl));
-      s.players[S.o].stats.kills += killed;
-      const order = BUILDING_KEYS.filter((k) => P.b[k] > 0).sort(() => this.rand() - 0.5);
-      for (const k of order.slice(0, S.lvl >= 3 ? 3 : 2)) P.b[k]--;
-      P.build = null;
-      P.pop *= 0.75;
-      this.emit({ k: 'boom', x: S.tx, y: S.ty, big: true });
-      if (victim >= 0) this.msg(victim, `Ракетный удар по провинции! Потери: ${killed}`, 'danger');
-    }
-  }
+  hash() { return hashState(this.s); }
 
-  damageBuilding(P, priority) {
-    for (const k of priority) {
-      if (P.b[k] > 0) { P.b[k]--; return k; }
-    }
-    if (P.build) P.build = null;
-    return null;
-  }
-
-  checkVictory() {
-    const s = this.s;
-    const counts = s.players.map(() => 0);
-    for (const P of s.provs) if (P.o >= 0) counts[P.o]++;
-    const armyOwners = new Set(s.armies.map((A) => A.o));
-    s.players.forEach((pl, i) => {
-      if (pl.alive && counts[i] === 0 && !armyOwners.has(i)) {
-        pl.alive = false;
-        this.emit({ k: 'eliminated', o: i });
-        this.msg(-1, `${pl.name} выбывает из игры`, 'info');
-      }
-    });
-    const alive = s.players.filter((p) => p.alive);
-    const total = s.provs.length;
-    const leader = counts.indexOf(Math.max(...counts));
-    if (alive.length <= 1 || counts[leader] >= total * s.victoryShare) {
-      s.winner = alive.length === 1 ? alive[0].id : leader;
-      this.emit({ k: 'victory', o: s.winner });
-    }
-  }
+  get seconds() { return this.s.tick / TICKS_PER_SEC; }
 }

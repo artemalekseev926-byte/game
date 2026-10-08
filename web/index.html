@@ -3,216 +3,908 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; font-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; font-src 'self'">
 <title>Pixel Conquest</title>
 <link rel="icon" href="icon.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <symbol id="i-gold" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></symbol>
+  <symbol id="i-troops" viewBox="0 0 24 24"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0"/><path d="M4.5 9.5h15"/><path d="M8.5 10a3.5 3.5 0 0 0 7 0"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V3.5"/><path d="M5 4h12.5l-2.5 4.5 2.5 4.5H5"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.4A1.8 1.8 0 0 0 6.1 21h11.8a1.8 1.8 0 0 0 1.5-2.6L14 9.5V3"/><path d="M7.2 15h9.6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.8v14.4a.8.8 0 0 0 1.2.7l11.3-7.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z" fill="currentColor"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6.4-6.4"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-house" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></symbol>
+  <symbol id="i-factory" viewBox="0 0 24 24"><path d="M2 20.5h20"/><path d="M3 20.5V11l5 3v-3l5 3v-3l5 3V4h3v16.5"/><path d="M7 17.5h2M11.5 17.5h2M16 17.5h2"/></symbol>
+  <symbol id="i-port" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v14"/><path d="M8.5 10.5h7"/><path d="M4.5 13.5a7.5 7.5 0 0 0 15 0"/></symbol>
+  <symbol id="i-fort" viewBox="0 0 24 24"><path d="M4 21V7.5h3V10h3V7.5h4V10h3V7.5h3V21z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/></symbol>
+  <symbol id="i-sam" viewBox="0 0 24 24"><path d="M12 3l8 3v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6z"/><path d="M12 16V8.5"/><path d="M9 11.5l3-3 3 3"/></symbol>
+  <symbol id="i-airbase" viewBox="0 0 24 24"><path d="M12 2.5c.9 0 1.4.9 1.4 2.2V9l7.1 4.3v2.2l-7.1-2.3v4.4l2.3 1.8v1.6L12 20.1l-3.7.9v-1.6l2.3-1.8v-4.4l-7.1 2.3v-2.2L10.6 9V4.7c0-1.3.5-2.2 1.4-2.2z"/></symbol>
+  <symbol id="i-silo" viewBox="0 0 24 24"><path d="M12 2c2 2 3 4.6 3 8v7H9v-7c0-3.4 1-6 3-8z"/><path d="M9 12.5l-3 3V19h3"/><path d="M15 12.5l3 3V19h-3"/><path d="M10.5 21h3"/></symbol>
+  <symbol id="i-rail" viewBox="0 0 24 24"><path d="M8.5 3L5 21"/><path d="M15.5 3L19 21"/><path d="M7.6 7.5h8.8M6.8 11.5h10.4M6 15.5h12M5.2 19.5h13.6"/></symbol>
+  <symbol id="i-drone" viewBox="0 0 24 24"><rect x="9" y="9" width="6" height="6" rx="1.5"/><path d="M9 9L6.8 6.8M15 9l2.2-2.2M9 15l-2.2 2.2M15 15l2.2 2.2"/><circle cx="5.2" cy="5.2" r="2.4"/><circle cx="18.8" cy="5.2" r="2.4"/><circle cx="5.2" cy="18.8" r="2.4"/><circle cx="18.8" cy="18.8" r="2.4"/></symbol>
+  <symbol id="i-kamikaze" viewBox="0 0 24 24"><path d="M13.5 13.5L3 8.8l3.3-2.5L8.8 3z"/><path d="M6.3 6.3l3.6 3.6"/><circle cx="18" cy="18" r="1.6"/><path d="M18 13.5V15M22.5 18H21M18 22.5V21M14.8 21.2l1-1M21.2 14.8l-1 1"/></symbol>
+  <symbol id="i-cruise" viewBox="0 0 24 24"><path d="M14.5 4.6l5.4-1.5-1.5 5.4-8.6 8.6-3.9-3.9z"/><path d="M6.2 13.4L3.5 14.5l6 6 1.1-2.7"/><path d="M4 20l2.2-2.2"/></symbol>
+  <symbol id="i-atom" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><path d="M13.6 14.77L16.5 19.79A9 9 0 0 1 7.5 19.79L10.4 14.77A3.2 3.2 0 0 0 13.6 14.77Z"/><path d="M8.8 12L3 12A9 9 0 0 1 7.5 4.21L10.4 9.23A3.2 3.2 0 0 0 8.8 12Z"/><path d="M13.6 9.23L16.5 4.21A9 9 0 0 1 21 12L15.2 12A3.2 3.2 0 0 0 13.6 9.23Z"/><circle cx="12" cy="12" r="1.7"/></g></symbol>
+  <symbol id="i-hbomb" viewBox="0 0 24 24"><circle cx="10.5" cy="14" r="7"/><path d="M15.5 9l2.2-2.2"/><path d="M18.5 3v1.6M22 7h-1.6M21 4l-1.1 1.1"/><path d="M8 11.5v5M13 11.5v5M8 14h5"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24"><path d="M12 3a8 8 0 0 0-8 8c0 2.6 1.2 4.4 3 5.6V20h10v-3.4c1.8-1.2 3-3 3-5.6a8 8 0 0 0-8-8z"/><circle cx="9" cy="11.5" r="1.7" fill="currentColor"/><circle cx="15" cy="11.5" r="1.7" fill="currentColor"/><path d="M10 20v-2.2M14 20v-2.2"/></symbol>
+  <symbol id="i-ship" viewBox="0 0 24 24"><path d="M2 15.5h20l-3 4.5H5z"/><path d="M5.5 15.5V12.5h9.5l2 3"/><path d="M8.5 12.5V9h4v3.5"/><path d="M10.5 9V5"/><path d="M12.5 10.5h5"/></symbol>
+  <symbol id="i-boat" viewBox="0 0 24 24"><path d="M2 14h13.5l-2 5H4z"/><path d="M4.5 14v-3h7.5v3"/><path d="M16.5 9h5.5"/><path d="M19.5 6.5L22 9l-2.5 2.5"/></symbol>
+  <symbol id="i-trade" viewBox="0 0 24 24"><path d="M2 15h20l-3 5H5z"/><rect x="5" y="10" width="4" height="5"/><rect x="10" y="10" width="4" height="5"/><rect x="10" y="6" width="4" height="4"/><path d="M17.5 15V7.5"/></symbol>
+  <symbol id="i-sword" viewBox="0 0 24 24"><path d="M4 4l11 11"/><path d="M12.5 17.5l5-5"/><path d="M16 16l4 4"/><path d="M20 4L9 15"/><path d="M6.5 12.5l5 5"/><path d="M8 16l-4 4"/></symbol>
+  <symbol id="i-ally" viewBox="0 0 24 24"><path d="M9.5 16.5H7a4.5 4.5 0 0 1 0-9h2.5"/><path d="M14.5 7.5H17a4.5 4.5 0 0 1 0 9h-2.5"/><path d="M8 12h8"/></symbol>
+  <symbol id="i-pact" viewBox="0 0 24 24"><path d="M12 3l8 3v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h15"/><path d="M15 4l4 4-4 4"/><path d="M20 16H5"/><path d="M9 12l-4 4 4 4"/></symbol>
+  <symbol id="i-break" viewBox="0 0 24 24"><path d="M9.5 16.5H7a4.5 4.5 0 0 1-2.2-8.4"/><path d="M14.5 7.5H17a4.5 4.5 0 0 1 2.2 8.4"/><path d="M8 12h1.5M14.5 12H16"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 20.5h18"/><path d="M6.5 17v-5M11 17V6.5M15.5 17v-8M20 17v-3"/></symbol>
+  <symbol id="i-econ" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v3.5"/><path d="M8.5 20.5h7"/><path d="M10 16.5h4l.5 4h-5z"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.5 14a6.5 6.5 0 0 1 3 6"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4.5V8"/><circle cx="12" cy="3.5" r="1"/><circle cx="9" cy="14" r="1.4" fill="currentColor"/><circle cx="15" cy="14" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.5A2 2 0 0 1 5 4.5h4l2 2h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3.5h11l4 4V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a1.5 1.5 0 0 1 1-1.5z"/><path d="M8 3.5V8h7V3.5"/><path d="M7.5 21v-6.5h9V21"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9.5M18.5 6H20M4 12h3.5M12.5 12H20M4 18h11.5"/><circle cx="16" cy="6" r="2.5"/><circle cx="10" cy="12" r="2.5"/><circle cx="18" cy="18" r="2.5"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.7v.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></symbol>
+  <symbol id="i-exit" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></symbol>
+  <symbol id="i-invite" viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21a7 7 0 0 1 14 0"/><path d="M19.5 8v6M16.5 11h6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.4L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0 0 14.6 4.4L20 15.5"/><path d="M20 20v-4.5h-4.5"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-gamepad" viewBox="0 0 24 24"><rect x="2" y="6.5" width="20" height="11.5" rx="5.2"/><path d="M7 10.2v4.2M4.9 12.3h4.2"/><circle cx="15.5" cy="11" r="1.1" fill="currentColor"/><circle cx="18" cy="13.6" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="i-lan" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9.5L4 20z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.2L2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></symbol>
+  <symbol id="i-upgrade" viewBox="0 0 24 24"><path d="M12 18V6"/><path d="M6.5 11.5L12 6l5.5 5.5"/><path d="M5 21h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 3.5h5M6 7l1 13.5h10L18 7"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.4-7-12a7 7 0 0 1 14 0c0 5.6-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-tank" viewBox="0 0 24 24"><rect x="2.5" y="13" width="19" height="6.5" rx="3.2"/><path d="M6 13v-3h9v3"/><path d="M15 11h6.5"/><circle cx="7" cy="16.2" r=".9" fill="currentColor"/><circle cx="12" cy="16.2" r=".9" fill="currentColor"/><circle cx="17" cy="16.2" r=".9" fill="currentColor"/></symbol>
+  <symbol id="i-art" viewBox="0 0 24 24"><circle cx="8" cy="17" r="3.2"/><path d="M10.4 14.8L20.5 6.5"/><path d="M8 17l9 2.5"/><path d="M3 21h18"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6.5 14h11"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6.5 3h11M6.5 21h11"/><path d="M8 3v3.5a4 4 0 0 0 1.6 3.2L12 12l2.4-2.3A4 4 0 0 0 16 6.5V3"/><path d="M8 21v-3.5a4 4 0 0 1 1.6-3.2L12 12l2.4 2.3a4 4 0 0 1 1.6 3.2V21"/></symbol>
+</svg>
+
 <section id="screen-menu" class="screen active">
   <canvas id="menu-bg"></canvas>
-  <div class="menu-col">
-    <h1 class="logo">PIXEL<br><span>CONQUEST</span></h1>
-    <p class="subtitle">Захвати мир. Пиксель за пикселем.</p>
-    <div class="menu-buttons">
-      <button class="btn big" data-go="setup">Одиночная игра</button>
-      <button class="btn big" data-go="mp">Мультиплеер</button>
-      <button class="btn big" id="btn-load-menu">Загрузить игру</button>
-      <button class="btn big" data-modal="settings">Настройки</button>
-      <button class="btn big" data-modal="help">Как играть</button>
-      <button class="btn big danger" id="btn-quit">Выход</button>
+  <div class="menu-shade"></div>
+  <div class="menu-wrap">
+    <div class="menu-card">
+      <div class="brand">
+        <h1 class="logo">PIXEL<span>CONQUEST</span></h1>
+        <span class="brand-ver">2.0</span>
+      </div>
+      <p class="tagline">Стратегия захвата мира: территория, флот, торговля, дипломатия и ядерное оружие.</p>
+      <nav class="menu-list">
+        <button class="menu-item primary" id="btn-single" data-go="setup">
+          <span class="mi-ic"><svg class="ic"><use href="#i-play"/></svg></span>
+          <span class="mi-text"><b>Одиночная игра</b><small>Против ботов на любой карте</small></span>
+          <svg class="ic mi-arrow"><use href="#i-chevron"/></svg>
+        </button>
+        <button class="menu-item" id="btn-mp" data-go="mp">
+          <span class="mi-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+          <span class="mi-text"><b>Мультиплеер</b><small>Лобби Steam и локальная сеть</small></span>
+          <svg class="ic mi-arrow"><use href="#i-chevron"/></svg>
+        </button>
+        <button class="menu-item" id="btn-load-menu">
+          <span class="mi-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+          <span class="mi-text"><b>Загрузить</b><small>Продолжить сохранённую партию</small></span>
+          <svg class="ic mi-arrow"><use href="#i-chevron"/></svg>
+        </button>
+        <button class="menu-item" id="btn-settings" data-modal="settings">
+          <span class="mi-ic"><svg class="ic"><use href="#i-sliders"/></svg></span>
+          <span class="mi-text"><b>Настройки</b><small>Тема, звук, масштаб интерфейса</small></span>
+          <svg class="ic mi-arrow"><use href="#i-chevron"/></svg>
+        </button>
+        <button class="menu-item" id="btn-help" data-modal="help">
+          <span class="mi-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+          <span class="mi-text"><b>Как играть</b><small>Правила, управление, советы</small></span>
+          <svg class="ic mi-arrow"><use href="#i-chevron"/></svg>
+        </button>
+        <button class="menu-item danger native-only" id="btn-quit">
+          <span class="mi-ic"><svg class="ic"><use href="#i-exit"/></svg></span>
+          <span class="mi-text"><b>Выход</b><small>Закрыть игру</small></span>
+        </button>
+      </nav>
+      <footer class="menu-foot">
+        <span>Версия <span id="ver">2.0.0</span></span>
+        <button class="link-btn" id="theme-link"><svg class="ic"><use href="#i-theme"/></svg>Сменить тему</button>
+      </footer>
     </div>
-    <p class="footer">v<span id="ver"></span> · офлайн и Steam · <a href="#" id="theme-link">сменить тему</a></p>
   </div>
 </section>
 
 <section id="screen-setup" class="screen">
-  <div class="setup-layout">
-    <div class="box">
-      <h2>Карта</h2>
-      <div id="map-list" class="map-list"></div>
-      <label class="file-btn btn small">Загрузить свою карту (.json)<input type="file" id="custom-map-file" accept=".json,application/json" hidden></label>
-      <div id="custom-maps" class="map-list"></div>
-    </div>
-    <div class="box preview-box">
-      <canvas id="map-preview" width="480" height="240"></canvas>
-      <p id="map-desc" class="muted"></p>
-    </div>
-    <div class="box">
-      <h2>Параметры</h2>
-      <label>Ваше имя <input id="sp-name" maxlength="20"></label>
-      <label>Ботов: <b id="sp-bots-v">5</b><input type="range" id="sp-bots" min="1" max="11" value="5"></label>
-      <label>Сложность
-        <select id="sp-diff"><option value="easy">Лёгкая</option><option value="normal" selected>Нормальная</option><option value="hard">Сложная</option><option value="mixed">Смешанная</option></select>
-      </label>
-      <label>Победа при контроле: <b id="sp-vic-v">70%</b><input type="range" id="sp-vic" min="30" max="100" step="5" value="70"></label>
-      <label>Seed карты <span class="row"><input id="sp-seed" type="number"><button class="btn small" id="sp-reseed">СЛУЧ.</button></span></label>
-      <div class="row end">
-        <button class="btn" data-go="menu">Назад</button>
-        <button class="btn primary" id="sp-start">В бой!</button>
+  <header class="screen-head">
+    <button class="btn ghost" data-go="menu"><svg class="ic"><use href="#i-back"/></svg>Назад</button>
+    <h2>Новая игра</h2>
+    <span class="head-spacer"></span>
+  </header>
+  <div class="setup-grid">
+    <section class="card map-pane">
+      <div class="card-head">
+        <h3><svg class="ic"><use href="#i-map"/></svg>Карта</h3>
+        <label class="btn sm" id="custom-map-btn" title="Файл JSON: {&quot;name&quot;: &quot;...&quot;, &quot;rows&quot;: [&quot;..##..&quot;]}"><svg class="ic"><use href="#i-upload"/></svg>Загрузить свою карту (JSON)<input type="file" id="custom-map-file" accept=".json,application/json" hidden></label>
       </div>
-    </div>
+      <div class="preview-row">
+        <div class="preview-wrap"><canvas id="map-preview" width="1000" height="400"></canvas></div>
+        <div class="preview-info">
+          <span class="field-label">Выбранная карта</span>
+          <b id="map-name">Земля</b>
+          <p id="map-desc">Выберите карту ниже</p>
+          <div id="map-meta" class="chips"></div>
+        </div>
+      </div>
+      <div id="map-grid" class="map-grid"></div>
+    </section>
+    <aside class="card setup-pane">
+      <div class="setup-scroll">
+        <div class="group">
+          <h4>Командир</h4>
+          <div class="field">
+            <label class="field-label" for="sp-name">Имя</label>
+            <input type="text" id="sp-name" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Командир">
+          </div>
+          <div class="field">
+            <span class="field-label">Цвет страны</span>
+            <div id="sp-color" class="swatches"></div>
+          </div>
+        </div>
+        <div class="group">
+          <h4>Соперники</h4>
+          <div class="field">
+            <span class="field-row"><label class="field-label" for="sp-bots">Количество ботов</label><output id="sp-bots-v">5</output></span>
+            <input type="range" id="sp-bots" min="1" max="11" value="5" style="--p:40%">
+          </div>
+          <div class="field">
+            <span class="field-label">Сложность</span>
+            <div class="seg" id="sp-diff">
+              <label><input type="radio" name="sp-diff" value="easy"><span>Лёгкая</span></label>
+              <label><input type="radio" name="sp-diff" value="normal" checked><span>Средняя</span></label>
+              <label><input type="radio" name="sp-diff" value="hard"><span>Сложная</span></label>
+              <label><input type="radio" name="sp-diff" value="mixed"><span>Смешанная</span></label>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <h4>Цели победы</h4>
+          <div class="goal-opt">
+            <label class="switch"><input type="checkbox" id="sp-vic-territory" checked><span class="switch-ui"></span><span class="switch-text"><b>Захват территории</b><small>Контролировать долю всей суши</small></span></label>
+            <div class="range-row"><input type="range" id="sp-vic-pct" min="30" max="100" step="5" value="70" style="--p:57.14%"><output id="sp-vic-pct-v">70%</output></div>
+          </div>
+          <div class="goal-opt">
+            <label class="switch"><input type="checkbox" id="sp-vic-economy"><span class="switch-ui"></span><span class="switch-text"><b>Экономическое лидерство</b><small>Доход выше всех на 15% без перерыва</small></span></label>
+            <div class="range-row"><input type="range" id="sp-vic-min" min="5" max="60" step="5" value="20" style="--p:27.27%"><output id="sp-vic-min-v">20 мин</output></div>
+          </div>
+          <div class="goal-opt fixed">
+            <span class="goal-ic"><svg class="ic"><use href="#i-crown"/></svg></span>
+            <span class="switch-text"><b>Последний выживший</b><small>Уничтожить всех соперников</small></span>
+            <span class="badge accent">всегда</span>
+          </div>
+        </div>
+        <div class="group">
+          <h4>Генерация</h4>
+          <div class="field">
+            <label class="field-label" for="sp-seed">Seed карты</label>
+            <div class="input-row"><input type="number" id="sp-seed"><button class="btn icon" id="sp-reseed" title="Случайный seed" aria-label="Случайный seed"><svg class="ic"><use href="#i-dice"/></svg></button></div>
+          </div>
+        </div>
+      </div>
+      <div class="setup-foot">
+        <button class="btn primary lg block" id="sp-start"><svg class="ic"><use href="#i-play"/></svg>В бой!</button>
+      </div>
+    </aside>
   </div>
 </section>
 
 <section id="screen-mp" class="screen">
-  <div class="mp-layout">
-    <div class="box">
-      <h2>Steam — игра с друзьями</h2>
-      <p id="steam-status" class="muted">Проверка Steam...</p>
-      <button class="btn primary" id="steam-host">Создать лобби</button>
-      <p class="muted small">Друзья смогут зайти через приглашение Steam (Shift+Tab), по ID лобби или из списка открытых лобби ниже.</p>
-      <label>ID лобби <span class="row"><input id="steam-lobby-id" placeholder="109775..."><button class="btn" id="steam-join">Войти</button></span></label>
-      <div class="row"><h3 style="flex:1;margin:0">Открытые лобби</h3><button class="btn small" id="steam-refresh">Обновить</button></div>
-      <ul id="steam-lobbies" class="slots"></ul>
-    </div>
-    <div class="box">
-      <h2>Локальная сеть / IP</h2>
-      <p class="muted small">Для игры по LAN, Radmin VPN, Hamachi или с пробросом порта.</p>
-      <label>Порт <span class="row"><input id="lan-port" type="number" value="27420"><button class="btn primary" id="lan-host">Создать сервер</button></span></label>
-      <label>Адрес хоста <span class="row"><input id="lan-addr" placeholder="192.168.0.10:27420"><button class="btn" id="lan-join">Подключиться</button></span></label>
-    </div>
-    <div class="box">
-      <label>Ваше имя <input id="mp-name" maxlength="20"></label>
-      <button class="btn" data-go="menu">Назад</button>
-    </div>
+  <header class="screen-head">
+    <button class="btn ghost" data-go="menu"><svg class="ic"><use href="#i-back"/></svg>Назад</button>
+    <h2>Мультиплеер</h2>
+    <span class="head-spacer"></span>
+  </header>
+  <div class="mp-grid">
+    <section class="card mp-name-card">
+      <span class="mh-ic"><svg class="ic"><use href="#i-user"/></svg></span>
+      <label class="field-label" for="mp-name">Ваше имя в игре</label>
+      <input type="text" id="mp-name" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Командир">
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <h3><svg class="ic"><use href="#i-gamepad"/></svg>Steam</h3>
+        <span id="steam-status" class="status" data-state="wait">Проверка Steam…</span>
+      </div>
+      <p class="hint-text">Создайте лобби и пригласите друзей через оверлей Steam (Shift+Tab), передайте им ID лобби или выберите открытое лобби из списка.</p>
+      <button class="btn primary block" id="steam-host"><svg class="ic"><use href="#i-plus"/></svg>Создать лобби</button>
+      <div class="field top-gap">
+        <label class="field-label" for="steam-lobby-id">ID лобби</label>
+        <div class="input-row"><input type="text" id="steam-lobby-id" placeholder="Например, 109775241234567890" autocomplete="off" spellcheck="false"><button class="btn" id="steam-join"><svg class="ic"><use href="#i-chevron"/></svg>Войти</button></div>
+      </div>
+      <div class="list-head">
+        <h4>Открытые лобби</h4>
+        <button class="btn sm ghost" id="steam-refresh"><svg class="ic"><use href="#i-refresh"/></svg>Обновить</button>
+      </div>
+      <ul id="steam-lobbies" class="list"></ul>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <h3><svg class="ic"><use href="#i-lan"/></svg>Локальная сеть / IP</h3>
+      </div>
+      <p class="hint-text">Для игры по LAN, через Radmin VPN, Hamachi или с пробросом порта на роутере.</p>
+      <div class="sub-card">
+        <h4>Создать сервер</h4>
+        <div class="field">
+          <label class="field-label" for="lan-port">Порт</label>
+          <div class="input-row"><input type="number" id="lan-port" value="27420" min="1024" max="65535"><button class="btn primary" id="lan-host"><svg class="ic"><use href="#i-plus"/></svg>Создать сервер</button></div>
+        </div>
+      </div>
+      <div class="sub-card">
+        <h4>Подключиться к серверу</h4>
+        <div class="field">
+          <label class="field-label" for="lan-addr">Адрес хоста</label>
+          <div class="input-row"><input type="text" id="lan-addr" placeholder="192.168.0.10:27420" autocomplete="off" spellcheck="false"><button class="btn" id="lan-join"><svg class="ic"><use href="#i-chevron"/></svg>Подключиться</button></div>
+        </div>
+      </div>
+    </section>
   </div>
 </section>
 
 <section id="screen-lobby" class="screen">
-  <div class="lobby-layout">
-    <div class="box">
-      <h2>Игроки</h2>
-      <ul id="lobby-slots" class="slots"></ul>
-      <div class="row host-only">
-        <select id="lobby-ai-diff"><option value="easy">Лёгкий</option><option value="normal" selected>Нормальный</option><option value="hard">Сложный</option></select>
-        <button class="btn small" id="lobby-add-ai">+ Бот</button>
+  <header class="screen-head">
+    <button class="btn ghost" id="lobby-leave"><svg class="ic"><use href="#i-back"/></svg>Выйти из лобби</button>
+    <h2>Лобби</h2>
+    <span class="badge" id="lobby-kind">Steam</span>
+    <span class="head-spacer"></span>
+  </header>
+  <div class="lobby-grid">
+    <section class="card">
+      <div class="card-head">
+        <h3><svg class="ic"><use href="#i-users"/></svg>Игроки</h3>
+        <span class="badge" id="lobby-count">1 / 12</span>
       </div>
-    </div>
-    <div class="box">
-      <h2>Партия</h2>
-      <div id="lobby-info" class="muted"></div>
+      <ul id="lobby-slots" class="list slots"></ul>
+      <div class="input-row add-bot host-only">
+        <select id="lobby-ai-diff">
+          <option value="easy">Бот: лёгкий</option>
+          <option value="normal" selected>Бот: средний</option>
+          <option value="hard">Бот: сложный</option>
+        </select>
+        <button class="btn" id="lobby-add-ai"><svg class="ic"><use href="#i-bot"/></svg>Добавить бота</button>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <h3><svg class="ic"><use href="#i-map"/></svg>Партия</h3>
+      </div>
+      <canvas id="lobby-preview" width="640" height="256"></canvas>
+      <div id="lobby-info" class="lobby-info"></div>
       <div class="host-only">
-        <label>Карта <select id="lobby-map"></select></label>
-        <label>Seed <span class="row"><input id="lobby-seed" type="number"><button class="btn small" id="lobby-reseed">СЛУЧ.</button></span></label>
-        <label>Победа при контроле: <b id="lobby-vic-v">70%</b><input type="range" id="lobby-vic" min="30" max="100" step="5" value="70"></label>
+        <div class="field">
+          <label class="field-label" for="lobby-map">Карта</label>
+          <select id="lobby-map"></select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="lobby-seed">Seed</label>
+          <div class="input-row"><input type="number" id="lobby-seed"><button class="btn icon" id="lobby-reseed" title="Случайный seed" aria-label="Случайный seed"><svg class="ic"><use href="#i-dice"/></svg></button></div>
+        </div>
+        <span class="field-label block-label">Цели победы</span>
+        <div class="goal-opt">
+          <label class="switch"><input type="checkbox" id="lobby-vic-territory" checked><span class="switch-ui"></span><span class="switch-text"><b>Захват территории</b><small>Контролировать долю всей суши</small></span></label>
+          <div class="range-row"><input type="range" id="lobby-vic-pct" min="30" max="100" step="5" value="70" style="--p:57.14%"><output id="lobby-vic-pct-v">70%</output></div>
+        </div>
+        <div class="goal-opt">
+          <label class="switch"><input type="checkbox" id="lobby-vic-economy"><span class="switch-ui"></span><span class="switch-text"><b>Экономическое лидерство</b><small>Доход выше всех на 15% без перерыва</small></span></label>
+          <div class="range-row"><input type="range" id="lobby-vic-min" min="5" max="60" step="5" value="20" style="--p:27.27%"><output id="lobby-vic-min-v">20 мин</output></div>
+        </div>
+        <div class="goal-opt fixed">
+          <span class="goal-ic"><svg class="ic"><use href="#i-crown"/></svg></span>
+          <span class="switch-text"><b>Последний выживший</b><small>Уничтожить всех соперников</small></span>
+          <span class="badge accent">всегда</span>
+        </div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <h3><svg class="ic"><use href="#i-lan"/></svg>Подключение</h3>
       </div>
       <div id="lobby-connect" class="connect-info"></div>
-      <div class="row end">
-        <button class="btn danger" id="lobby-leave">Выйти</button>
-        <button class="btn" id="lobby-copy" hidden>Копировать ID</button>
-        <button class="btn" id="lobby-invite" hidden>Пригласить друзей</button>
-        <button class="btn primary host-only" id="lobby-start">Начать</button>
+      <div class="btn-col">
+        <button class="btn" id="lobby-copy"><svg class="ic"><use href="#i-copy"/></svg>Копировать ID</button>
+        <button class="btn" id="lobby-invite"><svg class="ic"><use href="#i-invite"/></svg>Пригласить друзей</button>
       </div>
-    </div>
+      <p class="hint-text" id="lobby-hint">Друзья могут войти по приглашению Steam, по ID лобби или найти его в списке открытых лобби.</p>
+    </section>
   </div>
+  <footer class="screen-foot">
+    <span id="lobby-wait" class="wait-text"><span class="spinner"></span>Ожидание начала игры хостом…</span>
+    <button class="btn primary lg host-only" id="lobby-start"><svg class="ic"><use href="#i-play"/></svg>Начать игру</button>
+  </footer>
 </section>
 
 <section id="screen-game" class="screen">
   <canvas id="map"></canvas>
-  <header id="hud-top" class="hud-bar">
-    <div class="res" title="Казна (доход − содержание в секунду)"><img data-sprite="money"><b id="r-money">0</b><i id="r-money-rate"></i></div>
-    <div class="res" title="Людские резервы (прирост в секунду)"><img data-sprite="people"><b id="r-mp">0</b><i id="r-mp-rate"></i></div>
-    <div class="res" title="Провинции / нужно для победы"><span class="dot" id="r-color"></span><b id="r-provs">0</b><i id="r-goal"></i></div>
-    <div class="res clickable" id="r-research" title="Исследования (R)"><img data-sprite="flask"><b id="r-rs">—</b><span class="bar"><span id="r-rs-bar"></span></span></div>
-    <div class="spacer"></div>
-    <div class="speed" id="speed-ctrl">
-      <button class="btn tiny" data-speed="0" title="Пауза (Пробел)">❚❚</button>
-      <button class="btn tiny" data-speed="1" title="Скорость 1 (1)">▶</button>
-      <button class="btn tiny" data-speed="2" title="Скорость 2 (2)">▶▶</button>
-      <button class="btn tiny" data-speed="3" title="Скорость 3 (3)">▶▶▶</button>
+
+  <header id="hud-top" class="hud-top">
+    <div class="hud-stats">
+      <div class="me-chip" id="me-chip" title="Ваша страна"><span class="dot" id="r-color"></span><b id="r-name">Командир</b></div>
+      <div class="stat gold" id="st-gold" title="Золото. Справа — чистый доход в секунду (доход минус содержание)">
+        <span class="stat-label"><svg class="ic"><use href="#i-gold"/></svg>Золото</span>
+        <span class="stat-val"><b id="r-gold">0</b><i id="r-income" class="delta pos">+0/с</i></span>
+      </div>
+      <div class="stat army" id="st-army" title="Войска / максимум. Полоска — состав армии: пехота, танки, артиллерия">
+        <span class="stat-label"><svg class="ic"><use href="#i-troops"/></svg>Армия<span class="comp-legend"><span class="cl inf" title="Пехота"><b id="r-comp-inf-v">100</b>%</span><span class="cl tank" title="Танки"><b id="r-comp-tank-v">0</b>%</span><span class="cl art" title="Артиллерия"><b id="r-comp-art-v">0</b>%</span></span></span>
+        <span class="stat-val"><b id="r-troops">0</b><span class="of">/ <span id="r-maxtroops">0</span></span></span>
+        <span class="comp" id="r-comp"><span class="comp-inf" id="r-comp-inf" style="width:100%"></span><span class="comp-tank" id="r-comp-tank" style="width:0%"></span><span class="comp-art" id="r-comp-art" style="width:0%"></span></span>
+      </div>
+      <div class="stat terr" id="st-terr" title="Доля всей суши под вашим контролем и место среди стран">
+        <span class="stat-label"><svg class="ic"><use href="#i-flag"/></svg>Территория</span>
+        <span class="stat-val"><b id="r-terr">0%</b><span class="rank" id="r-rank"></span></span>
+      </div>
+      <div class="stat goals" id="st-goals" title="Прогресс целей победы">
+        <span class="stat-label"><svg class="ic"><use href="#i-trophy"/></svg>Цели победы</span>
+        <span class="goal" id="g-terr"><span class="goal-name">Территория</span><span class="goal-bar"><span id="g-terr-bar" style="width:0%"></span><i class="goal-lead" id="g-terr-lead" hidden></i></span><span class="goal-v" id="g-terr-v">0 / 70%</span></span>
+        <span class="goal" id="g-econ" hidden><span class="goal-name">Экономика</span><span class="goal-bar"><span id="g-econ-bar" style="width:0%"></span></span><span class="goal-v" id="g-econ-v">0:00 / 20:00</span></span>
+        <span class="goal" id="g-surv" hidden><span class="goal-name">Выживание</span><span class="goal-v wide" id="g-surv-v">Осталось стран: 0</span></span>
+      </div>
+      <button class="stat stat-btn research" id="r-research" title="Исследования (R)">
+        <span class="stat-label"><svg class="ic"><use href="#i-flask"/></svg>Исследование<span class="rs-time" id="r-rs-time"></span></span>
+        <span class="stat-val sm" id="r-rs">Нет</span>
+        <span class="mini-bar"><span id="r-rs-bar" style="width:0%"></span></span>
+      </button>
     </div>
-    <span id="game-time" class="muted">00:00</span>
-    <button class="btn tiny" id="btn-aa" title="Показать зоны ПВО (V)">ПВО</button>
-    <button class="btn tiny" id="btn-theme" title="Тема (T)">ТЕМА</button>
-    <button class="btn tiny" id="btn-menu" title="Меню (Esc)">МЕНЮ</button>
+    <div class="hud-right">
+      <div class="clock" title="Время партии"><svg class="ic"><use href="#i-clock"/></svg><span id="game-time">00:00</span></div>
+      <div class="speed" id="speed-ctrl" title="Скорость игры">
+        <button data-speed="0" title="Пауза (Пробел)" aria-label="Пауза"><svg class="ic"><use href="#i-pause"/></svg></button>
+        <button data-speed="1" class="on" title="Скорость 1×">1×</button>
+        <button data-speed="2" title="Скорость 2×">2×</button>
+        <button data-speed="3" title="Скорость 3×">3×</button>
+        <button data-speed="5" title="Скорость 5×">5×</button>
+      </div>
+      <div class="hud-btns">
+        <button class="hbtn" id="btn-countries" title="Страны и дипломатия (Tab)" aria-label="Страны"><svg class="ic"><use href="#i-globe"/></svg><span class="lbl">Страны</span><kbd>Tab</kbd><span class="count-badge" id="countries-badge" hidden>0</span></button>
+        <button class="hbtn" id="btn-research" title="Исследования (R)" aria-label="Исследования"><svg class="ic"><use href="#i-flask"/></svg><span class="lbl">Исследования</span><kbd>R</kbd></button>
+        <button class="hbtn" id="btn-aa" title="Показать зоны ПВО (V)" aria-label="Зоны ПВО"><svg class="ic"><use href="#i-radar"/></svg><span class="lbl">ПВО</span><kbd>V</kbd></button>
+        <button class="hbtn" id="btn-theme" title="Сменить тему (T)" aria-label="Тема"><svg class="ic"><use href="#i-theme"/></svg><span class="lbl">Тема</span><kbd>T</kbd></button>
+        <button class="hbtn" id="btn-menu" title="Меню (Esc)" aria-label="Меню"><svg class="ic"><use href="#i-menu"/></svg><span class="lbl">Меню</span><kbd>Esc</kbd></button>
+      </div>
+    </div>
   </header>
-  <aside id="board" class="box hud-box"></aside>
-  <aside id="panel" class="box hud-box" hidden></aside>
-  <div id="hint" class="hint" hidden></div>
-  <div id="log" class="log"></div>
-  <form id="chat-form" class="chat" hidden><input id="chat-input" maxlength="200" placeholder="Сообщение (Enter)"></form>
-  <div id="tip" class="tip" hidden></div>
-  <div id="toasts"></div>
+
+  <aside id="board" class="hud-card board">
+    <div class="board-head">
+      <h4>Лидеры</h4>
+      <button class="icon-btn sm" id="board-more" title="Все страны (Tab)" aria-label="Все страны"><svg class="ic"><use href="#i-list"/></svg></button>
+      <button class="icon-btn sm" id="board-toggle" title="Свернуть" aria-label="Свернуть"><svg class="ic"><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <ol id="board-list" class="board-list"></ol>
+  </aside>
+
+  <div id="right-col" class="right-col">
+    <div id="diplo-stack" class="diplo-stack"></div>
+    <aside id="panel" class="hud-card sel-panel" hidden>
+      <header class="sel-head">
+        <span class="sel-ic" id="panel-icon"><svg class="ic"><use href="#i-house"/></svg></span>
+        <div class="sel-title"><h3 id="panel-title">Объект</h3><span id="panel-sub"></span></div>
+        <button class="icon-btn" id="panel-close" title="Закрыть (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+      </header>
+      <div id="panel-body" class="sel-body"></div>
+    </aside>
+  </div>
+
+  <div id="spawn-overlay" class="spawn-banner" hidden>
+    <span class="spawn-ic"><svg class="ic"><use href="#i-pin"/></svg></span>
+    <div class="spawn-text"><b>Выберите место старта</b><span>Кликните по свободной суше. Место можно менять до конца отсчёта.</span></div>
+    <div class="spawn-timer"><b id="spawn-time">15</b><small>сек</small></div>
+    <div class="spawn-bar"><span id="spawn-bar" style="width:100%"></span></div>
+  </div>
+
+  <div id="hint" class="mode-hint" hidden>
+    <span class="hint-ic" id="hint-icon"><svg class="ic"><use href="#i-target"/></svg></span>
+    <span id="hint-text"></span>
+    <button class="btn sm" id="hint-cancel">Отмена <kbd>Esc</kbd></button>
+  </div>
+
+  <div class="feed" id="feed">
+    <div id="log" class="event-log"></div>
+    <form id="chat-form" class="chat-form" hidden autocomplete="off">
+      <svg class="ic"><use href="#i-chat"/></svg>
+      <input type="text" id="chat-input" maxlength="200" placeholder="Сообщение всем игрокам (Enter)">
+    </form>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+
+  <div id="hud-bottom" class="dock">
+    <div class="atk-row">
+      <span class="atk-label"><svg class="ic"><use href="#i-sword"/></svg>Сила атаки</span>
+      <button class="key-btn" id="atk-dec" title="Уменьшить (Q)" aria-label="Уменьшить силу атаки">Q</button>
+      <input type="range" id="atk-ratio" min="1" max="100" value="30" style="--p:29.29%">
+      <button class="key-btn" id="atk-inc" title="Увеличить (E)" aria-label="Увеличить силу атаки">E</button>
+      <output id="atk-ratio-v" class="atk-val">30%</output>
+      <span class="atk-troops" title="Сколько войск уйдёт в атаку или высадку"><svg class="ic"><use href="#i-troops"/></svg><b id="atk-troops">0</b><span>войск</span></span>
+      <span class="atk-help">Shift + колесо — плавно</span>
+    </div>
+    <div class="tools-row">
+      <div class="tool-group" id="build-bar">
+        <span class="group-cap">Строительство</span>
+        <div class="tools">
+          <button class="tool" data-build="house" id="tool-house" title="Жилой квартал: +25 000 к максимуму войск и +6 золота/с за уровень (1)"><kbd>1</kbd><svg class="ic"><use href="#i-house"/></svg><span class="tool-name">Дома</span><span class="tool-cost" id="cost-house">1 000</span></button>
+          <button class="tool" data-build="factory" id="tool-factory" title="Фабрика: отправляет товары в порт, увеличивает долю танков (2)"><kbd>2</kbd><svg class="ic"><use href="#i-factory"/></svg><span class="tool-name">Фабрика</span><span class="tool-cost" id="cost-factory">2 500</span></button>
+          <button class="tool" data-build="port" id="tool-port" title="Порт: верфь, торговля, приём товаров. Только на побережье (3)"><kbd>3</kbd><svg class="ic"><use href="#i-port"/></svg><span class="tool-name">Порт</span><span class="tool-cost" id="cost-port">3 000</span></button>
+          <button class="tool" data-build="fort" id="tool-fort" title="Укрепление: бонус обороны в радиусе (4)"><kbd>4</kbd><svg class="ic"><use href="#i-fort"/></svg><span class="tool-name">Укрепление</span><span class="tool-cost" id="cost-fort">1 500</span></button>
+          <button class="tool" data-build="sam" id="tool-sam" title="ПВО: перехват дронов, ракет и бомб в радиусе (5)"><kbd>5</kbd><svg class="ic"><use href="#i-sam"/></svg><span class="tool-name">ПВО</span><span class="tool-cost" id="cost-sam">4 000</span></button>
+          <button class="tool" data-build="airbase" id="tool-airbase" title="Аэродром БПЛА: запуск дронов. Нужно исследование «БПЛА» (6)"><kbd>6</kbd><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-airbase"/></svg><span class="tool-name">Аэродром</span><span class="tool-cost" id="cost-airbase">3 500</span></button>
+          <button class="tool" data-build="silo" id="tool-silo" title="Ракетная шахта: запуск ракет и бомб. Нужно исследование «Ракеты» (7)"><kbd>7</kbd><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-silo"/></svg><span class="tool-name">Шахта</span><span class="tool-cost" id="cost-silo">8 000</span></button>
+          <button class="tool" data-build="rail" id="tool-rail" title="Железная дорога между фабрикой, портом или домом: поезда возят товары в 2 раза быстрее грузовиков (8)"><kbd>8</kbd><svg class="ic"><use href="#i-rail"/></svg><span class="tool-name">Ж/д</span><span class="tool-cost" id="cost-rail">40/клетка</span></button>
+        </div>
+      </div>
+      <div class="tool-group" id="strike-bar">
+        <span class="group-cap">Удары</span>
+        <div class="tools">
+          <button class="tool" data-strike="drone" id="tool-drone" title="Дрон: уничтожает войска в небольшом радиусе. Нужен аэродром"><span class="tool-badge" id="cnt-drone" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-drone"/></svg><span class="tool-name">Дрон</span><span class="tool-cost" id="cost-drone">300</span></button>
+          <button class="tool" data-strike="kamikaze" id="tool-kamikaze" title="Дрон-камикадзе: точечно уничтожает здание. Нужен аэродром и БПЛА II"><span class="tool-badge" id="cnt-kamikaze" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-kamikaze"/></svg><span class="tool-name">Камикадзе</span><span class="tool-cost" id="cost-kamikaze">600</span></button>
+          <button class="tool" data-strike="cruise" id="tool-cruise" title="Крылатая ракета: точечно уничтожает здание на большой дистанции. Нужна шахта"><span class="tool-badge" id="cnt-cruise" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-cruise"/></svg><span class="tool-name">Крылатая</span><span class="tool-cost" id="cost-cruise">2 000</span></button>
+          <button class="tool nuke" data-strike="atom" id="tool-atom" title="Атомная бомба: выжигает область, земля становится ничьей и заражённой. Нужна шахта и ядерная программа I"><span class="tool-badge" id="cnt-atom" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-atom"/></svg><span class="tool-name">Атомная</span><span class="tool-cost" id="cost-atom">15 000</span></button>
+          <button class="tool nuke" data-strike="hbomb" id="tool-hbomb" title="Водородная бомба: огромный радиус поражения. Нужна шахта и ядерная программа II"><span class="tool-badge" id="cnt-hbomb" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-hbomb"/></svg><span class="tool-name">Водородная</span><span class="tool-cost" id="cost-hbomb">50 000</span></button>
+          <button class="tool mega" data-strike="mega" id="tool-mega" title="Мегабомба «Судный день»: боеголовки по всем вражеским странам. Нужна шахта и ядерная программа III"><span class="tool-badge" id="cnt-mega" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-mega"/></svg><span class="tool-name">Мегабомба</span><span class="tool-cost" id="cost-mega">250 000</span></button>
+        </div>
+      </div>
+      <div class="tool-group" id="fleet-bar">
+        <span class="group-cap">Флот</span>
+        <div class="tools">
+          <button class="tool" data-tool="boat" id="btn-boat" title="Высадка десанта: кликните по земле за морем (B)"><kbd>B</kbd><svg class="ic"><use href="#i-boat"/></svg><span class="tool-name">Высадка</span><span class="tool-cost muted-cost" id="cnt-boats">0 / 3</span></button>
+          <button class="tool wide" data-tool="warship" id="btn-warship" title="Военный корабль: строится в выбранном или ближайшем порту"><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-ship"/></svg><span class="tool-name">Военный корабль</span><span class="tool-cost" id="cost-warship">2 500</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ctx-menu" class="hud-card ctx-menu" hidden>
+    <div class="ctx-head">
+      <span class="dot" id="ctx-dot"></span>
+      <div class="ctx-title"><b id="ctx-title">Страна</b><span id="ctx-sub"></span></div>
+    </div>
+    <div class="ctx-group">
+      <button data-act="attack" id="ctx-attack"><svg class="ic"><use href="#i-sword"/></svg>Атаковать<span class="ctx-hint" id="ctx-attack-hint"></span></button>
+      <button data-act="boat" id="ctx-boat"><svg class="ic"><use href="#i-boat"/></svg>Высадка<span class="ctx-hint" id="ctx-boat-hint"></span></button>
+    </div>
+    <div class="ctx-group">
+      <button data-act="kamikaze" id="ctx-kamikaze" hidden><svg class="ic"><use href="#i-kamikaze"/></svg>Удар камикадзе<span class="ctx-hint" id="ctx-kamikaze-hint"></span></button>
+      <button data-act="cruise" id="ctx-cruise" hidden><svg class="ic"><use href="#i-cruise"/></svg>Крылатая ракета<span class="ctx-hint" id="ctx-cruise-hint"></span></button>
+    </div>
+    <div class="ctx-group">
+      <button data-act="alliance" id="ctx-alliance"><svg class="ic"><use href="#i-ally"/></svg>Предложить союз</button>
+      <button data-act="pact" id="ctx-pact"><svg class="ic"><use href="#i-pact"/></svg>Пакт о ненападении</button>
+      <button data-act="trade" id="ctx-trade"><svg class="ic"><use href="#i-swap"/></svg>Торговый договор</button>
+      <button data-act="break" id="ctx-break" class="danger"><svg class="ic"><use href="#i-break"/></svg>Разорвать договор</button>
+      <button data-act="embargo" id="ctx-embargo"><svg class="ic"><use href="#i-ban"/></svg><span id="ctx-embargo-text">Объявить эмбарго</span></button>
+    </div>
+    <div class="ctx-group">
+      <button data-act="summary" id="ctx-summary"><svg class="ic"><use href="#i-chart"/></svg>Сводка по стране</button>
+    </div>
+  </div>
+
+  <div id="tip" class="cursor-tip" hidden></div>
 </section>
 
-<div id="modal-research" class="modal" hidden><div class="box modal-box wide">
-  <h2>Исследования</h2>
-  <div id="research-list" class="research-grid"></div>
-  <div class="row end"><button class="btn" data-close>Закрыть</button></div>
-</div></div>
-
-<div id="modal-pause" class="modal" hidden><div class="box modal-box">
-  <h2>Меню</h2>
-  <div class="menu-buttons">
-    <button class="btn" data-close>Продолжить</button>
-    <button class="btn offline-only" id="btn-save">Сохранить</button>
-    <button class="btn offline-only" id="btn-load-game">Загрузить</button>
-    <button class="btn" data-modal="settings">Настройки</button>
-    <button class="btn" data-modal="help">Как играть</button>
-    <button class="btn danger" id="btn-exit">Выйти в меню</button>
-  </div>
-</div></div>
-
-<div id="modal-load" class="modal" hidden><div class="box modal-box">
-  <h2 id="load-title">Сохранения</h2>
-  <ul id="save-slots" class="slots"></ul>
-  <div class="row end"><button class="btn" data-close>Закрыть</button></div>
-</div></div>
-
-<div id="modal-settings" class="modal" hidden><div class="box modal-box">
-  <h2>Настройки</h2>
-  <label>Тема
-    <select id="set-theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select>
-  </label>
-  <label>Громкость: <b id="set-vol-v">50%</b><input type="range" id="set-vol" min="0" max="100" value="50"></label>
-  <label>Масштаб интерфейса
-    <select id="set-ui"><option value="0.85">Мелкий</option><option value="1" selected>Обычный</option><option value="1.2">Крупный</option><option value="1.4">Огромный</option></select>
-  </label>
-  <label class="check"><input type="checkbox" id="set-edge"> Прокрутка карты у края экрана</label>
-  <label class="check native-only"><input type="checkbox" id="set-fs"> Полноэкранный режим (F11)</label>
-  <div class="row end"><button class="btn" data-close>Готово</button></div>
-</div></div>
-
-<div id="modal-help" class="modal" hidden><div class="box modal-box wide help">
-  <h2>Как играть</h2>
-  <div class="help-cols">
-    <div>
-      <h3>Цель</h3>
-      <p>Захватите заданную долю провинций мира или уничтожьте всех соперников.</p>
-      <h3>Управление</h3>
-      <p><b>ЛКМ</b> — выбрать провинцию<br><b>ПКМ</b> по другой провинции — отправить войска (доля — кнопки в панели или клавиши Z/X/C/B = 25/50/75/100%)<br><b>Колёсико</b> — масштаб, <b>перетаскивание</b> или WASD/стрелки — прокрутка<br><b>Пробел</b> — пауза, <b>1-3</b> — скорость<br><b>Home</b> — к столице, <b>R</b> — исследования, <b>V</b> — зоны ПВО, <b>T</b> — тема, <b>Enter</b> — чат, <b>Esc</b> — отмена/меню</p>
-      <h3>Армии</h3>
-      <p>Войска идут через ваши провинции и по морским путям (пунктир). Бой: атака против обороны (укрепления, рельеф, исследования). Артиллерия пробивает укрепления, танки сильны и быстры, пехота дешёвая.</p>
-    </div>
-    <div>
-      <h3>Экономика</h3>
-      <p>Доход = налоги с населения + фабрики. Расход = содержание войск и построек. Чем больше провинций, тем ниже эффективность управления. Захваченные провинции 60 с платят половину налогов. При долгах войска дезертируют!</p>
-      <h3>Постройки</h3>
-      <p>Укрепления, фабрики, жилые дома, ПВО, аэродромы БПЛА и ракетные шахты. Каждая следующая постройка того же типа дороже.</p>
-      <h3>БПЛА, ракеты и ПВО</h3>
-      <p>Исследуйте «БПЛА», постройте аэродром и наносите удары по войскам (ударные), постройкам (камикадзе) или массированно (рой). Ракеты из шахт бьют по войскам, постройкам и населению. ПВО перехватывает цели в радиусе, но перезаряжается — рой перегружает оборону.</p>
+<div id="modal-research" class="modal" hidden>
+  <div class="modal-box xl" role="dialog" aria-labelledby="research-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-flask"/></svg></span>
+      <h2 id="research-title">Исследования</h2>
+      <span class="mh-sub">Одновременно изучается одна технология</span>
+      <button class="icon-btn" data-close title="Закрыть (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <div id="research-current" class="research-current">
+        <span class="rcard-ic"><svg class="ic"><use href="#i-hourglass"/></svg></span>
+        <div class="rc-main">
+          <div class="rc-line"><span class="rc-label">Сейчас изучается</span><b id="research-cur-name">Ничего</b><span id="research-cur-time" class="rc-time"></span></div>
+          <div class="pbar"><span id="research-cur-bar" style="width:0%"></span></div>
+        </div>
+      </div>
+      <div id="research-list" class="research-grid"></div>
     </div>
   </div>
-  <div class="row end"><button class="btn" data-close>Понятно</button></div>
-</div></div>
+</div>
 
-<div id="modal-end" class="modal" hidden><div class="box modal-box">
-  <h2 id="end-title">Победа!</h2>
-  <p id="end-text"></p>
-  <table id="end-stats" class="stats"></table>
-  <div class="row end">
-    <button class="btn" id="end-continue">Смотреть карту</button>
-    <button class="btn primary" id="end-menu">В меню</button>
+<div id="modal-countries" class="modal" hidden>
+  <div class="modal-box xxl" role="dialog" aria-labelledby="countries-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-globe"/></svg></span>
+      <h2 id="countries-title">Страны</h2>
+      <span class="mh-sub" id="countries-sub"></span>
+      <button class="icon-btn" data-close title="Закрыть (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal-body flush">
+      <div class="table-wrap">
+        <table id="countries-table" class="ctable">
+          <thead>
+            <tr>
+              <th data-sort="name" class="c-name">Страна</th>
+              <th data-sort="terr" class="num">Терр.</th>
+              <th data-sort="troops" class="num">Войска</th>
+              <th data-sort="gold" class="num">Золото</th>
+              <th data-sort="income" class="num">Доход/с</th>
+              <th data-sort="factory" class="ic-col" title="Фабрики"><svg class="ic"><use href="#i-factory"/></svg><span>Фабрики</span></th>
+              <th data-sort="house" class="ic-col" title="Жилые кварталы"><svg class="ic"><use href="#i-house"/></svg><span>Дома</span></th>
+              <th data-sort="port" class="ic-col" title="Порты"><svg class="ic"><use href="#i-port"/></svg><span>Порты</span></th>
+              <th data-sort="sam" class="ic-col" title="ПВО"><svg class="ic"><use href="#i-sam"/></svg><span>ПВО</span></th>
+              <th data-sort="silo" class="ic-col" title="Ракетные шахты"><svg class="ic"><use href="#i-silo"/></svg><span>Шахты</span></th>
+              <th data-sort="ships" class="ic-col" title="Военные корабли"><svg class="ic"><use href="#i-ship"/></svg><span>Корабли</span></th>
+              <th class="c-rel">Отношения</th>
+              <th class="c-act">Дипломатия</th>
+            </tr>
+          </thead>
+          <tbody id="countries-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <footer class="modal-foot legend">
+      <span><svg class="ic good"><use href="#i-ally"/></svg>Союз</span>
+      <span><svg class="ic blue"><use href="#i-pact"/></svg>Пакт о ненападении (10 мин)</span>
+      <span><svg class="ic gold"><use href="#i-swap"/></svg>Торговый договор (+50% к торговле)</span>
+      <span><svg class="ic danger"><use href="#i-break"/></svg>Разорвать</span>
+      <span><svg class="ic danger"><use href="#i-ban"/></svg>Эмбарго</span>
+      <span class="legend-note">Щёлкните по заголовку, чтобы отсортировать</span>
+    </footer>
   </div>
-</div></div>
+</div>
 
-<div id="modal-msg" class="modal" hidden><div class="box modal-box">
-  <h2 id="msg-title">Сообщение</h2>
-  <p id="msg-text"></p>
-  <div class="row end"><button class="btn primary" data-close>OK</button></div>
-</div></div>
+<div id="modal-pause" class="modal" hidden>
+  <div class="modal-box sm" role="dialog" aria-labelledby="pause-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-pause"/></svg></span>
+      <h2 id="pause-title">Пауза</h2>
+      <button class="icon-btn" data-close title="Продолжить (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <div class="menu-list compact">
+        <button class="menu-item primary" id="btn-resume" data-close><span class="mi-ic"><svg class="ic"><use href="#i-play"/></svg></span><span class="mi-text"><b>Продолжить</b></span></button>
+        <button class="menu-item offline-only" id="btn-save"><span class="mi-ic"><svg class="ic"><use href="#i-save"/></svg></span><span class="mi-text"><b>Сохранить</b></span></button>
+        <button class="menu-item offline-only" id="btn-load-game"><span class="mi-ic"><svg class="ic"><use href="#i-folder"/></svg></span><span class="mi-text"><b>Загрузить</b></span></button>
+        <button class="menu-item" data-modal="settings"><span class="mi-ic"><svg class="ic"><use href="#i-sliders"/></svg></span><span class="mi-text"><b>Настройки</b></span></button>
+        <button class="menu-item" data-modal="help"><span class="mi-ic"><svg class="ic"><use href="#i-help"/></svg></span><span class="mi-text"><b>Как играть</b></span></button>
+        <button class="menu-item" id="btn-surrender"><span class="mi-ic"><svg class="ic"><use href="#i-flag"/></svg></span><span class="mi-text"><b>Сдаться</b></span></button>
+        <button class="menu-item danger" id="btn-exit"><span class="mi-ic"><svg class="ic"><use href="#i-exit"/></svg></span><span class="mi-text"><b>Выйти в главное меню</b></span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal-load" class="modal" hidden>
+  <div class="modal-box md" role="dialog" aria-labelledby="load-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+      <h2 id="load-title">Сохранения</h2>
+      <button class="icon-btn" data-close title="Закрыть (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <ul id="save-slots" class="list save-list"></ul>
+    </div>
+  </div>
+</div>
+
+<div id="modal-settings" class="modal" hidden>
+  <div class="modal-box md" role="dialog" aria-labelledby="settings-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-sliders"/></svg></span>
+      <h2 id="settings-title">Настройки</h2>
+      <button class="icon-btn" data-close title="Закрыть (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <div class="field">
+        <span class="field-label">Тема оформления</span>
+        <div class="seg" id="set-theme">
+          <label><input type="radio" name="set-theme" value="dark" checked><span>Тёмная</span></label>
+          <label><input type="radio" name="set-theme" value="light"><span>Светлая</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-row"><label class="field-label" for="set-vol">Громкость</label><output id="set-vol-v">50%</output></span>
+        <div class="range-icon"><svg class="ic"><use href="#i-volume"/></svg><input type="range" id="set-vol" min="0" max="100" value="50" style="--p:50%"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">Масштаб интерфейса</span>
+        <div class="seg" id="set-ui">
+          <label><input type="radio" name="set-ui" value="0.85"><span>Мелкий</span></label>
+          <label><input type="radio" name="set-ui" value="1" checked><span>Обычный</span></label>
+          <label><input type="radio" name="set-ui" value="1.15"><span>Крупный</span></label>
+          <label><input type="radio" name="set-ui" value="1.3"><span>Огромный</span></label>
+        </div>
+      </div>
+      <label class="switch row-switch"><input type="checkbox" id="set-edge"><span class="switch-ui"></span><span class="switch-text"><b>Прокрутка у края экрана</b><small>Карта сдвигается, когда курсор у края окна</small></span></label>
+      <label class="switch row-switch native-only"><input type="checkbox" id="set-fs"><span class="switch-ui"></span><span class="switch-text"><b>Полноэкранный режим</b><small>Также переключается клавишей F11</small></span></label>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn primary" data-close><svg class="ic"><use href="#i-check"/></svg>Готово</button>
+    </footer>
+  </div>
+</div>
+
+<div id="modal-help" class="modal" hidden>
+  <div class="modal-box xl" role="dialog" aria-labelledby="help-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+      <h2 id="help-title">Как играть</h2>
+      <span class="mh-sub">Правила Pixel Conquest 2.0</span>
+      <button class="icon-btn" data-close title="Закрыть (Esc)" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <div class="help-grid">
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-trophy"/></svg>Цель игры</h3>
+          <p>Карта не разделена на области заранее: границы стран складываются по ходу партии, клетка за клеткой. Победа достигается по целям, выбранным перед игрой:</p>
+          <ul>
+            <li><b>Захват территории</b> — контролируйте заданную долю всей суши (от 30 до 100%).</li>
+            <li><b>Экономическое лидерство</b> — держите самый высокий доход с отрывом не меньше 15% от второго места непрерывно заданное число минут (от 5 до 60).</li>
+            <li><b>Последний выживший</b> — действует всегда: останьтесь единственной страной или коалицией союзников.</li>
+          </ul>
+          <p>Прогресс целей виден в верхней панели.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-pin"/></svg>Начало партии</h3>
+          <p>Первые секунды — выбор места старта. Кликните по свободной суше, чтобы основать страну; пока идёт отсчёт, место можно менять. Кто не успел выбрать, получает случайное место.</p>
+          <p>Каждая страна начинает с <b>3 000 войск</b> и <b>1 500 золота</b>.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-sword"/></svg>Захват и атаки</h3>
+          <p><b>ЛКМ</b> по ничьей или чужой земле, граничащей с вашей, — атака. Сколько войск уйдёт, задаёт ползунок <b>«Сила атаки»</b> внизу экрана (клавиши Q и E или Shift + колесо). Повторный клик по той же цели добавляет войска к идущей атаке.</p>
+          <p>Фронт продвигается сам, пока хватает войск. Горы, холмы и леса захватывать дороже, укрепления и артиллерия защитника усиливают оборону. Анклав, полностью окружённый одной страной, переходит к ней.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-boat"/></svg>Высадка десанта</h3>
+          <p>Если цель не граничит с вами, но до неё можно доплыть, <b>ЛКМ</b> отправит десант: транспорт выйдет из ближайшей вашей прибрежной клетки и высадит войска на берег. Подсказка у курсора заранее показывает, что произойдёт.</p>
+          <p>Режим высадки можно включить вручную клавишей <b>B</b>. Одновременно в море — до 3 транспортов. Транспорты беззащитны: их топят вражеские военные корабли.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-ship"/></svg>Флот и порты</h3>
+          <p>Порт строится только на побережье. В порту можно построить <b>военный корабль</b> — кнопкой «Военный корабль» внизу или в панели выбранного порта.</p>
+          <p>Выберите корабль <b>ЛКМ</b> и укажите курс <b>ПКМ</b> по воде. Корабли сами атакуют вражеские военные корабли, транспорты и торговые суда поблизости. Потопленный торговец отдаёт половину груза.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-gold"/></svg>Экономика</h3>
+          <p>Золото приносят территория, войска, жилые кварталы, фабрики и торговля. Содержание требуют военные корабли, ПВО, ракетные шахты и аэродромы.</p>
+          <p>Если казна уходит в минус, войска начинают дезертировать. Чем ближе армия к максимуму, тем медленнее растут войска, — не держите её у предела.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-tank"/></svg>Армия формируется сама</h3>
+          <p>Отряды не нужно нанимать вручную. Состав армии — <b>пехота</b>, <b>танки</b> и <b>артиллерия</b> — рассчитывается автоматически по исследованиям и фабрикам.</p>
+          <p>Изучили «Бронетехнику» — танки сами появятся в армии и распределятся по всем фронтам; каждая фабрика немного увеличивает их долю. Танки усиливают атаку, артиллерия — и атаку, и оборону. Состав показан цветной полоской в верхней панели.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-house"/></svg>Постройки</h3>
+          <p>Здания ставятся в <b>любой клетке</b> своей территории, не ближе 5 клеток к другому зданию. Выберите инструмент (клавиши 1–7) и кликните по карте. Повторная постройка на месте здания — улучшение, снос возвращает 25% цены. Каждое следующее здание того же типа дороже.</p>
+          <ul>
+            <li><b>Дома</b> — +25 000 к максимуму войск и +6 золота/с за уровень.</li>
+            <li><b>Фабрика</b> — производит товары для портов, увеличивает долю танков.</li>
+            <li><b>Порт</b> — верфь, торговля и приём товаров.</li>
+            <li><b>Укрепление</b> — бонус обороны в радиусе.</li>
+            <li><b>ПВО</b> — сбивает дроны, ракеты и бомбы.</li>
+            <li><b>Аэродром</b> и <b>Шахта</b> — запуск дронов и ракет, нужны исследования.</li>
+          </ul>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-rail"/></svg>Железные дороги</h3>
+          <p>Фабрики регулярно отправляют товары в ближайший порт. Без дороги их везут грузовики, а по железной дороге — поезда, которые идут <b>в 2 раза быстрее</b>. Товары в порту увеличивают доход торговых судов.</p>
+          <p>Инструмент «Ж/д» (клавиша <b>8</b>): кликните по первому зданию (фабрика, порт или дом), затем по второму. Цена зависит от длины, путь должен проходить по вашей земле. Дорога исчезает, если потерян любой её конец.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-trade"/></svg>Торговля</h3>
+          <p>Каждый порт сам отправляет торговые суда в порты других стран. Доход получают обе стороны; дальние рейсы и полный склад товаров выгоднее.</p>
+          <p>Торговые маршруты всех стран видны на карте пунктиром. Торговый договор даёт <b>+50%</b> к доходу, эмбарго полностью запрещает торговлю со страной.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-target"/></svg>Удары и ПВО</h3>
+          <ul>
+            <li><b>Дрон</b> — уничтожает войска в небольшом радиусе.</li>
+            <li><b>Камикадзе</b> — точечно уничтожает выбранное здание.</li>
+            <li><b>Крылатая ракета</b> — точечно уничтожает здание на большой дистанции.</li>
+            <li><b>Атомная бомба</b> — выжигает область: земля становится ничьей и заражённой.</li>
+            <li><b>Водородная бомба</b> — то же, но намного мощнее.</li>
+          </ul>
+          <p>Выберите удар внизу экрана и цель на карте или нажмите <b>ПКМ</b> по вражескому зданию. Запуск идёт с готового аэродрома или шахты, после выстрела — перезарядка. ПВО перехватывает снаряды в своём радиусе; клавиша <b>V</b> показывает зоны ПВО.</p>
+        </article>
+        <article class="help-card danger-card">
+          <h3><svg class="ic"><use href="#i-mega"/></svg>Мегабомба «Судный день»</h3>
+          <p>Самое дорогое оружие в игре — <b>250 000 золота</b>, требуется «Ядерная программа» III и готовая ракетная шахта, поэтому она доступна только в поздней игре.</p>
+          <p>Ракета распадается на боеголовки и поражает крупнейшие скопления и здания каждой вражеской страны, кроме ваших союзников, — уничтожает почти всю карту. Любой ядерный удар разрывает договоры с пострадавшими и делает вас предателем.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-ally"/></svg>Дипломатия</h3>
+          <p><b>ПКМ</b> по стране или окно «Страны» (<b>Tab</b>):</p>
+          <ul>
+            <li><b>Союз</b> — бессрочно, нельзя атаковать друг друга.</li>
+            <li><b>Пакт о ненападении</b> — то же, но на 10 минут.</li>
+            <li><b>Торговый договор</b> — +50% к торговле.</li>
+            <li><b>Эмбарго</b> — запрет торговли.</li>
+          </ul>
+          <p>Входящие предложения появляются справа карточками «Принять / Отклонить» и действуют 30 секунд. Разрыв союза делает вас предателем — боты долго не будут вам доверять.</p>
+        </article>
+        <article class="help-card">
+          <h3><svg class="ic"><use href="#i-chart"/></svg>Сводка по странам</h3>
+          <p>Окно «Страны» (<b>Tab</b>) показывает по каждой стране территорию, войска, золото, доход, число фабрик, домов, портов, ПВО, шахт и кораблей, а также ваши отношения и кнопки дипломатии. Щёлкните по заголовку столбца, чтобы отсортировать.</p>
+          <h3 class="sub"><svg class="ic"><use href="#i-flask"/></svg>Исследования</h3>
+          <p>Окно исследований (<b>R</b>): экономика, логистика, пехота, бронетехника, артиллерия, укрепления, флот, БПЛА, ракеты, ПВО и ядерная программа. Одновременно изучается одна технология, каждый следующий уровень дороже и дольше.</p>
+        </article>
+        <article class="help-card wide">
+          <h3><svg class="ic"><use href="#i-keyboard"/></svg>Управление</h3>
+          <div class="keys">
+            <div><span>Атака, высадка, выбор здания или корабля</span><kbd>ЛКМ</kbd></div>
+            <div><span>Меню страны, курс выбранного корабля</span><kbd>ПКМ</kbd></div>
+            <div><span>Масштаб карты</span><kbd>Колесо</kbd></div>
+            <div><span>Перемещение карты</span><span class="kgroup"><kbd>WASD</kbd><kbd>Стрелки</kbd></span></div>
+            <div><span>Сила атаки меньше / больше</span><span class="kgroup"><kbd>Q</kbd><kbd>E</kbd></span></div>
+            <div><span>Сила атаки плавно</span><kbd>Shift + колесо</kbd></div>
+            <div><span>Постройки</span><kbd>1–7</kbd></div>
+            <div><span>Железная дорога</span><kbd>8</kbd></div>
+            <div><span>Режим высадки</span><kbd>B</kbd></div>
+            <div><span>Страны и дипломатия</span><kbd>Tab</kbd></div>
+            <div><span>Исследования</span><kbd>R</kbd></div>
+            <div><span>Зоны ПВО</span><kbd>V</kbd></div>
+            <div><span>Сменить тему</span><kbd>T</kbd></div>
+            <div><span>Пауза (офлайн)</span><kbd>Пробел</kbd></div>
+            <div><span>Скорость медленнее / быстрее</span><span class="kgroup"><kbd>−</kbd><kbd>+</kbd></span></div>
+            <div><span>К своей стране</span><kbd>Home</kbd></div>
+            <div><span>Чат (мультиплеер)</span><kbd>Enter</kbd></div>
+            <div><span>Отмена режима / меню</span><kbd>Esc</kbd></div>
+            <div><span>Полноэкранный режим</span><kbd>F11</kbd></div>
+          </div>
+        </article>
+      </div>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn primary" data-close><svg class="ic"><use href="#i-check"/></svg>Понятно</button>
+    </footer>
+  </div>
+</div>
+
+<div id="modal-confirm" class="modal" hidden>
+  <div class="modal-box sm" role="dialog" aria-labelledby="confirm-title">
+    <header class="modal-head">
+      <span class="mh-ic warn"><svg class="ic"><use href="#i-alert"/></svg></span>
+      <h2 id="confirm-title">Подтверждение</h2>
+    </header>
+    <div class="modal-body"><p id="confirm-text" class="msg-text"></p></div>
+    <footer class="modal-foot">
+      <button class="btn" id="confirm-cancel" data-close>Отмена</button>
+      <button class="btn danger" id="confirm-ok">Подтвердить</button>
+    </footer>
+  </div>
+</div>
+
+<div id="modal-end" class="modal" hidden>
+  <div class="modal-box lg" role="dialog" aria-labelledby="end-title">
+    <div class="end-hero" id="end-hero">
+      <span class="end-ic" id="end-icon"><svg class="ic"><use href="#i-trophy"/></svg></span>
+      <h2 id="end-title">Победа!</h2>
+      <p id="end-reason" class="end-reason"></p>
+    </div>
+    <div class="modal-body">
+      <div class="end-winner" id="end-winner"></div>
+      <p id="end-text" class="end-text"></p>
+      <div class="table-wrap"><table id="end-stats" class="ctable compact"></table></div>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn" id="end-continue"><svg class="ic"><use href="#i-map"/></svg>Смотреть карту</button>
+      <button class="btn primary" id="end-menu"><svg class="ic"><use href="#i-exit"/></svg>В главное меню</button>
+    </footer>
+  </div>
+</div>
+
+<div id="modal-msg" class="modal" hidden>
+  <div class="modal-box sm" role="dialog" aria-labelledby="msg-title">
+    <header class="modal-head">
+      <span class="mh-ic"><svg class="ic"><use href="#i-info"/></svg></span>
+      <h2 id="msg-title">Сообщение</h2>
+    </header>
+    <div class="modal-body"><p id="msg-text" class="msg-text"></p></div>
+    <footer class="modal-foot">
+      <button class="btn primary" id="msg-ok" data-close>OK</button>
+    </footer>
+  </div>
+</div>
+
+<template id="tpl-map-card">
+  <button class="map-card"><span class="map-thumb-wrap"><canvas class="map-thumb" width="240" height="120"></canvas><span class="map-badge"></span></span><span class="map-card-name"></span><span class="map-card-meta"></span></button>
+</template>
+
+<template id="tpl-swatch">
+  <button class="swatch" aria-label="Цвет"></button>
+</template>
+
+<template id="tpl-lobby-slot">
+  <li class="slot"><span class="dot"></span><span class="slot-name"></span><span class="tag"></span><button class="icon-btn sm danger slot-kick" title="Исключить" aria-label="Исключить"><svg class="ic"><use href="#i-close"/></svg></button></li>
+</template>
+
+<template id="tpl-steam-lobby">
+  <li class="lobby-row"><span class="lobby-ic"><svg class="ic"><use href="#i-users"/></svg></span><span class="lobby-name"></span><span class="tag"></span><button class="btn sm">Войти</button></li>
+</template>
+
+<template id="tpl-save-slot">
+  <li class="save-slot"><span class="save-ic"><svg class="ic"><use href="#i-save"/></svg></span><span class="save-info"><b class="save-name"></b><span class="save-meta"></span></span><button class="btn sm"></button></li>
+</template>
+
+<template id="tpl-board-row">
+  <li class="board-row"><span class="rank"></span><span class="dot"></span><span class="nm"></span><span class="pct"></span></li>
+</template>
+
+<template id="tpl-research-card">
+  <div class="rcard">
+    <div class="rcard-top"><span class="rcard-ic"><svg class="ic"><use href="#i-flask"/></svg></span><div class="rcard-title"><h4></h4><span class="pips"></span></div></div>
+    <p class="rcard-desc"></p>
+    <div class="rcard-meta"><span class="rc-cost"><svg class="ic"><use href="#i-gold"/></svg><b></b></span><span class="rc-dur"><svg class="ic"><use href="#i-clock"/></svg><b></b></span></div>
+    <p class="rcard-req"></p>
+    <div class="pbar rcard-bar"><span style="width:0%"></span></div>
+    <button class="btn block rcard-btn">Исследовать</button>
+  </div>
+</template>
+
+<template id="tpl-country-row">
+  <tr>
+    <td class="c-name"><span class="cname"><span class="dot"></span><b></b><span class="tag"></span></span></td>
+    <td class="num c-terr"></td>
+    <td class="num c-troops"></td>
+    <td class="num c-gold"></td>
+    <td class="num c-income"></td>
+    <td class="ic-col c-factory"></td>
+    <td class="ic-col c-house"></td>
+    <td class="ic-col c-port"></td>
+    <td class="ic-col c-sam"></td>
+    <td class="ic-col c-silo"></td>
+    <td class="ic-col c-ships"></td>
+    <td class="c-rel"><span class="rel none">Нейтралитет</span></td>
+    <td class="c-act"><span class="dip-actions">
+      <button class="dip" data-dip="alliance" title="Предложить союз" aria-label="Предложить союз"><svg class="ic"><use href="#i-ally"/></svg></button>
+      <button class="dip" data-dip="pact" title="Предложить пакт о ненападении на 10 минут" aria-label="Пакт о ненападении"><svg class="ic"><use href="#i-pact"/></svg></button>
+      <button class="dip" data-dip="trade" title="Предложить торговый договор" aria-label="Торговый договор"><svg class="ic"><use href="#i-swap"/></svg></button>
+      <button class="dip" data-dip="break" title="Разорвать договор" aria-label="Разорвать договор"><svg class="ic"><use href="#i-break"/></svg></button>
+      <button class="dip" data-dip="embargo" title="Эмбарго: запретить торговлю" aria-label="Эмбарго"><svg class="ic"><use href="#i-ban"/></svg></button>
+    </span></td>
+  </tr>
+</template>
+
+<template id="tpl-diplo-card">
+  <div class="hud-card dcard">
+    <div class="dcard-head"><span class="dot"></span><b class="dcard-from"></b><span class="badge dcard-type"></span></div>
+    <p class="dcard-text"></p>
+    <div class="dcard-timer"><span style="width:100%"></span></div>
+    <div class="dcard-actions"><button class="btn sm good dcard-accept"><svg class="ic"><use href="#i-check"/></svg>Принять</button><button class="btn sm dcard-decline"><svg class="ic"><use href="#i-close"/></svg>Отклонить</button></div>
+  </div>
+</template>
+
+<template id="tpl-log-item">
+  <div class="log-item"><span class="log-time"></span><span class="log-text"></span></div>
+</template>
+
+<template id="tpl-toast">
+  <div class="toast"><svg class="ic"><use href="#i-alert"/></svg><span class="toast-text"></span></div>
+</template>
 
 <script src="game.js"></script>
 </body>

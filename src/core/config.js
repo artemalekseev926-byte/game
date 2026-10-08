@@ -1,92 +1,209 @@
-export const TICK = 0.25;
-export const VERSION = '1.0.0';
+export const VERSION = '2.0.0';
+export const TICK_MS = 100;
+export const TICKS_PER_SEC = 10;
+export const sec = (s) => Math.round(s * TICKS_PER_SEC);
 
 export const PLAYER_COLORS = [
-  '#d94141', '#3f7fe0', '#47b347', '#e0b23a', '#9b55d6', '#e07a2f',
-  '#2fc2c2', '#d655a3', '#8a6b3f', '#7c8c2e', '#5d6fd6', '#c2c2c2',
+  '#e04848', '#3d7ee6', '#3fb950', '#e6b422', '#a259e0', '#f07c2a',
+  '#22c3c3', '#e055a8', '#9c7a4a', '#9fb236', '#6b74f0', '#c7cbd1',
+  '#ff8f80', '#3ed6a6', '#c49bff', '#ffcf73',
 ];
 
-export const TERRAIN = {
-  plain: { name: 'Равнина', def: 1.0, grow: 1.0, color: '#7fae5a' },
-  forest: { name: 'Лес', def: 1.15, grow: 0.9, color: '#4f8a42' },
-  hills: { name: 'Горы', def: 1.35, grow: 0.75, color: '#9a8a6a' },
-  desert: { name: 'Пустыня', def: 0.95, grow: 0.6, color: '#d8c27a' },
-  snow: { name: 'Тундра', def: 1.1, grow: 0.55, color: '#dfe7ea' },
-};
-export const TERRAIN_KEYS = Object.keys(TERRAIN);
+export const TER = { DEEP: 0, SHALLOW: 1, PLAINS: 2, FOREST: 3, DESERT: 4, HILLS: 5, MOUNTAIN: 6, SNOW: 7 };
 
-export const UNITS = {
-  inf: { name: 'Пехота', short: 'ПЕХ', atk: 1.0, def: 1.3, cost: 3, mp: 1, upkeep: 0.012, speed: 1.0, needs: null, research: 'inf' },
-  tank: { name: 'Танки', short: 'ТНК', atk: 4.5, def: 3.0, cost: 18, mp: 2, upkeep: 0.06, speed: 1.5, needs: 'factory', research: 'armor' },
-  art: { name: 'Артиллерия', short: 'АРТ', atk: 3.5, def: 1.6, cost: 14, mp: 2, upkeep: 0.045, speed: 0.75, needs: 'factory', research: 'art', fortPierce: 0.6 },
-};
-export const UNIT_KEYS = Object.keys(UNITS);
-export const ARMY_BASE_SPEED = 1.8;
+export const TERRAIN = [
+  { key: 'deep', name: 'Глубокая вода', land: false, cost: 0, def: 0 },
+  { key: 'shallow', name: 'Мелководье', land: false, cost: 0, def: 0 },
+  { key: 'plains', name: 'Равнина', land: true, cost: 1.0, def: 1.0 },
+  { key: 'forest', name: 'Лес', land: true, cost: 1.25, def: 1.15 },
+  { key: 'desert', name: 'Пустыня', land: true, cost: 1.1, def: 0.95 },
+  { key: 'hills', name: 'Возвышенность', land: true, cost: 1.5, def: 1.3 },
+  { key: 'mountain', name: 'Горы', land: true, cost: 2.2, def: 1.7 },
+  { key: 'snow', name: 'Тундра и льды', land: true, cost: 1.4, def: 1.1 },
+];
+export const TERRAIN_COST = Float64Array.from(TERRAIN, (t) => t.cost);
+export const TERRAIN_DEF = Float64Array.from(TERRAIN, (t) => t.def);
 
 export const BUILDINGS = {
-  fort: { name: 'Укрепления', icon: 'fort', max: 3, cost: 60, upkeep: 0.25, time: 8, desc: '+35% к обороне за уровень' },
-  factory: { name: 'Фабрика', icon: 'factory', max: 3, cost: 120, upkeep: 0, time: 12, desc: '+3$/с за уровень, позволяет выпускать танки и артиллерию' },
-  house: { name: 'Жилые дома', icon: 'house', max: 3, cost: 70, upkeep: 0, time: 8, desc: '+35% к населению и +25% к росту за уровень' },
-  aa: { name: 'ПВО', icon: 'aa', max: 3, cost: 110, upkeep: 0.4, time: 10, desc: 'Сбивает БПЛА и ракеты в радиусе' },
-  airbase: { name: 'Аэродром БПЛА', icon: 'airbase', max: 2, cost: 140, upkeep: 0.5, time: 12, req: ['drone', 1], desc: 'Запуск БПЛА. Уровень увеличивает дальность и скорострельность' },
-  silo: { name: 'Ракетная шахта', icon: 'silo', max: 2, cost: 250, upkeep: 1.0, time: 18, req: ['missile', 1], desc: 'Запуск ракет. Уровень ускоряет перезарядку' },
+  house: {
+    name: 'Жилой квартал', short: 'Дома', max: 5, cost: 1000, time: 6, upkeep: 0, hotkey: '1',
+    desc: '+25 000 к максимуму войск и +6 золота/с за уровень',
+  },
+  factory: {
+    name: 'Фабрика', short: 'Фабрика', max: 3, cost: 2500, time: 10, upkeep: 0, hotkey: '2',
+    desc: 'Возит грузы в ближайший порт (по ж/д — вдвое быстрее). Без порта даёт 4 золота/с за уровень. Открывает танки и артиллерию',
+  },
+  port: {
+    name: 'Порт', short: 'Порт', max: 3, cost: 3000, time: 10, upkeep: 0, coast: true, hotkey: '3',
+    desc: 'Верфь, торговые суда и приём грузов с фабрик. Строится только на морском берегу',
+  },
+  fort: {
+    name: 'Укрепление', short: 'Форт', max: 3, cost: 1500, time: 8, upkeep: 0, hotkey: '4',
+    desc: 'Оборона ×1.6 в радиусе 18 клеток, +25% за каждый следующий уровень',
+  },
+  sam: {
+    name: 'ПВО', short: 'ПВО', max: 3, cost: 4000, time: 10, upkeep: 1.5, upkeepPerLevel: true, hotkey: '5',
+    desc: 'Сбивает дроны, ракеты и бомбы в радиусе 40 клеток (+10 за уровень)',
+  },
+  airbase: {
+    name: 'Аэродром БПЛА', short: 'Аэродром', max: 2, cost: 3500, time: 10, upkeep: 1, req: ['drone', 1], hotkey: '6',
+    desc: 'Запуск ударных дронов и дронов-камикадзе',
+  },
+  silo: {
+    name: 'Ракетная шахта', short: 'Шахта', max: 2, cost: 8000, time: 15, upkeep: 2, req: ['missile', 1], hotkey: '7',
+    desc: 'Запуск крылатых ракет и ядерных бомб',
+  },
 };
 export const BUILDING_KEYS = Object.keys(BUILDINGS);
+export const CAPTURABLE = { house: true, factory: true, port: true, fort: true };
+export const RAIL_TYPES = { factory: true, port: true, house: true };
 
 export const RESEARCH = {
-  econ: { name: 'Экономика', max: 5, cost: 100, desc: '+10% налогов и выпуска фабрик' },
-  logistics: { name: 'Логистика', max: 3, cost: 90, desc: '+12% скорости армий, -10% содержания войск' },
-  inf: { name: 'Стрелковое оружие', max: 5, cost: 80, desc: '+15% атаки и обороны пехоты' },
-  armor: { name: 'Бронетехника', max: 5, cost: 120, desc: '+15% атаки и обороны танков' },
-  art: { name: 'Артиллерия', max: 5, cost: 110, desc: '+15% атаки артиллерии, лучше пробивает укрепления' },
-  fort: { name: 'Фортификация', max: 3, cost: 100, desc: '+10% к эффекту укреплений' },
-  drone: { name: 'БПЛА', max: 3, cost: 150, desc: '1: ударные БПЛА и аэродромы, 2: дроны-камикадзе, 3: рой дронов' },
-  missile: { name: 'Ракеты', max: 3, cost: 200, desc: '1: шахты и тактические ракеты, 2: средняя дальность, 3: МБР' },
-  aa: { name: 'Системы ПВО', max: 3, cost: 130, desc: '+шанс перехвата и скорострельность ПВО' },
+  econ: { name: 'Экономика', max: 5, base: 1200, desc: '+10% к доходу и +5% к приросту войск за уровень' },
+  logistics: { name: 'Логистика', max: 3, base: 1500, desc: '+10% к скорости наступления за уровень' },
+  inf: { name: 'Пехота', max: 5, base: 1000, desc: '+8% к атаке и обороне за уровень' },
+  armor: { name: 'Бронетехника', max: 5, base: 2000, desc: 'Танки сами появляются в армии (нужна фабрика): мощная атака' },
+  art: { name: 'Артиллерия', max: 5, base: 1800, desc: 'Артиллерия сама появляется в армии (нужна фабрика): атака и оборона' },
+  fort: { name: 'Фортификация', max: 3, base: 1500, desc: '+12% к обороне всей территории за уровень' },
+  naval: { name: 'Флот', max: 3, base: 2000, desc: '+20% к прочности и урону военных кораблей за уровень' },
+  drone: { name: 'БПЛА', max: 3, base: 3000, desc: '1: аэродромы и ударные дроны, 2: дроны-камикадзе, 3: усиленные дроны' },
+  missile: { name: 'Ракеты', max: 3, base: 5000, desc: '1: шахты и крылатые ракеты, 2: дальность 500, 3: без ограничения дальности' },
+  aa: { name: 'Системы ПВО', max: 3, base: 3000, desc: '+10% к шансу перехвата за уровень' },
+  nuclear: { name: 'Ядерное оружие', max: 3, base: 12000, req: ['missile', 1], desc: '1: атомная бомба, 2: водородная бомба, 3: мегабомба «Судный день»' },
 };
 export const RESEARCH_KEYS = Object.keys(RESEARCH);
-export const researchCost = (key, lvl) => Math.round(RESEARCH[key].cost * Math.pow(lvl + 1, 1.6));
-export const researchTime = (lvl) => 15 + 12 * lvl;
+export const researchCost = (key, lvl) => Math.round(RESEARCH[key].base * Math.pow(lvl + 1, 1.6));
+export const researchTicks = (lvl) => (20 + 15 * lvl) * TICKS_PER_SEC;
 
-export const DRONES = {
-  strike: { name: 'Ударный БПЛА', cost: 35, lvl: 1, dmg: 26, bldg: 0, count: 1 },
-  kamikaze: { name: 'Дрон-камикадзе', cost: 50, lvl: 2, dmg: 10, bldg: 1, count: 1 },
-  swarm: { name: 'Рой дронов', cost: 120, lvl: 3, dmg: 22, bldg: 0, count: 5 },
+export const STRIKES = {
+  drone: { name: 'Ударный БПЛА', src: 'airbase', req: ['drone', 1], cost: 300, r: 3, speed: 1.5, killPerLevel: 1500 },
+  kamikaze: { name: 'Дрон-камикадзе', src: 'airbase', req: ['drone', 2], cost: 600, r: 0, speed: 1.5, point: true, pick: 2 },
+  cruise: { name: 'Крылатая ракета', src: 'silo', req: ['missile', 1], cost: 2000, r: 0, speed: 2.5, point: true, pick: 2 },
+  atom: { name: 'Атомная бомба', src: 'silo', req: ['nuclear', 1], cost: 15000, r: 14, speed: 2.0, nuke: true },
+  hbomb: { name: 'Водородная бомба', src: 'silo', req: ['nuclear', 2], cost: 50000, r: 40, speed: 2.0, nuke: true },
+  mega: { name: 'Мегабомба «Судный день»', src: 'silo', req: ['nuclear', 3], cost: 250000, r: 24, speed: 2.0, nuke: true, warheads: 6 },
 };
-export const DRONE_SPEED = 6;
-export const droneRange = (airbaseLvl, droneLvl) => 26 + 10 * airbaseLvl + 8 * droneLvl;
-export const droneCooldown = (airbaseLvl) => 8 / airbaseLvl;
+export const STRIKE_KEYS = Object.keys(STRIKES);
+export const WARHEAD = { r: 24, speed: 2.0 };
+export const FALLOUT_TICKS = 600;
+export const NUKE_TROOP_LOSS = 1.5;
+export const TRAITOR_TICKS = 3000;
+export const cruiseRange = (lvl) => (lvl >= 3 ? Infinity : 300 + 200 * (lvl - 1));
+export const siloReload = (lvl) => Math.round(300 / Math.max(1, lvl));
+export const airbaseReload = (lvl) => Math.round(100 / Math.max(1, lvl));
 
-export const MISSILE = { name: 'Ракета', cost: 180, speed: 10 };
-export const missileRange = (lvl) => (lvl >= 3 ? 9999 : lvl === 2 ? 90 : 50);
-export const missileTroopLoss = (lvl) => 0.4 + 0.1 * lvl;
-export const siloCooldown = (siloLvl) => (siloLvl >= 2 ? 15 : 25);
+export const SAM = {
+  every: 5,
+  radius: (lvl) => 40 + 10 * (lvl - 1),
+  reload: (lvl) => Math.round(30 / Math.max(1, lvl)),
+};
+export const INTERCEPT = { drone: 0.6, kamikaze: 0.6, cruise: 0.5, atom: 0.45, warhead: 0.45, mega: 0.45, hbomb: 0.35 };
+export const interceptChance = (kind, aaLvl) => Math.min(0.95, (INTERCEPT[kind] ?? 0.45) + 0.1 * aaLvl);
 
-export const aaRadius = (lvl) => 8 + 3 * lvl;
-export const aaCooldown = (lvl, research) => 2.2 / (lvl + 0.5 * research);
-export const aaHitChance = (kind, lvl, research) =>
-  kind === 'missile' ? 0.12 + 0.08 * lvl + 0.06 * research : 0.3 + 0.12 * lvl + 0.07 * research;
+export const SHIPS = {
+  warship: {
+    name: 'Военный корабль', cost: 2500, costStep: 0.1, hp: 1000, dmg: 120, navalBonus: 0.2,
+    range: 14, chase: 25, fireEvery: 5, speed: 0.9, upkeep: 3, perPortBase: 3,
+  },
+  transport: { name: 'Десантный корабль', hp: 300, speed: 1.1, maxActive: 3 },
+  trade: { name: 'Торговое судно', hp: 300, speed: 0.8 },
+};
+export const LAND_UNITS = {
+  truck: { name: 'Грузовик', speed: 0.6 },
+  train: { name: 'Поезд', speed: 1.2 },
+};
+export const TRADE = {
+  interval: (lvl) => (40 - 5 * lvl) * TICKS_PER_SEC,
+  base: 100, perTile: 3, treaty: 0.5, stockBonus: 0.1, maxStock: 20, sunkLoot: 0.5,
+};
 
 export const ECON = {
-  startMoney: 400,
-  startManpower: 60,
-  taxPerPop: 0.04,
-  manpowerPerPop: 0.018,
-  factoryIncome: 3,
-  popBase: 8,
-  popPerTile: 0.9,
-  growth: 0.02,
-  overextensionFree: 10,
-  overextension: 0.012,
-  unrestTime: 60,
-  debtDesertion: 0.02,
-  buildingScale: 0.08,
-  neutralGarrison: 0.6,
-  maxMoney: 1e7,
+  startGold: 1500,
+  startTroops: 3000,
+  maxGold: 1e9,
+  troopsBase: 5000,
+  troopsPerTile: 2.2,
+  houseTroops: 25000,
+  growthBase: 10,
+  growthExp: 0.73,
+  growthDiv: 4,
+  growthEcon: 0.05,
+  overCapDecay: 0.01,
+  desertion: 0.01,
+  incomePerTile: 0.045,
+  incomeTroops: 0.06,
+  houseIncome: 6,
+  factoryDirect: 4,
+  incomeEcon: 0.1,
+  eventIncomeAlpha: 0.08,
+  neutralCost: 8,
+  tileCost: 8,
+  densityCost: 1.2,
+  defenderLoss: 0.9,
+  falloutCostMul: 3,
+  captureRate: 0.18,
+  logisticsSpeed: 0.1,
+  sampleMul: 4,
+  frontRescan: 40,
+  fortRadius: 18,
+  fortBonus: 1.6,
+  fortLevelBonus: 0.25,
+  enclaveEvery: 50,
+  enclaveMax: 200,
+  spawnRadius: 5,
+  spawnMinDist: 30,
+  buildMinDist: 5,
+  buildCostStep: 0.25,
+  demolishRefund: 0.25,
+  factoryInterval: 20,
+  cargoPerLevel: 150,
+  railCostPerTile: 40,
+  railOwnShare: 0.8,
+  railMaxLen: 300,
+};
+
+export const ARMY = {
+  tankPerArmor: 0.07, tankPerFactory: 0.01, tankMax: 0.45,
+  artPerLevel: 0.06, artMax: 0.3,
+  infBonus: 0.08, tankAtk: 1.3, artAtk: 0.9, artDef: 0.5, fortDef: 0.12,
+  armorBonus: 0.1, artBonus: 0.1,
+};
+
+export const DIPLO = {
+  requestTicks: 30 * TICKS_PER_SEC,
+  pactTicks: 600 * TICKS_PER_SEC,
+  traitorTicks: TRAITOR_TICKS,
+  aiReplyEvery: 10,
+};
+export const RELATIONS = {
+  none: 'Нет договора',
+  alliance: 'Союз',
+  pact: 'Пакт о ненападении',
+  trade: 'Торговый договор',
+};
+export const PROPOSALS = { alliance: true, pact: true, trade: true };
+
+export const DEFAULT_SETTINGS = {
+  victory: { territory: true, territoryPct: 70, economy: false, economyMinutes: 20 },
+  spawnSeconds: 15,
+  difficulty: 'normal',
+};
+export const VICTORY = {
+  econLead: 0.15,
+  econCheckEvery: 10,
+  minTerritoryPct: 30,
+  maxTerritoryPct: 100,
+  minEconMinutes: 5,
+  maxEconMinutes: 60,
+};
+export const WIN_REASONS = {
+  territory: 'Захват территории',
+  economy: 'Экономическое лидерство',
+  survivor: 'Последний выживший',
 };
 
 export const DIFFICULTY = {
-  easy: { name: 'Лёгкий', income: 0.75, think: 3.0, aggression: 1.6 },
-  normal: { name: 'Нормальный', income: 1.0, think: 2.0, aggression: 1.3 },
-  hard: { name: 'Сложный', income: 1.3, think: 1.2, aggression: 1.1 },
+  easy: { name: 'Лёгкий', income: 0.8, think: 30, aggression: 0.7 },
+  normal: { name: 'Нормальный', income: 1.0, think: 18, aggression: 1.0 },
+  hard: { name: 'Сложный', income: 1.25, think: 10, aggression: 1.3 },
 };
