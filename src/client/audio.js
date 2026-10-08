@@ -1,4 +1,3 @@
-// 8-битные звуки на WebAudio (без файлов-ассетов)
 let ctx = null;
 let volume = 0.5;
 let last = {};
@@ -64,10 +63,9 @@ const SOUNDS = {
   alert: () => { tone(880, 0.1, 'square', 0.12); tone(880, 0.1, 'square', 0.12, 0, 0.18); },
 };
 
-// Ограничиваем частоту одинаковых звуков
 export function play(name) {
   const now = performance.now();
   if (last[name] && now - last[name] < 70) return;
   last[name] = now;
-  try { SOUNDS[name] && SOUNDS[name](); } catch { /* звук не критичен */ }
+  try { SOUNDS[name] && SOUNDS[name](); } catch { }
 }

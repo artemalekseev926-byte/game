@@ -1,17 +1,14 @@
-// Главный процесс Electron: окно игры, Steam (steamworks.js), LAN-сервер, пользовательские карты.
 const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const steam = require('./steam.cjs');
 const lan = require('./lan.cjs');
 
-// Оверлей Steam требует настроек Chromium до готовности приложения
 steam.prepareOverlay();
 
 let win = null;
 
 function customMapsDir() {
-  // Пользовательские карты: <папка игры>/maps и <userData>/maps
   const dirs = [path.join(path.dirname(app.getPath('exe')), 'maps'), path.join(__dirname, '..', 'maps'), path.join(app.getPath('userData'), 'maps')];
   return dirs.filter((d, i) => dirs.indexOf(d) === i && fs.existsSync(d));
 }
@@ -55,7 +52,7 @@ ipcMain.handle('app:customMaps', () => {
         const full = path.join(dir, f);
         if (fs.statSync(full).size > 2_000_000) continue;
         out.push({ name: f, content: fs.readFileSync(full, 'utf8') });
-      } catch { /* пропускаем битые файлы */ }
+      } catch { }
     }
   }
   return out;

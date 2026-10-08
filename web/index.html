@@ -10,7 +10,6 @@
 </head>
 <body>
 
-<!-- ===== Главное меню ===== -->
 <section id="screen-menu" class="screen active">
   <canvas id="menu-bg"></canvas>
   <div class="menu-col">
@@ -28,7 +27,6 @@
   </div>
 </section>
 
-<!-- ===== Одиночная игра ===== -->
 <section id="screen-setup" class="screen">
   <div class="setup-layout">
     <div class="box">
@@ -58,15 +56,16 @@
   </div>
 </section>
 
-<!-- ===== Мультиплеер ===== -->
 <section id="screen-mp" class="screen">
   <div class="mp-layout">
     <div class="box">
       <h2>Steam — игра с друзьями</h2>
       <p id="steam-status" class="muted">Проверка Steam...</p>
       <button class="btn primary" id="steam-host">Создать лобби</button>
-      <p class="muted small">Друзья смогут зайти через приглашение Steam, «Присоединиться к игре» в списке друзей или по ID лобби.</p>
+      <p class="muted small">Друзья смогут зайти через приглашение Steam (Shift+Tab), по ID лобби или из списка открытых лобби ниже.</p>
       <label>ID лобби <span class="row"><input id="steam-lobby-id" placeholder="109775..."><button class="btn" id="steam-join">Войти</button></span></label>
+      <div class="row"><h3 style="flex:1;margin:0">Открытые лобби</h3><button class="btn small" id="steam-refresh">Обновить</button></div>
+      <ul id="steam-lobbies" class="slots"></ul>
     </div>
     <div class="box">
       <h2>Локальная сеть / IP</h2>
@@ -81,7 +80,6 @@
   </div>
 </section>
 
-<!-- ===== Лобби ===== -->
 <section id="screen-lobby" class="screen">
   <div class="lobby-layout">
     <div class="box">
@@ -103,6 +101,7 @@
       <div id="lobby-connect" class="connect-info"></div>
       <div class="row end">
         <button class="btn danger" id="lobby-leave">Выйти</button>
+        <button class="btn" id="lobby-copy" hidden>Копировать ID</button>
         <button class="btn" id="lobby-invite" hidden>Пригласить друзей</button>
         <button class="btn primary host-only" id="lobby-start">Начать</button>
       </div>
@@ -110,7 +109,6 @@
   </div>
 </section>
 
-<!-- ===== Игра ===== -->
 <section id="screen-game" class="screen">
   <canvas id="map"></canvas>
   <header id="hud-top" class="hud-bar">
@@ -139,7 +137,6 @@
   <div id="toasts"></div>
 </section>
 
-<!-- ===== Модальные окна ===== -->
 <div id="modal-research" class="modal" hidden><div class="box modal-box wide">
   <h2>Исследования</h2>
   <div id="research-list" class="research-grid"></div>

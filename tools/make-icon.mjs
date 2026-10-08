@@ -1,4 +1,3 @@
-// Рисует пиксельную иконку игры 256x256 (build/icon.png) без сторонних библиотек.
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
@@ -38,14 +37,16 @@ const ART = [
 ];
 const PAL = { k: [10, 12, 18, 255], b: [36, 92, 150, 255], g: [92, 170, 80, 255], r: [216, 66, 58, 255], y: [242, 194, 58, 255], '.': [0, 0, 0, 0] };
 
-const S = 8, N = 32 * S;
-const raw = Buffer.alloc((N * 4 + 1) * N);
-for (let y = 0; y < N; y++) {
-  raw[y * (N * 4 + 1)] = 0;
-  for (let x = 0; x < N; x++) {
-    const c = PAL[ART[(y / S) | 0][(x / S) | 0]];
-    raw.set(c, y * (N * 4 + 1) + 1 + x * 4);
+function pixels(N) {
+  const raw = Buffer.alloc((N * 4 + 1) * N);
+  for (let y = 0; y < N; y++) {
+    raw[y * (N * 4 + 1)] = 0;
+    for (let x = 0; x < N; x++) {
+      const c = PAL[ART[Math.floor((y * 32) / N)][Math.floor((x * 32) / N)]];
+      raw.set(c, y * (N * 4 + 1) + 1 + x * 4);
+    }
   }
+  return raw;
 }
 const crcTable = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -63,10 +64,30 @@ const chunk = (type, data) => {
   const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
   return Buffer.concat([len, td, c]);
 };
-const ihdr = Buffer.alloc(13);
-ihdr.writeUInt32BE(N, 0); ihdr.writeUInt32BE(N, 4);
-ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
-const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
-writeFileSync(new URL('../build/icon.png', import.meta.url), png);
-writeFileSync(new URL('../web/icon.png', import.meta.url), png);
-console.log('icon written', N, 'x', N);
+function png(N) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(N, 0); ihdr.writeUInt32BE(N, 4);
+  ihdr[8] = 8; ihdr[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(pixels(N))), chunk('IEND', Buffer.alloc(0))]);
+}
+
+function ico(sizes) {
+  const images = sizes.map(png);
+  const head = Buffer.alloc(6 + 16 * sizes.length);
+  head.writeUInt16LE(0, 0); head.writeUInt16LE(1, 2); head.writeUInt16LE(sizes.length, 4);
+  let offset = head.length;
+  sizes.forEach((n, i) => {
+    const o = 6 + 16 * i;
+    head[o] = n >= 256 ? 0 : n; head[o + 1] = n >= 256 ? 0 : n;
+    head.writeUInt16LE(1, o + 4); head.writeUInt16LE(32, o + 6);
+    head.writeUInt32LE(images[i].length, o + 8); head.writeUInt32LE(offset, o + 12);
+    offset += images[i].length;
+  });
+  return Buffer.concat([head, ...images]);
+}
+
+const big = png(256);
+writeFileSync(new URL('../build/icon.png', import.meta.url), big);
+writeFileSync(new URL('../web/icon.png', import.meta.url), big);
+writeFileSync(new URL('../build/icon.ico', import.meta.url), ico([16, 32, 48, 64, 128, 256]));
+console.log('icons written');

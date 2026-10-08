@@ -1,4 +1,3 @@
-// Точка входа: меню, настройки, одиночная игра, мультиплеер, сохранения, игровой цикл.
 import { VERSION, PLAYER_COLORS } from '../core/config.js';
 import { MAPS, generateMap, parseCustomMap } from '../core/mapgen.js';
 import { createState, Game } from '../core/game.js';
@@ -40,7 +39,6 @@ class App {
     this.loadNativeMaps();
   }
 
-  // ---------- Настройки и тема ----------
   saveSettings() { store.set('pc_settings', this.settings); }
   applySettings() {
     document.documentElement.dataset.theme = this.settings.theme;
@@ -63,7 +61,6 @@ class App {
     if (this.previewDesc) this.drawPreview();
   }
 
-  // ---------- Навигация ----------
   show(id) {
     document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === 'screen-' + id));
     this.screen = id;
@@ -102,7 +99,6 @@ class App {
     $('theme-link').onclick = (e) => { e.preventDefault(); this.toggleTheme(); };
     $('btn-quit').onclick = () => window.native && window.native.quit();
 
-    // Настройки
     $('set-theme').onchange = (e) => { this.settings.theme = e.target.value; this.saveSettings(); this.applySettings(); };
     $('set-vol').oninput = (e) => { this.settings.volume = Number(e.target.value); this.saveSettings(); this.applySettings(); };
     $('set-vol').onchange = () => play('click');
@@ -112,7 +108,6 @@ class App {
     window.addEventListener('keydown', (e) => { if (e.key === 'F11' && window.native) { e.preventDefault(); window.native.toggleFullscreen(); } });
     for (const id of ['sp-name', 'mp-name']) $(id).onchange = (e) => { this.settings.name = e.target.value.trim().slice(0, 20) || 'Командир'; this.saveSettings(); this.applySettings(); };
 
-    // Одиночная игра
     $('sp-bots').oninput = (e) => { $('sp-bots-v').textContent = e.target.value; };
     $('sp-vic').oninput = (e) => { $('sp-vic-v').textContent = e.target.value + '%'; };
     $('sp-seed').value = this.sp.seed;
@@ -121,7 +116,6 @@ class App {
     $('sp-start').onclick = () => this.startSingle();
     $('custom-map-file').onchange = (e) => this.importCustomMap(e.target.files[0]);
 
-    // Пауза / сохранения
     $('btn-exit').onclick = () => { this.closeModals(); this.exitGame(); };
     $('btn-save').onclick = () => this.openSaves('save');
     $('btn-load-game').onclick = () => this.openSaves('load');
@@ -130,9 +124,15 @@ class App {
     $('end-continue').onclick = () => { $('modal-end').hidden = true; };
     $('end-menu').onclick = () => { $('modal-end').hidden = true; this.exitGame(); };
 
-    // Мультиплеер
     $('steam-host').onclick = () => this.hostSteam();
     $('steam-join').onclick = () => this.joinSteam($('steam-lobby-id').value.trim());
+    $('steam-refresh').onclick = () => this.refreshLobbies();
+    $('steam-lobbies').onclick = (e) => { const b = e.target.closest('[data-lobby]'); if (b) this.joinSteam(b.dataset.lobby); };
+    $('lobby-copy').onclick = () => {
+      const id = this.lobby && this.lobby.transport.lobbyId;
+      if (!id) return;
+      navigator.clipboard.writeText(id).then(() => { $('lobby-copy').textContent = 'Скопировано!'; setTimeout(() => { $('lobby-copy').textContent = 'Копировать ID'; }, 1500); }).catch(() => {});
+    };
     $('lan-host').onclick = () => this.hostLan();
     $('lan-join').onclick = () => this.joinLan();
     $('lobby-leave').onclick = () => this.leaveLobby();
@@ -153,7 +153,6 @@ class App {
     };
   }
 
-  // ---------- Фон меню: пиксельная карта мира с «живыми» державами ----------
   menuBackground() {
     const cv = $('menu-bg');
     const map = generateMap({ id: 'world', seed: 7 });
@@ -164,7 +163,6 @@ class App {
       if (this.screen !== 'menu' && this.screen !== undefined) { this.bgDirty = true; requestAnimationFrame(tick); return; }
       t++;
       if (t % 20 === 0 || this.bgDirty) {
-        // Державы понемногу расширяются
         for (let k = 0; k < 3; k++) {
           const i = (Math.random() * owners.length) | 0;
           if (owners[i] < 0) continue;
@@ -206,7 +204,6 @@ class App {
     ctx.drawImage(tmp, 0, 0, cv.width, cv.height);
   }
 
-  // ---------- Выбор карты ----------
   renderMapList() {
     $('map-list').innerHTML = MAPS.map((m) => `<button class="btn small ${this.sp.map === m.id && !this.sp.custom ? 'on' : ''}" data-map="${m.id}">${m.name}</button>`).join('');
     $('custom-maps').innerHTML = this.customMaps.map((m, i) => `<button class="btn small ${this.sp.custom === m ? 'on' : ''}" data-cmap="${i}">★ ${esc(m.name)}</button>`).join('');
@@ -259,7 +256,6 @@ class App {
     } catch (e) { console.warn(e); }
   }
 
-  // ---------- Одиночная игра ----------
   startSingle() {
     play('click');
     const bots = Number($('sp-bots').value);
@@ -271,13 +267,11 @@ class App {
     const map = generateMap(desc);
     const state = createState(map, { seed: this.sp.seed, players, victoryShare: Number($('sp-vic').value) / 100 });
     this.enterGame(new Session({ map, state, localPid: 0, mode: 'offline' }));
-    // новый seed для следующей партии
     this.sp.seed = (Math.random() * 1e9) | 0;
     $('sp-seed').value = this.sp.seed;
     this.previewDesc = null;
   }
 
-  // ---------- Игровой цикл ----------
   enterGame(session) {
     this.session = session;
     this.lobby = null;
@@ -316,7 +310,6 @@ class App {
     this.show('menu');
   }
 
-  // ---------- Сохранения ----------
   openSaves(mode) {
     this.saveMode = mode;
     $('load-title').textContent = mode === 'save' ? 'Сохранить игру' : 'Загрузить игру';
@@ -359,7 +352,6 @@ class App {
     }
   }
 
-  // ---------- Мультиплеер ----------
   async checkSteam() {
     const st = $('steam-status');
     const r = await SteamTransport.init();
@@ -367,7 +359,21 @@ class App {
     st.textContent = r.ok ? `Steam подключён: ${r.name}` : r.error || 'Steam недоступен';
     $('steam-host').disabled = !r.ok;
     $('steam-join').disabled = !r.ok;
+    $('steam-refresh').disabled = !r.ok;
+    if (r.ok) this.refreshLobbies();
     $('lan-host').disabled = !hasNative();
+  }
+  async refreshLobbies() {
+    const ul = $('steam-lobbies');
+    ul.innerHTML = '<li class="muted">Поиск...</li>';
+    try {
+      const list = await SteamTransport.list();
+      ul.innerHTML = list.length
+        ? list.map((l) => `<li><span class="name">${esc(l.name)}</span><span class="tag">${l.members}/${l.max}</span><button class="btn small" data-lobby="${esc(l.id)}">Войти</button></li>`).join('')
+        : '<li class="muted">Открытых лобби нет</li>';
+    } catch (e) {
+      ul.innerHTML = `<li class="muted">${esc(e.message)}</li>`;
+    }
   }
   bindSteamInvites() {
     if (!window.native || !window.native.steam) return;
@@ -378,7 +384,7 @@ class App {
 
   async hostSteam() {
     try {
-      const t = await SteamTransport.host(12);
+      const t = await SteamTransport.host(12, this.playerName());
       this.openLobby(new HostLobby(t, this.playerName()), true);
     } catch (e) { this.showMessage('Steam', e.message); }
   }
@@ -411,6 +417,7 @@ class App {
     this.show('lobby');
     document.querySelectorAll('#screen-lobby .host-only').forEach((el) => { el.hidden = !isHost; });
     $('lobby-invite').hidden = lobby.transport.kind !== 'steam';
+    $('lobby-copy').hidden = lobby.transport.kind !== 'steam';
     const t = lobby.transport;
     let info = '';
     if (t.kind === 'steam') info = `ID лобби: <b>${esc(t.lobbyId)}</b><br>Пригласите друзей через Steam или передайте им ID.`;

@@ -1,4 +1,3 @@
-// Сборка клиентского кода в web/game.js
 import * as esbuild from 'esbuild';
 
 const options = {

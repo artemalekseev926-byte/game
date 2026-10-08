@@ -1,4 +1,3 @@
-// Простой статический сервер для запуска в браузере (только одиночная игра): npm run web
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';

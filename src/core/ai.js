@@ -1,4 +1,3 @@
-// ИИ-противники: экономика, исследования, оборона, наступление, удары БПЛА и ракетами.
 import { UNITS, UNIT_KEYS, BUILDINGS, RESEARCH, researchCost, DRONES, droneRange, missileRange, MISSILE, DIFFICULTY } from './config.js';
 import { troopCount } from './game.js';
 
@@ -33,7 +32,6 @@ function think(game, pid) {
   const border = owned.filter(isBorder);
   const net = () => pl.income - pl.upkeep;
 
-  // 1. Исследования (ИИ копит на них, урезая набор войск)
   let saving = false;
   if (!pl.rs) {
     const done = {};
@@ -47,7 +45,6 @@ function think(game, pid) {
     }
   }
 
-  // 2. Строительство
   const factories = game.buildingCount(pid, 'factory');
   const tryBuild = (p, k, reserve = 1.2) => {
     if (game.canBuild(pid, p, k)) return false;
@@ -78,7 +75,6 @@ function think(game, pid) {
   }
   if (pl.research.missile >= 1 && game.buildingCount(pid, 'silo') < 1 + Math.floor(owned.length / 25)) tryBuild(byPop[0], 'silo', 1.8);
 
-  // 3. Набор войск (не уходя в минус по содержанию)
   const targets = threatened.length ? threatened.map((x) => x[0]) : border.length ? border : owned;
   let budget = pl.money * (saving ? 0.2 : 0.55);
   for (const p of targets.slice(0, 4)) {
@@ -90,7 +86,6 @@ function think(game, pid) {
     if (n >= 1 && game.command(pid, { c: 'recruit', p, u, n }).ok) budget -= n * U.cost;
   }
 
-  // 4. Наступление
   for (const p of border) {
     const P = s.provs[p];
     if (troopCount(P.t) < 4) continue;
@@ -109,7 +104,6 @@ function think(game, pid) {
     if (best >= 0) game.command(pid, { c: 'move', from: p, to: best, frac: 0.85 });
   }
 
-  // 4б. Сбор ударного кулака: если одной провинции мало, стягиваем войска соседей
   const cands = new Map();
   for (const p of border) {
     for (const n of map.provinces[p].adj) {
@@ -131,14 +125,12 @@ function think(game, pid) {
     staged++;
   }
 
-  // 5. Подтягивание тыловых войск к границе
   for (const p of owned) {
     if (isBorder(p) || troopCount(s.provs[p].t) < 5) continue;
     const dest = nearestBorder(game, pid, p);
     if (dest >= 0) game.command(pid, { c: 'move', from: p, to: dest, frac: 1 });
   }
 
-  // 6. Удары БПЛА и ракетами по крупнейшим скоплениям противника
   const enemyProvs = [];
   s.provs.forEach((P, i) => { if (P.o >= 0 && P.o !== pid) enemyProvs.push(i); });
   if (!enemyProvs.length) return;

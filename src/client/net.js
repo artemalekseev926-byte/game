@@ -1,5 +1,3 @@
-// Транспорты для мультиплеера: Steam P2P (через steamworks.js в Electron) и LAN/IP (WebSocket).
-// Интерфейс: isHost, selfId, hostId, send(peer, obj), broadcast(obj), onMessage, onPeerJoin, onPeerLeave, close().
 const native = () => (typeof window !== 'undefined' ? window.native : null);
 
 export const hasNative = () => !!native();
@@ -24,8 +22,13 @@ export class SteamTransport extends BaseTransport {
     if (!n || !n.steam) return { ok: false, error: 'Steam доступен только в версии для ПК (Electron)' };
     return n.steam.init();
   }
-  static async host(maxPlayers) {
-    const r = await native().steam.createLobby(maxPlayers);
+  static async list() {
+    const r = await native().steam.listLobbies();
+    if (!r.ok) throw new Error(r.error);
+    return r.list;
+  }
+  static async host(maxPlayers, name) {
+    const r = await native().steam.createLobby(maxPlayers, name);
     if (!r.ok) throw new Error(r.error);
     return new SteamTransport(true, r.selfId, r.selfId, r.lobbyId);
   }

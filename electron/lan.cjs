@@ -1,4 +1,3 @@
-// LAN/IP-сервер на WebSocket для игры без Steam (локальная сеть, VPN, проброс порта).
 const { ipcMain } = require('electron');
 const os = require('node:os');
 const { WebSocketServer } = require('ws');

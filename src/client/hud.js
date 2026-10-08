@@ -1,4 +1,3 @@
-// Игровой интерфейс: верхняя панель, панель провинции, исследования, журнал, ввод.
 import { UNITS, UNIT_KEYS, BUILDINGS, BUILDING_KEYS, RESEARCH, RESEARCH_KEYS, researchCost, researchTime, TERRAIN, DRONES, MISSILE, droneRange, missileRange } from '../core/config.js';
 import { troopCount, popCap } from '../core/game.js';
 import { spriteURL } from './sprites.js';
@@ -54,7 +53,6 @@ export class Hud {
     $('modal-end').hidden = true;
   }
 
-  // ---------- События сессии ----------
   onSession(ev) {
     if (ev.type === 'fx') {
       this.r.addFx(ev.fx);
@@ -129,10 +127,8 @@ export class Hud {
     return true;
   }
 
-  // ---------- Покадровое обновление ----------
   update(dt) {
     const s = this.s, me = this.me;
-    // Прокрутка клавишами / у края экрана
     const pan = (600 / this.r.cam.z) * dt;
     if (this.keys.has('arrowleft') || this.keys.has('a')) this.r.cam.x -= pan;
     if (this.keys.has('arrowright') || this.keys.has('d')) this.r.cam.x += pan;
@@ -189,7 +185,6 @@ export class Hud {
     }).join('');
   }
 
-  // ---------- Панель провинции ----------
   renderPanel() {
     const sel = this.r.selected;
     const panel = $('panel');
@@ -227,12 +222,10 @@ export class Hud {
       return h;
     }
 
-    // Отправка войск
     h += '<div class="section"><h3>Армия</h3><div class="frac">' + [0.25, 0.5, 0.75, 1].map((f) =>
       `<button class="btn tiny ${this.frac === f ? 'on' : ''}" data-act="frac" data-v="${f}">${f * 100}%</button>`).join('') + '</div>';
     h += `<div class="actions"><button class="btn" data-act="mode-move" ${troopCount(P.t) ? '' : 'disabled'}>Отправить войска</button></div>`;
     h += '<p class="muted small">или ПКМ по цели на карте</p>';
-    // Найм
     h += '<h3>Набор</h3>';
     for (const k of UNIT_KEYS) {
       const U = UNITS[k];
@@ -248,7 +241,6 @@ export class Hud {
     }
     h += '</div>';
 
-    // Удары
     if (P.b.airbase > 0 || P.b.silo > 0) {
       h += '<div class="section"><h3>Удары</h3>';
       if (P.cd > 0) h += `<p class="warn">Перезарядка: ${Math.ceil(P.cd)} с</p>`;
@@ -266,7 +258,6 @@ export class Hud {
       h += '</div></div>';
     }
 
-    // Постройки
     h += '<div class="section"><h3>Постройки</h3>';
     for (const k of BUILDING_KEYS) {
       const B = BUILDINGS[k];
@@ -289,7 +280,6 @@ export class Hud {
     return h;
   }
 
-  // Клиенту нужны функции расчёта без авторитетной симуляции
   helper() {
     if (!this._helper || this._helper.s !== this.s) {
       const G = this.app.GameClass;
@@ -348,7 +338,6 @@ export class Hud {
     if (ok) this.setMode(null);
   }
 
-  // ---------- Исследования ----------
   openResearch() {
     $('modal-research').hidden = false;
     this.renderResearch();
@@ -368,7 +357,6 @@ export class Hud {
     }).join('');
   }
 
-  // ---------- Конец игры ----------
   showEnd(dead = false) {
     const s = this.s;
     const won = s.winner === this.pid;
@@ -385,7 +373,6 @@ export class Hud {
     document.querySelectorAll('#speed-ctrl .btn').forEach((b) => b.classList.toggle('on', Number(b.dataset.speed) === this.session.speed));
   }
 
-  // ---------- Ввод ----------
   bindInput() {
     const cv = this.r.canvas;
     const dpr = () => window.devicePixelRatio || 1;
@@ -393,7 +380,7 @@ export class Hud {
 
     this.listen(cv, 'pointerdown', (e) => {
       const [x, y] = pos(e);
-      if (e.button === 2) { // ПКМ: приказ
+      if (e.button === 2) {
         const p = this.r.provAt(x, y);
         if (this.r.targetMode) { this.setMode(null); return; }
         this.order(p);

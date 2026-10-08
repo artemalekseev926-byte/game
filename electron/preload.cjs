@@ -1,4 +1,3 @@
-// Безопасный мост между страницей игры и главным процессом
 const { contextBridge, ipcRenderer } = require('electron');
 
 const listen = (channel, cb) => {
@@ -12,7 +11,8 @@ contextBridge.exposeInMainWorld('native', {
   readCustomMaps: () => ipcRenderer.invoke('app:customMaps'),
   steam: {
     init: () => ipcRenderer.invoke('steam:init'),
-    createLobby: (max) => ipcRenderer.invoke('steam:createLobby', max),
+    createLobby: (max, name) => ipcRenderer.invoke('steam:createLobby', max, name),
+    listLobbies: () => ipcRenderer.invoke('steam:listLobbies'),
     joinLobby: (id) => ipcRenderer.invoke('steam:joinLobby', id),
     pendingJoin: () => ipcRenderer.invoke('steam:pendingJoin'),
     invite: () => ipcRenderer.send('steam:invite'),

@@ -1,4 +1,3 @@
-// Детерминированный ГПСЧ (mulberry32): одинаковый seed => одинаковая карта у всех игроков.
 export function makeRng(seed) {
   let a = seed >>> 0;
   const next = () => {
@@ -17,7 +16,6 @@ export function makeRng(seed) {
   };
 }
 
-// Гладкий value-noise для генерации континентов и рельефа.
 export function makeNoise(seed) {
   const rng = makeRng(seed);
   const perm = new Uint8Array(512);

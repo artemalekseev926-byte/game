@@ -1,4 +1,3 @@
-// Палитры тёмной и светлой темы (для canvas; UI-цвета — в CSS-переменных)
 export const THEMES = {
   dark: {
     bg: '#0b0e13',

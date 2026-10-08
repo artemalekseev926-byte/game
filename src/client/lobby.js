@@ -1,4 +1,3 @@
-// Лобби мультиплеера: хост собирает игроков и ботов, выбирает карту и запускает партию.
 import { generateMap, MAPS } from '../core/mapgen.js';
 import { createState } from '../core/game.js';
 import { PLAYER_COLORS } from '../core/config.js';

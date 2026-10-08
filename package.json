@@ -14,7 +14,7 @@
     "web": "npm run build && node tools/serve.mjs",
     "worldmap": "node tools/build-worldmap.mjs",
     "test": "node --test test/*.test.mjs",
-    "dist": "npm run build && electron-builder --win portable nsis",
+    "dist": "npm run build && electron-builder --win dir --x64 && node tools/patch-exe.mjs && electron-builder --win portable --x64 --prepackaged release/win-unpacked",
     "maps": "node tools/make-maps.mjs",
     "icon": "node tools/make-icon.mjs"
   },
@@ -27,6 +27,7 @@
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
     "esbuild": "^0.24.0",
+    "resedit": "^2.0.3",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
@@ -53,9 +54,10 @@
     ],
     "win": {
       "target": [
-        "portable",
-        "nsis"
-      ]
+        "portable"
+      ],
+      "signAndEditExecutable": false,
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": [
@@ -65,6 +67,9 @@
     "directories": {
       "buildResources": "build",
       "output": "release"
+    },
+    "portable": {
+      "artifactName": "PixelConquest-${version}-portable.exe"
     }
   }
 }

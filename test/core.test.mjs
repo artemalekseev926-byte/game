@@ -82,7 +82,6 @@ test('ракеты и ПВО', () => {
   assert.equal(game.command(0, { c: 'missile', from: home, to: enemy }).ok, false, 'перезарядка');
   for (let i = 0; i < 400 && game.s.shots.length; i++) game.tick();
   assert.ok(game.s.provs[enemy].t.inf < 700, 'ракета уничтожила войска');
-  // ПВО со 100% шансом перехвата
   pl.research.drone = 3;
   game.s.provs[home].b.airbase = 2;
   game.s.provs[enemy].b.aa = 3;
@@ -102,5 +101,5 @@ test('ИИ доигрывает партию до победителя', () => {
   const game = new Game(map, createState(map, { seed: 3, players, victoryShare: 0.5 }));
   for (let i = 0; i < 4 * 60 * 40 && game.s.winner === null; i++) { game.tick(); runAI(game, TICK); }
   assert.notEqual(game.s.winner, null);
-  JSON.parse(JSON.stringify(game.s)); // состояние сериализуемо
+  JSON.parse(JSON.stringify(game.s));
 });

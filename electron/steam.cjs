@@ -1,10 +1,9 @@
-// Интеграция со Steam через steamworks.js: лобби для друзей, приглашения, P2P-пакеты.
 const { ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
-// Значения enum'ов steamworks.js
-const LOBBY_FRIENDS_ONLY = 1;
+const LOBBY_PUBLIC = 2;
+const GAME_KEY = 'pixel-conquest';
 const SEND_RELIABLE = 2;
 const CB = { LobbyChatUpdate: 5, P2PSessionRequest: 6, GameLobbyJoinRequested: 8 };
 const MEMBER_ENTERED = 0;
@@ -38,19 +37,18 @@ function readAppId(app) {
     try {
       const id = Number(fs.readFileSync(f, 'utf8').trim());
       if (id > 0) return id;
-    } catch { /* следующий вариант */ }
+    } catch { }
   }
-  return 480; // Spacewar — тестовый AppID Valve
+  return 480;
 }
 
 function prepareOverlay() {
   const sw = loadModule();
   if (!sw) return;
-  try { sw.electronEnableSteamOverlay(); } catch { /* оверлей не обязателен */ }
+  try { sw.electronEnableSteamOverlay(); } catch { }
 }
 
 function init(app) {
-  // Запуск по приглашению: +connect_lobby <id>
   const argv = process.argv;
   const i = argv.indexOf('+connect_lobby');
   if (i >= 0 && argv[i + 1]) pendingJoin = argv[i + 1];
@@ -66,7 +64,7 @@ function init(app) {
   }
   const cb = client.callback;
   cb.register(CB.P2PSessionRequest, (e) => {
-    try { client.networking.acceptP2PSession(e.remote); } catch { /* ignore */ }
+    try { client.networking.acceptP2PSession(e.remote); } catch { }
   });
   cb.register(CB.LobbyChatUpdate, (e) => {
     if (!lobby || e.lobby !== lobby.id) return;
@@ -102,12 +100,12 @@ function setPresence(lobbyId) {
   try {
     client.localplayer.setRichPresence('connect', lobbyId ? `+connect_lobby ${lobbyId}` : null);
     client.localplayer.setRichPresence('status', lobbyId ? 'В лобби Pixel Conquest' : null);
-  } catch { /* ignore */ }
+  } catch { }
 }
 
 function leave() {
   if (lobby) {
-    try { lobby.leave(); } catch { /* ignore */ }
+    try { lobby.leave(); } catch { }
     lobby = null;
   }
   if (client) setPresence(null);
@@ -122,12 +120,13 @@ ipcMain.handle('steam:init', () => {
   return { ok: true, name: client.localplayer.getName(), steamId: selfId() };
 });
 
-ipcMain.handle('steam:createLobby', async (_e, max) => {
+ipcMain.handle('steam:createLobby', async (_e, max, name) => {
   if (!client) return { ok: false, error: initError };
   try {
     leave();
-    lobby = await client.matchmaking.createLobby(LOBBY_FRIENDS_ONLY, Math.max(2, Math.min(12, Number(max) || 12)));
-    lobby.setData('game', 'pixel-conquest');
+    lobby = await client.matchmaking.createLobby(LOBBY_PUBLIC, Math.max(2, Math.min(12, Number(max) || 12)));
+    lobby.setData('game', GAME_KEY);
+    lobby.setData('name', String(name || client.localplayer.getName()).slice(0, 32));
     lobby.setJoinable(true);
     const id = lobby.id.toString();
     setPresence(id);
@@ -145,6 +144,22 @@ ipcMain.handle('steam:joinLobby', async (_e, id) => {
     const host = lobby.getOwner().steamId64.toString();
     setPresence(lobby.id.toString());
     return { ok: true, lobbyId: lobby.id.toString(), selfId: selfId(), hostId: host };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('steam:listLobbies', async () => {
+  if (!client) return { ok: false, error: initError };
+  try {
+    const all = await client.matchmaking.getLobbies();
+    const list = all.filter((l) => l.getData('game') === GAME_KEY).map((l) => ({
+      id: l.id.toString(),
+      name: l.getData('name') || 'Лобби',
+      members: Number(l.getMemberCount()),
+      max: Number(l.getMemberLimit() || 12),
+    }));
+    return { ok: true, list };
   } catch (e) {
     return { ok: false, error: e.message };
   }

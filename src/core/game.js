@@ -1,5 +1,3 @@
-// Ядро симуляции. Состояние — простой JSON (для сохранений и сетевой синхронизации).
-// Симуляцию выполняет только хост; клиенты получают снимки состояния.
 import {
   TICK, VERSION, PLAYER_COLORS, TERRAIN, UNITS, UNIT_KEYS, ARMY_BASE_SPEED, BUILDINGS, BUILDING_KEYS,
   RESEARCH, RESEARCH_KEYS, researchCost, researchTime, DRONES, DRONE_SPEED, droneRange, droneCooldown,
@@ -16,7 +14,6 @@ export function popCap(mp, prov) {
   return (ECON.popBase + mp.size * ECON.popPerTile) * (1 + 0.35 * prov.b.house);
 }
 
-// Создание новой партии
 export function createState(map, opts) {
   const rng = makeRng((opts.seed ^ 0x7777) >>> 0);
   const players = opts.players.map((p, i) => ({
@@ -42,7 +39,6 @@ export function createState(map, opts) {
     return P;
   });
 
-  // Стартовые позиции: максимально удалённые друг от друга провинции
   const candidates = map.provinces.filter((p) => p.adj.length >= 2 && p.size >= 15);
   const pool = candidates.length >= players.length ? candidates : map.provinces;
   const starts = [];
@@ -86,7 +82,7 @@ export class Game {
   constructor(map, state) {
     this.map = map;
     this.s = state;
-    this.fx = []; // события для визуализации и журнала за текущий тик
+    this.fx = [];
   }
 
   rand() {
@@ -99,7 +95,6 @@ export class Game {
   emit(e) { this.fx.push(e); }
   msg(to, text, kind = 'info') { this.fx.push({ k: 'msg', to, text, kind }); }
 
-  // ---------- Вспомогательные вычисления ----------
   dist(a, b) {
     const A = this.map.provinces[a], B = this.map.provinces[b];
     return Math.hypot(A.cx - B.cx, A.cy - B.cy);
@@ -164,7 +159,6 @@ export class Game {
     return null;
   }
 
-  // Путь: через свои провинции к цели (последний шаг — в любую провинцию)
   findPath(pid, from, to) {
     if (from === to) return null;
     const provs = this.s.provs, adj = this.map.provinces;
@@ -188,7 +182,6 @@ export class Game {
     return null;
   }
 
-  // ---------- Команды игроков ----------
   command(pid, cmd) {
     const pl = this.s.players[pid];
     if (!pl || !pl.alive || this.s.winner !== null) return { ok: false, error: 'Недоступно' };
@@ -319,7 +312,6 @@ export class Game {
     return null;
   }
 
-  // ---------- Тик симуляции ----------
   tick() {
     const s = this.s;
     if (s.winner !== null) return;
@@ -362,7 +354,6 @@ export class Game {
       pl.money = Math.min(ECON.maxMoney, pl.money + (pl.income - pl.upkeep) * dt);
       pl.mp = Math.min(60 + a.pop * 3, pl.mp + pl.mpRate * dt);
       if (pl.money < 0) {
-        // Долги: войска дезертируют
         const loss = ECON.debtDesertion * dt;
         for (const P of s.provs) if (P.o === i) for (const k of UNIT_KEYS) P.t[k] = Math.floor(P.t[k] * (1 - loss));
         for (const A of s.armies) if (A.o === i) for (const k of UNIT_KEYS) A.t[k] = Math.floor(A.t[k] * (1 - loss));
@@ -491,7 +482,6 @@ export class Game {
         continue;
       }
       S.x += (dx / d) * step; S.y += (dy / d) * step;
-      // ПВО
       for (const i of aaSites) {
         const P = s.provs[i];
         if (P.o === S.o || P.aacd > 0 || S.hit.includes(i)) continue;

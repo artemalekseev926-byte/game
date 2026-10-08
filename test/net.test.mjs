@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HostLobby, ClientLobby } from '../src/client/lobby.js';
 
-// Транспорт в памяти, имитирующий Steam/LAN (JSON-сериализация как в сети)
 function pair() {
   const mk = (isHost, selfId, hostId) => ({
     isHost, selfId, hostId, kind: 'test', peers: new Set(), lobbyId: 'L1',
@@ -44,21 +43,18 @@ test('лобби, старт и синхронизация команд клие
   clientSession.command({ c: 'recruit', p: home, u: 'inf', n: 10 });
   flush();
   assert.equal(hostSession.s.provs[home].t.inf, 50);
-  // Хост тикает и рассылает снимок
   hostSession.update(0.3);
   hostSession.broadcastSnapshot(false);
   flush();
   assert.equal(clientSession.s.provs[home].t.inf, 50);
   assert.ok(clientSession.s.time > 0);
 
-  // Ошибочная команда возвращает ошибку клиенту
   const errors = [];
   clientSession.on((e) => { if (e.type === 'error') errors.push(e.error); });
   clientSession.command({ c: 'build', p: 0, k: 'fort' });
   flush();
   assert.equal(errors.length, 1);
 
-  // Отключение клиента передаёт страну ИИ
   hostSession.onPeerLeave('C');
   assert.equal(hostSession.s.players[1].ai, 'normal');
 });

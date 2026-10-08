@@ -1,10 +1,9 @@
-// Пиксельный рендер карты, войск, БПЛА, ракет и эффектов.
 import { THEMES, hexToRgb, mix, shade, lighten, rgbStr } from './theme.js';
 import { TERRAIN, aaRadius, droneRange, missileRange } from '../core/config.js';
 import { troopCount } from '../core/game.js';
 import { sprite } from './sprites.js';
 
-const SUB = 4; // субпикселей текстуры на клетку
+const SUB = 4;
 const MASKS = {
   plain: ['....', '..l.', '....', 'l...'],
   forest: ['.d..', 'ddd.', '.d..', '....'],
@@ -28,7 +27,7 @@ export class Renderer {
     this.trails = new Map();
     this.hover = -1;
     this.selected = -1;
-    this.targetMode = null; // { kind, from }
+    this.targetMode = null;
     this.showAA = false;
     this.time = 0;
   }
@@ -39,7 +38,6 @@ export class Renderer {
     this.tex.width = map.W * SUB;
     this.tex.height = map.H * SUB;
     this.texSig = '';
-    // Контуры провинций (отрезки по краям клеток) для выделения
     this.edges = map.provinces.map(() => []);
     const { W, H, prov } = map;
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -91,7 +89,6 @@ export class Renderer {
   clampCam() {
     const vw = this.canvas.width / this.cam.z, vh = this.canvas.height / this.cam.z;
     const { W, H } = this.map;
-    // Запас по краям, чтобы окраины карты можно было вывести из-под панелей
     const mx = Math.min(vw * 0.35, W * 0.5), my = Math.min(vh * 0.25, H * 0.5);
     this.cam.x = vw > W + mx ? (W - vw) / 2 : Math.max(-mx, Math.min(W - vw + mx, this.cam.x));
     this.cam.y = vh > H + my ? (H - vh) / 2 : Math.max(-my, Math.min(H - vh + my, this.cam.y));
@@ -106,7 +103,6 @@ export class Renderer {
   sx(tx) { return (tx - this.cam.x) * this.cam.z; }
   sy(ty) { return (ty - this.cam.y) * this.cam.z; }
 
-  // ---------- Текстура территории ----------
   rebuildTexture(state) {
     const sig = this.themeName + state.provs.map((P) => P.o).join(',');
     if (sig === this.texSig) return;
@@ -130,7 +126,6 @@ export class Renderer {
         const t = y * W + x;
         const p = prov[t];
         if (p < 0 || !land[t]) {
-          // Вода с пиксельными волнами
           let coast = false;
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (provAt(x + dx, y + dy) >= 0) coast = true;
           for (let j = 0; j < SUB; j++) for (let i = 0; i < SUB; i++) {
@@ -155,7 +150,6 @@ export class Renderer {
           const m = mask[(j + (x & 1) * 2) % 4][(i + (y & 1)) % 4];
           if (m === 'l') c = lighten(c, 0.12);
           else if (m === 'd') c = shade(c, 0.82);
-          // Границы стран: тёмная линия + светлая кромка внутри
           const edgeCountry = (i === 0 && oL !== owner && oL !== -2) || (i === SUB - 1 && oR !== owner && oR !== -2) ||
             (j === 0 && oU !== owner && oU !== -2) || (j === SUB - 1 && oD !== owner && oD !== -2);
           const coastEdge = (i === 0 && pL < 0) || (i === SUB - 1 && pR < 0) || (j === 0 && pU < 0) || (j === SUB - 1 && pD < 0);
@@ -173,7 +167,6 @@ export class Renderer {
     ctx.putImageData(img, 0, 0);
   }
 
-  // ---------- События -> эффекты ----------
   addFx(events) {
     for (const e of events) {
       if (e.k === 'boom') this.explode(e.x, e.y, e.big ? 26 : 12, e.big);
@@ -201,7 +194,6 @@ export class Renderer {
     }
   }
 
-  // ---------- Кадр ----------
   draw(session, dt) {
     this.time += dt;
     this.resize();
@@ -215,7 +207,6 @@ export class Renderer {
     const me = session.localPid;
     const alpha = session.alpha();
 
-    // Вспышки захвата
     for (const [p, f] of this.flashes) {
       f.t -= dt;
       if (f.t <= 0) { this.flashes.delete(p); continue; }
@@ -225,7 +216,6 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
 
-    // Морские пути выбранной провинции
     if (this.selected >= 0) {
       const P = map.provinces[this.selected];
       ctx.strokeStyle = th.lane;
@@ -241,7 +231,6 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    // Радиусы ПВО
     if (this.showAA || this.targetMode) {
       s.provs.forEach((P, i) => {
         if (P.o < 0 || P.b.aa < 1) return;
@@ -255,7 +244,6 @@ export class Renderer {
         ctx.setLineDash([]);
       });
     }
-    // Радиус удара в режиме прицеливания
     if (this.targetMode && this.targetMode.from >= 0) {
       const from = this.targetMode.from, mp = map.provinces[from], P = s.provs[from], pl = s.players[me];
       const r = this.targetMode.kind === 'missile' ? missileRange(pl.research.missile) : droneRange(P.b.airbase, pl.research.drone);
@@ -268,7 +256,6 @@ export class Renderer {
       }
     }
 
-    // Выделение и наведение
     this.outline(this.hover, th.hover, Math.max(1, z / 6));
     if (this.selected >= 0) {
       const pulse = 0.6 + 0.4 * Math.sin(this.time * 6);
@@ -277,7 +264,6 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
 
-    // Подписи провинций: войска, постройки, стройка
     const labelScale = Math.max(1, Math.round(z / 6));
     const fontPx = 8 * labelScale;
     ctx.font = `${fontPx}px ${FONT}`;
@@ -299,7 +285,6 @@ export class Renderer {
       ctx.fillRect(Math.round(x - w / 2), Math.round(y + h / 2 - labelScale), Math.round(w), labelScale);
       ctx.fillStyle = th.label;
       ctx.fillText(txt, Math.round(x), Math.round(y + labelScale * 0.5));
-      // Иконки построек
       if (z >= 8) {
         const icons = [];
         for (const k of ['fort', 'factory', 'house', 'aa', 'airbase', 'silo']) if (P.b[k] > 0) icons.push(k);
@@ -320,7 +305,6 @@ export class Renderer {
       }
     });
 
-    // Армии в пути
     for (const A of s.armies) {
       const a = map.provinces[A.path[A.i]], b = map.provinces[A.path[A.i + 1]];
       if (!a || !b) continue;
@@ -329,7 +313,6 @@ export class Renderer {
       const p = Math.min(1, A.p + (A.spd * (sea ? 0.6 : 1) * alpha) / len);
       const x = this.sx(a.cx + 0.5 + (b.cx - a.cx) * p), y = this.sy(a.cy + 0.5 + (b.cy - a.cy) * p);
       const col = s.players[A.o].color;
-      // Линия маршрута
       ctx.strokeStyle = col;
       ctx.globalAlpha = 0.5;
       ctx.lineWidth = Math.max(1, z / 6);
@@ -359,7 +342,6 @@ export class Renderer {
       }
     }
 
-    // БПЛА и ракеты
     const live = new Set();
     for (const S of s.shots) {
       live.add(S.id);
@@ -394,7 +376,6 @@ export class Renderer {
     }
     for (const id of this.trails.keys()) if (!live.has(id)) this.trails.delete(id);
 
-    // Трассеры ПВО
     for (const T of this.tracers) {
       T.t -= dt;
       ctx.strokeStyle = Math.floor(this.time * 20) % 2 ? '#fff6a0' : '#ff5a3a';
@@ -406,7 +387,6 @@ export class Renderer {
     }
     this.tracers = this.tracers.filter((T) => T.t > 0);
 
-    // Частицы
     for (const p of this.particles) {
       p.t += dt;
       const k = p.t / p.life;

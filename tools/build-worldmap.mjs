@@ -1,5 +1,3 @@
-// Растеризует контуры суши (Natural Earth через world-atlas) в пиксельную карту мира.
-// Результат: src/data/worldmap.js — массив строк, '#' — суша, '.' — вода.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { feature } from 'topojson-client';
@@ -42,7 +40,6 @@ const rows = [];
 for (let y = 0; y < H; y++) {
   let row = '';
   for (let x = 0; x < W; x++) {
-    // 4 подвыборки на клетку: суша, если покрыто >= 2
     let hits = 0;
     for (const [dx, dy] of [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]]) {
       const lon = -180 + ((x + dx) / W) * 360;
@@ -54,8 +51,7 @@ for (let y = 0; y < H; y++) {
   rows.push(row);
 }
 
-const out = `// Сгенерировано tools/build-worldmap.mjs из Natural Earth (public domain). Не редактировать вручную.
-export const WORLD_W = ${W};
+const out = `export const WORLD_W = ${W};
 export const WORLD_H = ${H};
 export const WORLD_LAT_TOP = ${LAT_TOP};
 export const WORLD_LAT_BOTTOM = ${LAT_BOTTOM};

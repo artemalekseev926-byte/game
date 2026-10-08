@@ -1,5 +1,4 @@
-// Весь баланс игры в одном месте. Значения "в секунду" игрового времени.
-export const TICK = 0.25; // длительность игрового тика, сек
+export const TICK = 0.25;
 export const VERSION = '1.0.0';
 
 export const PLAYER_COLORS = [
@@ -22,7 +21,7 @@ export const UNITS = {
   art: { name: 'Артиллерия', short: 'АРТ', atk: 3.5, def: 1.6, cost: 14, mp: 2, upkeep: 0.045, speed: 0.75, needs: 'factory', research: 'art', fortPierce: 0.6 },
 };
 export const UNIT_KEYS = Object.keys(UNITS);
-export const ARMY_BASE_SPEED = 1.8; // клеток/сек
+export const ARMY_BASE_SPEED = 1.8;
 
 export const BUILDINGS = {
   fort: { name: 'Укрепления', icon: 'fort', max: 3, cost: 60, upkeep: 0.25, time: 8, desc: '+35% к обороне за уровень' },
@@ -54,7 +53,7 @@ export const DRONES = {
   kamikaze: { name: 'Дрон-камикадзе', cost: 50, lvl: 2, dmg: 10, bldg: 1, count: 1 },
   swarm: { name: 'Рой дронов', cost: 120, lvl: 3, dmg: 22, bldg: 0, count: 5 },
 };
-export const DRONE_SPEED = 6; // клеток/сек
+export const DRONE_SPEED = 6;
 export const droneRange = (airbaseLvl, droneLvl) => 26 + 10 * airbaseLvl + 8 * droneLvl;
 export const droneCooldown = (airbaseLvl) => 8 / airbaseLvl;
 
@@ -76,13 +75,13 @@ export const ECON = {
   factoryIncome: 3,
   popBase: 8,
   popPerTile: 0.9,
-  growth: 0.02, // доля разницы до лимита в секунду
-  overextensionFree: 10, // столько провинций без штрафа к эффективности
+  growth: 0.02,
+  overextensionFree: 10,
   overextension: 0.012,
-  unrestTime: 60, // секунд пониженных налогов после захвата
-  debtDesertion: 0.02, // доля войск, дезертирующих в секунду при долгах
-  buildingScale: 0.08, // удорожание каждой следующей постройки того же типа
-  neutralGarrison: 0.6, // пехоты на клетку площади у нейтралов
+  unrestTime: 60,
+  debtDesertion: 0.02,
+  buildingScale: 0.08,
+  neutralGarrison: 0.6,
   maxMoney: 1e7,
 };
 

@@ -1,20 +1,19 @@
-// Игровая сессия: офлайн, хост (авторитетная симуляция) или клиент (снимки от хоста).
 import { TICK } from '../core/config.js';
 import { Game } from '../core/game.js';
 import { runAI } from '../core/ai.js';
 
-const SNAP_INTERVAL = 200; // мс реального времени между снимками для клиентов
-const FULL_EVERY = 25; // полный снимок каждые N отправок
+const SNAP_INTERVAL = 200;
+const FULL_EVERY = 25;
 
 const provKey = (P) => JSON.stringify([P.o, P.t, P.b, Math.round(P.pop), P.unrest > 0 ? 1 : 0, P.build && [P.build.k, Math.round(P.build.t), P.build.total], Math.ceil(P.cd)]);
 
 export class Session {
   constructor({ map, state, localPid, mode, transport = null, peers = {} }) {
     this.map = map;
-    this.mode = mode; // 'offline' | 'host' | 'client'
+    this.mode = mode;
     this.localPid = localPid;
     this.transport = transport;
-    this.peers = peers; // peerId -> pid (только у хоста)
+    this.peers = peers;
     this.speed = 1;
     this.acc = 0;
     this.listeners = [];
@@ -99,7 +98,6 @@ export class Session {
     this.emit({ type: 'chat', chat: c });
   }
 
-  // ---------- Сеть ----------
   snapshot(full) {
     const provs = [];
     this.s.provs.forEach((P, i) => {

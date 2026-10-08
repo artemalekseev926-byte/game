@@ -78,18 +78,12 @@
     popBase: 8,
     popPerTile: 0.9,
     growth: 0.02,
-    // доля разницы до лимита в секунду
     overextensionFree: 10,
-    // столько провинций без штрафа к эффективности
     overextension: 0.012,
     unrestTime: 60,
-    // секунд пониженных налогов после захвата
     debtDesertion: 0.02,
-    // доля войск, дезертирующих в секунду при долгах
     buildingScale: 0.08,
-    // удорожание каждой следующей постройки того же типа
     neutralGarrison: 0.6,
-    // пехоты на клетку площади у нейтралов
     maxMoney: 1e7
   };
   var DIFFICULTY = {
@@ -728,7 +722,6 @@
     msg(to, text, kind = "info") {
       this.fx.push({ k: "msg", to, text, kind });
     }
-    // ---------- Вспомогательные вычисления ----------
     dist(a, b) {
       const A = this.map.provinces[a], B = this.map.provinces[b];
       return Math.hypot(A.cx - B.cx, A.cy - B.cy);
@@ -792,7 +785,6 @@
       if (this.s.players[pid].money < cost) return "\u041D\u0435\u0434\u043E\u0441\u0442\u0430\u0442\u043E\u0447\u043D\u043E \u0434\u0435\u043D\u0435\u0433";
       return null;
     }
-    // Путь: через свои провинции к цели (последний шаг — в любую провинцию)
     findPath(pid, from, to) {
       if (from === to) return null;
       const provs = this.s.provs, adj = this.map.provinces;
@@ -818,7 +810,6 @@
       }
       return null;
     }
-    // ---------- Команды игроков ----------
     command(pid, cmd) {
       const pl = this.s.players[pid];
       if (!pl || !pl.alive || this.s.winner !== null) return { ok: false, error: "\u041D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E" };
@@ -963,7 +954,6 @@
       if (target >= 0) this.msg(target, `${pl.name} \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B \u0440\u0430\u043A\u0435\u0442\u0443 \u043F\u043E \u0432\u0430\u0448\u0435\u0439 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438!`, "danger");
       return null;
     }
-    // ---------- Тик симуляции ----------
     tick() {
       const s = this.s;
       if (s.winner !== null) return;
@@ -1540,7 +1530,6 @@
     sy(ty) {
       return (ty - this.cam.y) * this.cam.z;
     }
-    // ---------- Текстура территории ----------
     rebuildTexture(state) {
       const sig = this.themeName + state.provs.map((P) => P.o).join(",");
       if (sig === this.texSig) return;
@@ -1609,7 +1598,6 @@
       }
       ctx2.putImageData(img, 0, 0);
     }
-    // ---------- События -> эффекты ----------
     addFx(events) {
       for (const e of events) {
         if (e.k === "boom") this.explode(e.x, e.y, e.big ? 26 : 12, e.big);
@@ -1636,7 +1624,6 @@
         this.particles.push({ x, y, vx: Math.cos(a) * 1.2, vy: Math.sin(a) * 1.2 - 0.5, t: 0, life: 0.4, c: i % 2 ? "#fff6a0" : "#ff7a3a", s: 1 });
       }
     }
-    // ---------- Кадр ----------
     draw(session, dt) {
       this.time += dt;
       this.resize();
@@ -2035,7 +2022,6 @@
       $("modal-research").hidden = true;
       $("modal-end").hidden = true;
     }
-    // ---------- События сессии ----------
     onSession(ev) {
       if (ev.type === "fx") {
         this.r.addFx(ev.fx);
@@ -2126,7 +2112,6 @@
       this.lastPanel = "";
       return true;
     }
-    // ---------- Покадровое обновление ----------
     update(dt) {
       const s = this.s, me = this.me;
       const pan = 600 / this.r.cam.z * dt;
@@ -2194,7 +2179,6 @@
         return `<div class="pl ${p.alive ? "" : "dead"} ${i === this.pid ? "me" : ""}" title="${p.ai ? "\u0418\u0418" : "\u0418\u0433\u0440\u043E\u043A"}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(p.name)}</span><b>${counts[i]}</b></div>`;
       }).join("");
     }
-    // ---------- Панель провинции ----------
     renderPanel() {
       const sel = this.r.selected;
       const panel = $("panel");
@@ -2287,7 +2271,6 @@
       h += "</div>";
       return h;
     }
-    // Клиенту нужны функции расчёта без авторитетной симуляции
     helper() {
       if (!this._helper || this._helper.s !== this.s) {
         const G = this.app.GameClass;
@@ -2362,7 +2345,6 @@
       else if (m.kind === "missile") ok = this.cmd({ c: "missile", from: m.from, to: p });
       if (ok) this.setMode(null);
     }
-    // ---------- Исследования ----------
     openResearch() {
       $("modal-research").hidden = false;
       this.renderResearch();
@@ -2381,7 +2363,6 @@
         return `<div class="rcard ${active ? "active" : ""}"><h4>${R.name}</h4><span class="pips">${pips(lvl, R.max)}</span><span class="muted">${R.desc}</span>${btn}</div>`;
       }).join("");
     }
-    // ---------- Конец игры ----------
     showEnd(dead = false) {
       const s = this.s;
       const won = s.winner === this.pid;
@@ -2395,7 +2376,6 @@
     updateSpeedButtons() {
       document.querySelectorAll("#speed-ctrl .btn").forEach((b) => b.classList.toggle("on", Number(b.dataset.speed) === this.session.speed));
     }
-    // ---------- Ввод ----------
     bindInput() {
       const cv = this.r.canvas;
       const dpr = () => window.devicePixelRatio || 1;
@@ -2850,7 +2830,6 @@
       this.chat.push(c);
       this.emit({ type: "chat", chat: c });
     }
-    // ---------- Сеть ----------
     snapshot(full) {
       const provs = [];
       this.s.provs.forEach((P, i) => {
@@ -3109,8 +3088,13 @@
       if (!n || !n.steam) return { ok: false, error: "Steam \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0432\u0435\u0440\u0441\u0438\u0438 \u0434\u043B\u044F \u041F\u041A (Electron)" };
       return n.steam.init();
     }
-    static async host(maxPlayers) {
-      const r = await native().steam.createLobby(maxPlayers);
+    static async list() {
+      const r = await native().steam.listLobbies();
+      if (!r.ok) throw new Error(r.error);
+      return r.list;
+    }
+    static async host(maxPlayers, name) {
+      const r = await native().steam.createLobby(maxPlayers, name);
       if (!r.ok) throw new Error(r.error);
       return new _SteamTransport(true, r.selfId, r.selfId, r.lobbyId);
     }
@@ -3517,7 +3501,6 @@
       this.bindSteamInvites();
       this.loadNativeMaps();
     }
-    // ---------- Настройки и тема ----------
     saveSettings() {
       store.set("pc_settings", this.settings);
     }
@@ -3541,7 +3524,6 @@
       this.applySettings();
       if (this.previewDesc) this.drawPreview();
     }
-    // ---------- Навигация ----------
     show(id) {
       document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.id === "screen-" + id));
       this.screen = id;
@@ -3674,6 +3656,22 @@
       };
       $2("steam-host").onclick = () => this.hostSteam();
       $2("steam-join").onclick = () => this.joinSteam($2("steam-lobby-id").value.trim());
+      $2("steam-refresh").onclick = () => this.refreshLobbies();
+      $2("steam-lobbies").onclick = (e) => {
+        const b = e.target.closest("[data-lobby]");
+        if (b) this.joinSteam(b.dataset.lobby);
+      };
+      $2("lobby-copy").onclick = () => {
+        const id = this.lobby && this.lobby.transport.lobbyId;
+        if (!id) return;
+        navigator.clipboard.writeText(id).then(() => {
+          $2("lobby-copy").textContent = "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E!";
+          setTimeout(() => {
+            $2("lobby-copy").textContent = "\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C ID";
+          }, 1500);
+        }).catch(() => {
+        });
+      };
       $2("lan-host").onclick = () => this.hostLan();
       $2("lan-join").onclick = () => this.joinLan();
       $2("lobby-leave").onclick = () => this.leaveLobby();
@@ -3700,7 +3698,6 @@
         if (b && this.lobby instanceof HostLobby) this.lobby.remove(Number(b.dataset.kick));
       };
     }
-    // ---------- Фон меню: пиксельная карта мира с «живыми» державами ----------
     menuBackground() {
       const cv = $2("menu-bg");
       const map = generateMap({ id: "world", seed: 7 });
@@ -3762,7 +3759,6 @@
       ctx2.imageSmoothingEnabled = false;
       ctx2.drawImage(tmp, 0, 0, cv.width, cv.height);
     }
-    // ---------- Выбор карты ----------
     renderMapList() {
       $2("map-list").innerHTML = MAPS.map((m) => `<button class="btn small ${this.sp.map === m.id && !this.sp.custom ? "on" : ""}" data-map="${m.id}">${m.name}</button>`).join("");
       $2("custom-maps").innerHTML = this.customMaps.map((m, i) => `<button class="btn small ${this.sp.custom === m ? "on" : ""}" data-cmap="${i}">\u2605 ${esc2(m.name)}</button>`).join("");
@@ -3831,7 +3827,6 @@
         console.warn(e);
       }
     }
-    // ---------- Одиночная игра ----------
     startSingle() {
       play("click");
       const bots = Number($2("sp-bots").value);
@@ -3847,7 +3842,6 @@
       $2("sp-seed").value = this.sp.seed;
       this.previewDesc = null;
     }
-    // ---------- Игровой цикл ----------
     enterGame(session) {
       this.session = session;
       this.lobby = null;
@@ -3891,7 +3885,6 @@
       this.closeModals();
       this.show("menu");
     }
-    // ---------- Сохранения ----------
     openSaves(mode) {
       this.saveMode = mode;
       $2("load-title").textContent = mode === "save" ? "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0438\u0433\u0440\u0443" : "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u0433\u0440\u0443";
@@ -3936,7 +3929,6 @@
         this.showMessage("\u041E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438", e.message);
       }
     }
-    // ---------- Мультиплеер ----------
     async checkSteam() {
       const st = $2("steam-status");
       const r = await SteamTransport.init();
@@ -3944,7 +3936,19 @@
       st.textContent = r.ok ? `Steam \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0451\u043D: ${r.name}` : r.error || "Steam \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D";
       $2("steam-host").disabled = !r.ok;
       $2("steam-join").disabled = !r.ok;
+      $2("steam-refresh").disabled = !r.ok;
+      if (r.ok) this.refreshLobbies();
       $2("lan-host").disabled = !hasNative();
+    }
+    async refreshLobbies() {
+      const ul = $2("steam-lobbies");
+      ul.innerHTML = '<li class="muted">\u041F\u043E\u0438\u0441\u043A...</li>';
+      try {
+        const list = await SteamTransport.list();
+        ul.innerHTML = list.length ? list.map((l) => `<li><span class="name">${esc2(l.name)}</span><span class="tag">${l.members}/${l.max}</span><button class="btn small" data-lobby="${esc2(l.id)}">\u0412\u043E\u0439\u0442\u0438</button></li>`).join("") : '<li class="muted">\u041E\u0442\u043A\u0440\u044B\u0442\u044B\u0445 \u043B\u043E\u0431\u0431\u0438 \u043D\u0435\u0442</li>';
+      } catch (e) {
+        ul.innerHTML = `<li class="muted">${esc2(e.message)}</li>`;
+      }
     }
     bindSteamInvites() {
       if (!window.native || !window.native.steam) return;
@@ -3958,7 +3962,7 @@
     }
     async hostSteam() {
       try {
-        const t = await SteamTransport.host(12);
+        const t = await SteamTransport.host(12, this.playerName());
         this.openLobby(new HostLobby(t, this.playerName()), true);
       } catch (e) {
         this.showMessage("Steam", e.message);
@@ -4003,6 +4007,7 @@
         el.hidden = !isHost;
       });
       $2("lobby-invite").hidden = lobby.transport.kind !== "steam";
+      $2("lobby-copy").hidden = lobby.transport.kind !== "steam";
       const t = lobby.transport;
       let info = "";
       if (t.kind === "steam") info = `ID \u043B\u043E\u0431\u0431\u0438: <b>${esc2(t.lobbyId)}</b><br>\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u0435 \u0434\u0440\u0443\u0437\u0435\u0439 \u0447\u0435\u0440\u0435\u0437 Steam \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0434\u0430\u0439\u0442\u0435 \u0438\u043C ID.`;

@@ -1,4 +1,3 @@
-// Генерация карт: пиксельная сетка суши/воды, разбиение на провинции, соседство и морские пути.
 import { makeRng, makeNoise } from './rng.js';
 import { WORLD_ROWS, WORLD_W, WORLD_H, WORLD_LAT_TOP, WORLD_LAT_BOTTOM } from '../data/worldmap.js';
 
@@ -74,7 +73,6 @@ function baseShape(desc) {
   }
 }
 
-// Минимальная двоичная куча для Дейкстры
 class Heap {
   constructor() { this.a = []; }
   push(p, v) {
@@ -106,7 +104,6 @@ export function generateMap(desc) {
   const noise = makeNoise(seed ^ 0x1234567);
   const idx = (x, y) => y * W + x;
 
-  // Убираем одиночные клетки суши и связные кусочки < 3 клеток
   const comp = new Int32Array(W * H).fill(-1);
   const comps = [];
   for (let i = 0; i < W * H; i++) {
@@ -127,7 +124,6 @@ export function generateMap(desc) {
   }
   for (const tiles of comps) if (tiles.length < 3) for (const t of tiles) land[t] = 0;
 
-  // Сиды провинций
   const area = shape.area;
   const minDist = Math.sqrt(area) * 0.85;
   const landTiles = [];
@@ -155,7 +151,6 @@ export function generateMap(desc) {
     if (!near(t % W, (t / W) | 0)) addSeed(t);
   }
 
-  // Рост провинций (Дейкстра с шумовой стоимостью => неровные границы)
   const prov = new Int16Array(W * H).fill(-1);
   const grow = () => {
     const dist = new Float32Array(W * H).fill(Infinity);
@@ -179,7 +174,6 @@ export function generateMap(desc) {
     }
   };
   grow();
-  // Острова без сидов
   for (;;) {
     const orphan = landTiles.find((t) => land[t] && prov[t] < 0);
     if (orphan === undefined) break;
@@ -187,7 +181,6 @@ export function generateMap(desc) {
     grow();
   }
 
-  // Подсчёт и слияние мелких провинций
   const build = () => {
     const n = seeds.length;
     const sizes = new Int32Array(n);
@@ -218,13 +211,11 @@ export function generateMap(desc) {
     for (let i = 0; i < W * H; i++) if (prov[i] === p) prov[i] = best;
     sizes[best] += sizes[p]; sizes[p] = 0;
   }
-  // Перенумерация
   const remap = new Int16Array(seeds.length).fill(-1);
   let count = 0;
   for (let p = 0; p < seeds.length; p++) if (sizes[p] > 0) remap[p] = count++;
   for (let i = 0; i < W * H; i++) if (prov[i] >= 0) prov[i] = remap[prov[i]];
 
-  // Провинции: центр, размер, соседи
   const provinces = [];
   for (let p = 0; p < count; p++) provinces.push({ id: p, size: 0, sx: 0, sy: 0, neighbors: new Set(), sea: new Set(), coastal: false, tiles: [] });
   for (let i = 0; i < W * H; i++) {
@@ -245,7 +236,6 @@ export function generateMap(desc) {
     let best = P.tiles[0], bd = Infinity;
     for (const t of P.tiles) {
       const x = t % W, y = (t / W) | 0;
-      // Предпочитаем клетки подальше от края провинции
       let inner = 0;
       for (const [dx, dy] of N4) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H && prov[idx(nx, ny)] === P.id) inner++; }
       const d = Math.hypot(x - mx, y - my) + (4 - inner) * 1.5;
@@ -254,7 +244,6 @@ export function generateMap(desc) {
     P.cx = best % W; P.cy = (best / W) | 0;
   }
 
-  // Морские пути: BFS по воде от берега провинции на seaRange клеток
   const seaDist = new Int16Array(W * H);
   const seaLinks = (P, range) => {
     seaDist.fill(-1);
@@ -282,14 +271,11 @@ export function generateMap(desc) {
     }
   };
   for (const P of provinces) if (P.coastal) seaLinks(P, shape.seaRange);
-  // Изолированные острова получают путь подлиннее
   for (const P of provinces) {
     for (let r = shape.seaRange * 2; P.coastal && !P.neighbors.size && !P.sea.size && r < 200; r *= 2) seaLinks(P, r);
   }
-  // Морские пути симметричны
   for (const P of provinces) for (const o of P.sea) if (!provinces[o].neighbors.has(P.id)) provinces[o].sea.add(P.id);
 
-  // Связность: соединяем отдельные группы суши дальними морскими путями
   for (;;) {
     const compOf = new Int32Array(provinces.length).fill(-1);
     let nc = 0;
@@ -316,7 +302,6 @@ export function generateMap(desc) {
     best[0].sea.add(best[1].id); best[1].sea.add(best[0].id);
   }
 
-  // Рельеф провинций
   const tnoise = makeNoise(seed ^ 0xabcdef);
   for (const P of provinces) {
     let terrain = 'plain';
@@ -343,7 +328,6 @@ export function generateMap(desc) {
   };
 }
 
-// Разбор пользовательской карты из JSON: { name, rows: ["..##..", ...] }
 export function parseCustomMap(json) {
   const data = typeof json === 'string' ? JSON.parse(json) : json;
   if (!Array.isArray(data.rows) || data.rows.length < 10) throw new Error('Карта должна содержать массив rows (минимум 10 строк)');

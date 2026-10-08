@@ -1,4 +1,3 @@
-// Пиксельные спрайты, заданные строками. 'X' — цвет игрока, '.' — прозрачный.
 const PAL = {
   k: '#14161a', w: '#f4f4f4', g: '#9aa0a8', d: '#5a6068', r: '#d8423a', y: '#f2c23a',
   b: '#5ab0f0', o: '#e8862e', n: '#7a5a3a', l: '#c8ccd2', G: '#4caf50',
@@ -151,7 +150,6 @@ export function sprite(name, color = '#ffffff') {
   return c;
 }
 
-// dataURL увеличенного спрайта для HTML-иконок
 const urlCache = new Map();
 export function spriteURL(name, color = '#ffffff', scale = 3) {
   const key = name + color + scale;

@@ -1,4 +1,3 @@
-// Сгенерировано tools/build-worldmap.mjs из Natural Earth (public domain). Не редактировать вручную.
 export const WORLD_W = 240;
 export const WORLD_H = 96;
 export const WORLD_LAT_TOP = 84;
