@@ -54,7 +54,6 @@ export function createPlayer(i, src, settings) {
     incBase: 0,
     eventIncome: 0,
     eventAcc: 0,
-    bonusTroops: 0,
     stats: { tilesCaptured: 0, tilesLost: 0, kills: 0, shipsSunk: 0, nukes: 0, peakTiles: 0, goldEarned: 0 },
     traitorUntil: 0,
     capital: -1,

@@ -30,7 +30,7 @@ function stop() {
 ipcMain.handle('lan:host', (_e, port) => new Promise((resolve) => {
   stop();
   port = Number(port) || 27420;
-  const server = new WebSocketServer({ port, maxPayload: 8 * 1024 * 1024 });
+  const server = new WebSocketServer({ port, maxPayload: 32 * 1024 * 1024 });
   server.once('listening', () => {
     wss = server;
     resolve({ ok: true, port, ips: localIps() });

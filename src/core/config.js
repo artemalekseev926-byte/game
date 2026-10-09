@@ -3,6 +3,41 @@ export const TICK_MS = 100;
 export const TICKS_PER_SEC = 10;
 export const sec = (s) => Math.round(s * TICKS_PER_SEC);
 
+const LN2 = 0.6931471805599453;
+
+function dlog(x) {
+  let k = 0;
+  while (x >= 2) { x /= 2; k++; }
+  while (x < 1) { x *= 2; k--; }
+  const z = (x - 1) / (x + 1), z2 = z * z;
+  let term = z, sum = 0;
+  for (let n = 1; n < 44; n += 2) { sum += term / n; term *= z2; }
+  return 2 * sum + k * LN2;
+}
+
+function dexp(y) {
+  let k = Math.floor(y / LN2);
+  const r = y - k * LN2;
+  let term = 1, sum = 1;
+  for (let n = 1; n < 26; n++) { term *= r / n; sum += term; }
+  for (; k > 0; k--) sum *= 2;
+  for (; k < 0; k++) sum /= 2;
+  return sum;
+}
+
+export const dpow = (x, e) => (x > 0 && Number.isFinite(x) ? dexp(e * dlog(x)) : 0);
+
+export function heading(dx, dy) {
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (ax === 0 && ay === 0) return 0;
+  const a = ax > ay ? ay / ax : ax / ay;
+  const q = a * a;
+  let r = ((-0.0464964749 * q + 0.15931422) * q - 0.327622764) * q * a + a;
+  if (ay > ax) r = 1.5707963267948966 - r;
+  if (dx < 0) r = 3.141592653589793 - r;
+  return dy < 0 ? -r : r;
+}
+
 export const PLAYER_COLORS = [
   '#e04848', '#3d7ee6', '#3fb950', '#e6b422', '#a259e0', '#f07c2a',
   '#22c3c3', '#e055a8', '#9c7a4a', '#9fb236', '#6b74f0', '#c7cbd1',
@@ -72,7 +107,7 @@ export const RESEARCH = {
   nuclear: { name: 'Ядерное оружие', max: 3, base: 12000, req: ['missile', 1], desc: '1: атомная бомба, 2: водородная бомба, 3: мегабомба «Судный день»' },
 };
 export const RESEARCH_KEYS = Object.keys(RESEARCH);
-export const researchCost = (key, lvl) => Math.round(RESEARCH[key].base * Math.pow(lvl + 1, 1.6));
+export const researchCost = (key, lvl) => Math.round(RESEARCH[key].base * dpow(lvl + 1, 1.6));
 export const researchTicks = (lvl) => (20 + 15 * lvl) * TICKS_PER_SEC;
 
 export const STRIKES = {
@@ -130,7 +165,7 @@ export const ECON = {
   growthEcon: 0.05,
   overCapDecay: 0.01,
   desertion: 0.01,
-  incomePerTile: 0.045,
+  incomePerTile: 0.008,
   incomeTroops: 0.06,
   houseIncome: 6,
   factoryDirect: 4,
@@ -154,6 +189,7 @@ export const ECON = {
   spawnMinDist: 30,
   buildMinDist: 5,
   buildCostStep: 0.25,
+  upgradeStep: 0.5,
   demolishRefund: 0.25,
   factoryInterval: 20,
   cargoPerLevel: 150,
@@ -166,7 +202,7 @@ export const ARMY = {
   tankPerArmor: 0.07, tankPerFactory: 0.01, tankMax: 0.45,
   artPerLevel: 0.06, artMax: 0.3,
   infBonus: 0.08, tankAtk: 1.3, artAtk: 0.9, artDef: 0.5, fortDef: 0.12,
-  armorBonus: 0.1, artBonus: 0.1,
+  armorBonus: 0.1, artBonus: 0.1, shiftPerSec: 0.02,
 };
 
 export const DIPLO = {

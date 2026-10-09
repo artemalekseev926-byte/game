@@ -436,7 +436,7 @@ function enclavesOf(game, pid, out) {
   const vis = game.mark, big = game.mark2;
   const st = game.nextStamp();
   const max = ECON.enclaveMax;
-  for (const start of game.borders[pid]) {
+  for (const start of game.borderList(pid)) {
     if (vis[start] === st) continue;
     vis[start] = st;
     const comp = [start];
@@ -490,9 +490,18 @@ function tickEnclaves(game) {
   }
 }
 
+function spawnAIs(game) {
+  for (const p of game.s.players) {
+    if (!p.alive || !p.ai || p.spawned) continue;
+    const i = pickSpawn(game, p.id);
+    if (i >= 0) placeSpawn(game, p.id, i);
+  }
+}
+
 export function tickTerritory(game) {
   const s = game.s;
   if (s.phase === 'spawn') {
+    spawnAIs(game);
     if (s.tick + 1 >= spawnTicks(s)) finishSpawn(game);
     return;
   }

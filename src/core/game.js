@@ -1,5 +1,6 @@
 import { ARMY, BUILDINGS, ECON, TICKS_PER_SEC, LAND_UNITS } from './config.js';
 import { hashState } from './state.js';
+import { relKey } from './diplomacy.js';
 import * as territory from './territory.js';
 import * as economy from './economy.js';
 import * as buildings from './buildings.js';
@@ -43,8 +44,8 @@ const CORE_INTENTS = {
       const p = game.s.players[t];
       const lvl = typeof cmd.level === 'string' && ['easy', 'normal', 'hard'].includes(cmd.level) ? cmd.level : 'normal';
       p.ai = cmd.level === null ? null : lvl;
-      p.netId = null;
-      if (p.alive) game.msg(-1, `${p.name} передан под управление компьютера`, 'info');
+      if (p.ai) p.netId = null;
+      if (p.alive) game.msg(-1, p.ai ? `${p.name} передан под управление компьютера` : `${p.name} снова под управлением игрока`, 'info');
     },
   },
 };
@@ -98,11 +99,12 @@ export function mapExtras(map) {
   return ex;
 }
 
-const NO_REL = Object.freeze({ type: 'none', until: 0, embargo: false });
+const NO_REL = Object.freeze({ type: 'none', until: 0, embargo: false, emb: 0 });
 const OK = Object.freeze({ ok: true });
 const fail = (error) => ({ ok: false, error });
 
-export const relKey = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
+export { relKey };
+export { createState, serializeState, deserializeState, hashState } from './state.js';
 
 export class Game {
   constructor(map, state) {
@@ -386,6 +388,23 @@ export class Game {
     if (p && p.alive && n > 0) p.troops += n;
   }
 
+  killTroops(pid, n, by = -1) {
+    const p = this.s.players[pid];
+    if (!p || !(n > 0)) return 0;
+    const k = Math.min(p.troops, n);
+    p.troops -= k;
+    const q = this.s.players[by];
+    if (q && by !== pid) q.stats.kills += k;
+    return k;
+  }
+
+  incomeMult(pid) {
+    const p = this.s.players[pid];
+    return p ? economy.incomeMult(p) : 1;
+  }
+
+  hasTradeTreaty(a, b) { return diplomacy.hasTradeTreaty(this, a, b); }
+
   spawnUnit(u) {
     u.id = this.s.nextId++;
     if (u.pi === undefined) u.pi = 0;
@@ -395,8 +414,22 @@ export class Game {
   }
 
   unitById(id) {
-    for (const u of this.s.units) if (u.id === id) return u;
+    const n = Number(id);
+    for (const u of this.s.units) if (u.id === n) return u;
     return null;
+  }
+
+  removeUnit(u) {
+    const s = this.s;
+    const k = s.units.indexOf(u);
+    if (k < 0) return false;
+    s.units.splice(k, 1);
+    return true;
+  }
+
+  aiRespond(pid, req) {
+    if (typeof AI.aiRespond !== 'function') return false;
+    return AI.aiRespond(this, pid, req);
   }
 
   createAttack(pid, target, troops, landing = -1) {
@@ -409,10 +442,7 @@ export class Game {
 
   breakRelation(a, b, traitor = false) { diplomacy.breakRelation(this, a, b, traitor); }
 
-  markTraitor(pid) {
-    const p = this.s.players[pid];
-    if (p) p.traitorUntil = this.s.tick + diplomacy.TRAITOR_TICKS;
-  }
+  markTraitor(pid) { diplomacy.markTraitor(this, pid); }
 
   eliminate(pid, reason = '') { victory.eliminate(this, pid, reason); }
 
