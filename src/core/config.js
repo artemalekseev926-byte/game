@@ -149,7 +149,7 @@ export const LAND_UNITS = {
 };
 export const TRADE = {
   interval: (lvl) => (40 - 5 * lvl) * TICKS_PER_SEC,
-  base: 100, perTile: 3, treaty: 0.5, stockBonus: 0.1, maxStock: 20, sunkLoot: 0.5,
+  base: 100, perTile: 1, treaty: 0.5, stockBonus: 0.1, maxStock: 10, sunkLoot: 0.5,
 };
 
 export const ECON = {

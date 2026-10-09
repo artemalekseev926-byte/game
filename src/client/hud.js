@@ -1,514 +1,2163 @@
-import { UNITS, UNIT_KEYS, BUILDINGS, BUILDING_KEYS, RESEARCH, RESEARCH_KEYS, researchCost, researchTime, TERRAIN, DRONES, MISSILE, droneRange, missileRange } from '../core/config.js';
-import { troopCount, popCap } from '../core/game.js';
-import { spriteURL } from './sprites.js';
+import {
+  BUILDINGS, BUILDING_KEYS, RESEARCH, RESEARCH_KEYS, STRIKES, SHIPS, TERRAIN, TICKS_PER_SEC, WIN_REASONS, TRADE,
+  ECON, SAM, DIPLO, RAIL_TYPES, researchCost, researchTicks, siloReload, airbaseReload, interceptChance,
+} from '../core/config.js';
+import { buildCost, upgradeCost, demolishRefund, factoryInterval, nearestPort, railRoute } from '../core/buildings.js';
+import { shipCost, portShips, portShipCap, countUnits, warshipDamage, buildShipError } from '../core/units.js';
+import { strikeTarget, strikeRange } from '../core/strikes.js';
+import { proposeError, embargoBy } from '../core/diplomacy.js';
+import { spawnTicks } from '../core/territory.js';
 import { fmtNum } from './render.js';
 import { play } from './audio.js';
 
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const pips = (n, max) => '■'.repeat(n) + '□'.repeat(Math.max(0, max - n));
-const fmtTime = (t) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+export const $ = (id) => document.getElementById(id);
+export const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const icon = (name, cls = '') => `<svg class="ic${cls ? ' ' + cls : ''}"><use href="#i-${name}"/></svg>`;
+export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+export const safeColor = (c) => (typeof c === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#888888');
+
+export function fmtInt(n) {
+  const v = Math.round(Number(n) || 0);
+  const s = String(Math.abs(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return v < 0 ? '−' + s : s;
+}
+
+export const fmtPct = (v, d = 1) => (Number(v) || 0).toFixed(d).replace('.', ',') + '%';
+
+export function fmtClock(sec) {
+  const t = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
+  const ss = String(s).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${String(m).padStart(2, '0')}:${ss}`;
+}
+
+export function fmtSec(sec) {
+  const t = Math.max(0, Math.ceil(Number(sec) || 0));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+export function plural(n, forms) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return forms[2];
+  if (b > 1 && b < 5) return forms[1];
+  if (b === 1) return forms[0];
+  return forms[2];
+}
+
+export function tpl(id) { return $(id).content.firstElementChild.cloneNode(true); }
+
+export function setRangeFill(el) {
+  const min = Number(el.min) || 0, max = Number(el.max) || 100, v = Number(el.value);
+  el.style.setProperty('--p', (max > min ? ((v - min) / (max - min)) * 100 : 0) + '%');
+}
+
+export function setText(el, v) {
+  const t = String(v);
+  if (el && el.textContent !== t) el.textContent = t;
+}
+
+export function setHTML(el, v) {
+  if (el && el.dataset.h !== v) {
+    el.innerHTML = v;
+    el.dataset.h = v;
+  }
+}
+
+function toggle(el, cls, on) {
+  if (el && el.classList.contains(cls) !== !!on) el.classList.toggle(cls, !!on);
+}
+
+function show(el, on) {
+  if (el && el.hidden === !!on) el.hidden = !on;
+}
+
+function labelNode(btn) {
+  for (const n of btn.childNodes) if (n.nodeType === 3 && n.textContent.trim()) return n;
+  const t = document.createTextNode('');
+  btn.appendChild(t);
+  return t;
+}
+
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+const RESEARCH_ICONS = { econ: 'econ', logistics: 'rail', inf: 'troops', armor: 'tank', art: 'art', fort: 'fort', naval: 'ship', drone: 'drone', missile: 'cruise', aa: 'sam', nuclear: 'atom' };
+const UNIT_NAMES = { warship: 'Военный корабль', transport: 'Десантный корабль', trade: 'Торговое судно', train: 'Поезд', truck: 'Грузовик' };
+const UNIT_ICONS = { warship: 'ship', transport: 'boat', trade: 'trade', train: 'rail', truck: 'factory' };
+const DIP_TYPES = { alliance: 'Союз', pact: 'Пакт', trade: 'Торговля' };
+const DIP_TEXT = {
+  alliance: 'Предлагает союз: вы не сможете нападать друг на друга.',
+  pact: 'Предлагает пакт о ненападении на 10 минут.',
+  trade: 'Предлагает торговый договор: +50% к доходу от торговли.',
+};
+const BREAK_TEXT = { alliance: 'Разорвать союз', pact: 'Разорвать пакт', trade: 'Разорвать торговлю' };
+const STRIKE_SHORT = { drone: 'Дрон', kamikaze: 'Камикадзе', cruise: 'Крылатая ракета', atom: 'Атомная бомба', hbomb: 'Водородная бомба', mega: 'Мегабомба' };
+const SRC_NEED = { airbase: 'Постройте аэродром БПЛА (клавиша 6)', silo: 'Постройте ракетную шахту (клавиша 7)' };
+const PANEL_STRIKES = { silo: ['cruise', 'atom', 'hbomb', 'mega'], airbase: ['drone', 'kamikaze'] };
+const RATIO_STEP = 5;
+
+const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, k) => `<i${k < n ? ' class="on"' : ''}></i>`).join('')}</span>`;
+const kv = (rows) => `<div class="kv">${rows.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
+const pbar = (label, value, pct, cls = '') => `<div class="pbar-block"><div class="pbar-label"><span>${label}</span><b>${value}</b></div><div class="pbar${cls ? ' ' + cls : ''}"><span style="width:${clamp(pct, 0, 100).toFixed(1)}%"></span></div></div>`;
+const btn = (act, label, extra = {}) => {
+  const attrs = Object.entries(extra.data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
+  const cls = ['btn', 'sm', extra.cls || '', extra.full ? 'full' : ''].filter(Boolean).join(' ');
+  const cost = extra.cost !== undefined ? `<span class="cost">${extra.cost}</span>` : '';
+  return `<button class="${cls}" data-act="${act}"${attrs}${extra.disabled ? ' disabled' : ''}${extra.title ? ` title="${esc(extra.title)}"` : ''}>${extra.icon ? icon(extra.icon) : ''}${label}${cost}</button>`;
+};
 
 export class Hud {
   constructor(app, session, renderer) {
     this.app = app;
     this.session = session;
     this.r = renderer;
-    this.frac = 0.5;
-    this.panelT = 0;
-    this.boardT = 0;
-    this.lastPanel = '';
+    this.pid = session.localPid;
+    this.canvas = renderer.canvas;
+    this.ratio = clamp(Number(app.settings.ratio) || 0.3, 0.01, 1);
+    this.listeners = [];
+    this.mouse = { cx: -1, cy: -1, inside: false, inWin: false, down: -1, ox: 0, oy: 0, lx: 0, ly: 0, drag: false };
+    this.keyPan = { l: 0, r: 0, u: 0, d: 0 };
+    this.cards = new Map();
+    this.rows = new Map();
+    this.sort = { key: 'terr', dir: -1 };
+    this.focusPid = -1;
+    this.ctx = null;
+    this.hoverIndex = -1;
+    this.tipAt = 0;
+    this.tipDirty = true;
+    this.hintKey = '';
     this.endShown = false;
     this.deadShown = false;
-    this.keys = new Set();
-    this.listeners = [];
-    this.mouse = { x: 0, y: 0, down: false, drag: false, sx: 0, sy: 0, cx: 0, cy: 0 };
-
-    document.querySelectorAll('#screen-game img[data-sprite]').forEach((img) => { img.src = spriteURL(img.dataset.sprite, '#fff', 3); });
-    $('chat-form').hidden = session.mode === 'offline';
-    $('speed-ctrl').style.display = session.isAuthority ? '' : 'none';
-    document.querySelectorAll('.offline-only').forEach((el) => { el.hidden = session.mode !== 'offline'; });
-    $('log').innerHTML = '';
-    $('panel').hidden = true;
-    $('hint').hidden = true;
-    $('r-color').style.background = this.me.color;
-
-    session.on((ev) => this.onSession(ev));
-    this.bindInput();
-    this.updateSpeedButtons();
+    this.endWait = 0;
+    this.lastMsg = { text: '', at: 0, el: null, n: 1 };
+    this.boatCache = { key: '', v: null };
+    this.timers = { top: 0, dock: 0, panel: 0, board: 0, cards: 0, modal: 0, tip: 0 };
+    this.r.mode = null;
+    this.r.selection = null;
+    this.r.hoverTile = -1;
+    this.r.keys.x = 0;
+    this.r.keys.y = 0;
+    this.initDom();
+    this.bind();
+    this.unsub = session.on((ev) => this.onSession(ev));
+    this.update(0);
   }
 
+  get game() { return this.session.game; }
+
   get s() { return this.session.s; }
-  get me() { return this.s.players[this.session.localPid]; }
-  get pid() { return this.session.localPid; }
+
+  get me() { return this.session.s.players[this.pid]; }
 
   listen(target, type, fn, opts) {
     target.addEventListener(type, fn, opts);
     this.listeners.push([target, type, fn, opts]);
   }
+
   destroy() {
     for (const [t, type, fn, opts] of this.listeners) t.removeEventListener(type, fn, opts);
     this.listeners = [];
-    $('modal-research').hidden = true;
-    $('modal-end').hidden = true;
+    if (this.unsub) this.unsub();
+    this.unsub = null;
+    this.r.mode = null;
+    this.r.selection = null;
+    this.r.hoverTile = -1;
+    this.r.keys.x = 0;
+    this.r.keys.y = 0;
+    this.canvas.style.cursor = '';
+    $('tip').hidden = true;
+    $('ctx-menu').hidden = true;
+    $('diplo-stack').innerHTML = '';
+    $('toasts').innerHTML = '';
+    this.cards.clear();
+  }
+
+  initDom() {
+    const s = this.s, me = this.me, offline = this.session.mode === 'offline';
+    $('chat-form').hidden = offline;
+    $('chat-input').value = '';
+    document.querySelectorAll('.offline-only').forEach((el) => { el.hidden = !offline; });
+    $('log').innerHTML = '';
+    $('toasts').innerHTML = '';
+    $('diplo-stack').innerHTML = '';
+    $('panel').hidden = true;
+    $('hint').hidden = true;
+    $('ctx-menu').hidden = true;
+    $('tip').hidden = true;
+    $('hud-bottom').hidden = !me || !me.alive;
+    $('spawn-overlay').hidden = s.phase !== 'spawn';
+    $('countries-badge').hidden = true;
+    $('board').classList.toggle('collapsed', !!this.app.settings.boardCollapsed);
+    $('btn-aa').classList.toggle('on', !!this.r.showAA);
+    $('r-name').textContent = me ? me.name : '';
+    $('r-color').style.background = me ? safeColor(me.color) : '';
+    for (const b of $('speed-ctrl').querySelectorAll('[data-speed]')) b.hidden = !this.session.speeds.includes(Number(b.dataset.speed));
+    $('speed-ctrl').hidden = !this.session.speeds.length;
+    $('research-list').innerHTML = '';
+    $('countries-body').innerHTML = '';
+    this.setRatio(this.ratio, true);
+    this.updateSpeed();
+    this.updateDockHeight();
+  }
+
+  bind() {
+    const c = this.canvas;
+    this.listen(c, 'mousedown', (e) => this.onMouseDown(e));
+    this.listen(window, 'mousemove', (e) => this.onMouseMove(e));
+    this.listen(window, 'mouseup', (e) => this.onMouseUp(e));
+    this.listen(c, 'wheel', (e) => this.onWheel(e), { passive: false });
+    this.listen(c, 'contextmenu', (e) => { e.preventDefault(); this.onRightClick(e); });
+    this.listen(c, 'mouseleave', () => {
+      this.mouse.inside = false;
+      this.r.hoverTile = -1;
+      this.hoverIndex = -1;
+      $('tip').hidden = true;
+    });
+    this.listen(document.documentElement, 'mouseleave', () => { this.mouse.inWin = false; });
+    this.listen(window, 'keyup', (e) => this.onKeyUp(e));
+    this.listen(window, 'blur', () => this.releaseKeys());
+    this.listen(window, 'resize', () => this.updateDockHeight());
+    this.listen(document, 'mousedown', (e) => {
+      if (this.ctx && !e.target.closest('#ctx-menu')) this.closeCtx();
+    }, true);
+
+    $('speed-ctrl').onclick = (e) => {
+      const b = e.target.closest('[data-speed]');
+      if (b) this.setSpeed(Number(b.dataset.speed));
+    };
+    $('btn-countries').onclick = () => this.openCountries();
+    $('btn-research').onclick = () => this.openResearch();
+    $('r-research').onclick = () => this.openResearch();
+    $('btn-aa').onclick = () => this.toggleAA();
+    $('btn-theme').onclick = () => this.app.toggleTheme();
+    $('btn-menu').onclick = () => this.app.openPause();
+    $('board-more').onclick = () => this.openCountries();
+    $('board-toggle').onclick = () => {
+      const on = !$('board').classList.contains('collapsed');
+      $('board').classList.toggle('collapsed', on);
+      this.app.settings.boardCollapsed = on;
+      this.app.saveSettings();
+      play('toggle');
+    };
+    $('board-list').onclick = (e) => {
+      const li = e.target.closest('[data-pid]');
+      if (li) this.focusPlayer(Number(li.dataset.pid));
+    };
+    $('me-chip').onclick = () => this.focusHome();
+    $('panel-close').onclick = () => this.clearSelection();
+    $('panel-body').onclick = (e) => this.onPanelAction(e);
+    $('diplo-stack').onclick = (e) => this.onCardAction(e);
+    $('hint-cancel').onclick = () => this.cancelHint();
+    $('atk-ratio').oninput = (e) => this.setRatio(Number(e.target.value) / 100);
+    $('atk-dec').onclick = () => this.stepRatio(-RATIO_STEP);
+    $('atk-inc').onclick = () => this.stepRatio(RATIO_STEP);
+    $('build-bar').onclick = (e) => {
+      const b = e.target.closest('[data-build]');
+      if (b) this.onBuildTool(b.dataset.build);
+    };
+    $('strike-bar').onclick = (e) => {
+      const b = e.target.closest('[data-strike]');
+      if (b) this.onStrikeTool(b.dataset.strike);
+    };
+    $('btn-boat').onclick = () => this.toggleBoat();
+    $('btn-warship').onclick = () => this.buildWarship();
+    $('ctx-menu').onclick = (e) => {
+      const b = e.target.closest('[data-act]');
+      if (b && !b.disabled) this.onCtxAction(b.dataset.act);
+    };
+    $('ctx-menu').oncontextmenu = (e) => e.preventDefault();
+    $('chat-form').onsubmit = (e) => {
+      e.preventDefault();
+      const inp = $('chat-input');
+      const text = inp.value.trim();
+      if (text) this.session.sendChat(text);
+      inp.value = '';
+      inp.blur();
+    };
+    $('research-list').onclick = (e) => {
+      const b = e.target.closest('[data-research]');
+      if (b && !b.disabled) this.startResearch(b.dataset.research);
+    };
+    $('countries-table').onclick = (e) => this.onCountriesClick(e);
   }
 
   onSession(ev) {
-    if (ev.type === 'fx') {
-      this.r.addFx(ev.fx);
-      for (const e of ev.fx) this.onFx(e);
-    } else if (ev.type === 'error') {
-      this.toast(ev.error);
-    } else if (ev.type === 'chat') {
-      this.log(`${ev.chat.name}: ${ev.chat.text}`, 'chat');
-      play('click');
-    } else if (ev.type === 'disconnected') {
-      this.app.showMessage('Игра прервана', ev.reason, () => this.app.exitGame());
+    switch (ev.type) {
+      case 'events':
+        this.r.addEvents(ev.events);
+        this.onEvents(ev.events);
+        break;
+      case 'chat':
+        this.logChat(ev.chat);
+        break;
+      case 'disconnected':
+        this.app.onDisconnected(ev.reason);
+        break;
+      case 'desync':
+        if (this.session.mode === 'client') this.toast('Рассинхронизация — загружаем состояние с хоста…', 'info');
+        break;
+      case 'resync':
+        this.toast('Синхронизация восстановлена', 'ok');
+        break;
+      case 'pause':
+      case 'speed':
+        this.updateSpeed();
+        break;
+      case 'peerLeft':
+        this.log(`${ev.name || 'Игрок'} отключился — страной управляет компьютер`, 'warn');
+        break;
+      case 'ready':
+        this.toast('Все игроки загрузились', 'ok');
+        break;
+      case 'error':
+        if (typeof console !== 'undefined') console.error(ev.error);
+        this.toast(ev.error || 'Ошибка');
+        break;
+      default:
+        break;
     }
   }
 
-  onFx(e) {
+  visible(x, y) {
+    const [px, py] = this.r.tileToScreen(x, y);
+    return px >= 0 && py >= 0 && px <= this.r.viewW && py <= this.r.viewH;
+  }
+
+  onEvents(events) {
     const me = this.pid;
-    switch (e.k) {
-      case 'msg':
-        if (e.to === me || e.to === -1) {
-          this.log(e.text, e.kind);
-          if (e.kind === 'danger') play('alert');
+    for (const e of events) {
+      if (!e) continue;
+      switch (e.k) {
+        case 'msg':
+          if (e.to === me || e.to === -1) this.log(e.text, e.kind || 'info');
+          break;
+        case 'capture':
+          if (e.pid === me) play('capture');
+          else if (e.from === me) play('lost');
+          break;
+        case 'built':
+          if (e.pid === me) play('built');
+          break;
+        case 'destroyed':
+          if (e.owner === me || e.by === me || this.visible(e.x, e.y)) play('smallboom');
+          break;
+        case 'launch':
+          if (e.kind === 'mega') play('mega');
+          else if (e.pid === me) play(e.kind === 'drone' || e.kind === 'kamikaze' ? 'drone' : 'launch');
+          else if (this.visible(e.x, e.y)) play('launch');
+          break;
+        case 'impact':
+          if ((e.kind === 'drone' || e.kind === 'kamikaze' || e.kind === 'cruise') && (e.owner === me || this.visible(e.x, e.y))) play('smallboom');
+          break;
+        case 'nuke':
+          play('nuke');
+          break;
+        case 'intercept':
+          if (e.by === me || e.owner === me || this.visible(e.x, e.y)) play('intercept');
+          break;
+        case 'shipSunk':
+          if (e.owner === me || e.by === me || this.visible(e.x, e.y)) play('splash');
+          break;
+        case 'ship':
+          if (e.pid === me) play(e.type === 'transport' ? 'boat' : 'ship');
+          break;
+        case 'trade':
+          if (e.from === me || e.to === me) play('trade');
+          break;
+        case 'cargo':
+          if (e.pid === me) play('cash');
+          break;
+        case 'research':
+          if (e.pid === me) play('research');
+          break;
+        case 'request':
+          if (e.req && e.req.to === me) {
+            play('proposal');
+            this.timers.cards = 0;
+          }
+          break;
+        case 'eliminated':
+          if (e.pid === me) play('eliminated');
+          break;
+        case 'victory': {
+          const g = this.game;
+          const won = e.pid === me || (e.pid >= 0 && this.me && this.me.alive && g.isAllied(me, e.pid));
+          play(won ? 'victory' : 'defeat');
+          break;
         }
-        break;
-      case 'capture':
-        if (e.o === me) play('capture');
-        else if (e.from === me) play('lost');
-        else if (this.visible(e.p)) play('battle');
-        break;
-      case 'repelled':
-      case 'battle':
-        if (this.visible(e.p)) play('battle');
-        break;
-      case 'boom': play(e.big ? 'boom' : 'smallboom'); break;
-      case 'intercept': play('intercept'); break;
-      case 'launch': if (e.o === me) play(e.kind === 'missile' ? 'launch' : 'drone'); break;
-      case 'research': if (e.o === me) { play('research'); if (!$('modal-research').hidden) this.renderResearch(); } break;
-      case 'built': if (this.s.provs[e.p].o === me) play('build'); break;
-      case 'eliminated': if (e.o === me) play('defeat'); break;
-      case 'victory': play(e.o === me ? 'victory' : 'defeat'); break;
-      default: break;
+        case 'phase':
+          if (e.phase === 'play') {
+            play('spawn');
+            this.focusHome(5);
+          }
+          break;
+        default:
+          break;
+      }
     }
+    this.tipDirty = true;
   }
 
-  visible(p) {
-    const P = this.r.map.provinces[p];
-    const x = this.r.sx(P.cx), y = this.r.sy(P.cy);
-    return x > 0 && y > 0 && x < this.r.canvas.width && y < this.r.canvas.height;
-  }
-
-  log(text, kind = 'info') {
-    const el = document.createElement('div');
-    el.className = kind;
-    el.textContent = text;
+  log(text, kind = 'info', html = false) {
+    const now = performance.now();
+    const L = this.lastMsg;
+    if (!html && L.el && L.el.isConnected && L.text === text && now - L.at < 5000) {
+      L.n++;
+      L.at = now;
+      L.el.querySelector('.log-text').textContent = `${text} ×${L.n}`;
+      return;
+    }
+    const el = tpl('tpl-log-item');
+    el.classList.add(kind === 'danger' || kind === 'good' || kind === 'warn' || kind === 'chat' ? kind : 'info');
+    el.querySelector('.log-time').textContent = fmtClock(this.s.tick / TICKS_PER_SEC);
+    const t = el.querySelector('.log-text');
+    if (html) t.innerHTML = text;
+    else t.textContent = text;
     const log = $('log');
     log.appendChild(el);
-    while (log.children.length > 7) log.firstChild.remove();
+    while (log.children.length > 7) log.firstElementChild.remove();
     setTimeout(() => el.remove(), 12000);
-  }
-  toast(text) {
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = text;
-    $('toasts').appendChild(el);
-    setTimeout(() => el.remove(), 3000);
-    play('error');
+    this.lastMsg = { text: html ? '' : text, at: now, el, n: 1 };
+    if (kind === 'danger') play('alert');
   }
 
-  cmd(c) {
-    const res = this.session.command(c);
-    if (!res.ok) { this.toast(res.error); return false; }
-    this.lastPanel = '';
+  logChat(c) {
+    this.log(`<b style="color:${safeColor(c.color)}">${esc(c.name)}:</b> ${esc(c.text)}`, 'chat', true);
+    if (c.from !== this.pid) play('chat');
+  }
+
+  toast(text, kind = '') {
+    const el = tpl('tpl-toast');
+    if (kind) el.classList.add(kind);
+    if (kind === 'info' || kind === 'ok') el.querySelector('use').setAttribute('href', kind === 'ok' ? '#i-check' : '#i-info');
+    el.querySelector('.toast-text').textContent = text;
+    const box = $('toasts');
+    for (const old of box.children) {
+      if (old.querySelector('.toast-text').textContent === text) old.remove();
+    }
+    box.appendChild(el);
+    while (box.children.length > 4) box.firstElementChild.remove();
+    setTimeout(() => el.remove(), 3200);
+    if (!kind) play('error');
+  }
+
+  send(cmd) {
+    const r = this.session.send(cmd);
+    if (!r.ok) {
+      this.toast(r.error || 'Команда отклонена');
+      return false;
+    }
+    this.timers.panel = 0.05;
+    this.timers.dock = 0.05;
+    this.tipDirty = true;
     return true;
   }
 
   update(dt) {
-    const s = this.s, me = this.me;
-    const pan = (600 / this.r.cam.z) * dt;
-    if (this.keys.has('arrowleft') || this.keys.has('a')) this.r.cam.x -= pan;
-    if (this.keys.has('arrowright') || this.keys.has('d')) this.r.cam.x += pan;
-    if (this.keys.has('arrowup') || this.keys.has('w')) this.r.cam.y -= pan;
-    if (this.keys.has('arrowdown') || this.keys.has('s')) this.r.cam.y += pan;
-    if (this.app.settings.edgeScroll && this.mouse.inside) {
-      const m = 12, W = window.innerWidth, H = window.innerHeight;
-      if (this.mouse.cx < m) this.r.cam.x -= pan;
-      if (this.mouse.cx > W - m) this.r.cam.x += pan;
-      if (this.mouse.cy < m) this.r.cam.y -= pan;
-      if (this.mouse.cy > H - m) this.r.cam.y += pan;
+    if (!this.session.s) return;
+    const T = this.timers;
+    this.applyPan();
+    this.updateSpawn();
+    if ((T.top -= dt) <= 0) { T.top = 0.12; this.updateTop(); }
+    if ((T.dock -= dt) <= 0) { T.dock = 0.2; this.updateDock(); }
+    if ((T.panel -= dt) <= 0) { T.panel = 0.25; this.updatePanel(); }
+    if ((T.board -= dt) <= 0) { T.board = 0.5; this.updateBoard(); }
+    if ((T.cards -= dt) <= 0) { T.cards = 0.2; this.updateCards(); }
+    if ((T.modal -= dt) <= 0) { T.modal = 0.4; this.updateModals(); }
+    T.tip -= dt;
+    if (T.tip <= 0 || (this.tipDirty && performance.now() - this.tipAt > 50)) {
+      T.tip = 0.25;
+      this.updateTip();
     }
-    this.r.clampCam();
-
-    const net = me.income - me.upkeep;
-    setText('r-money', fmtNum(me.money));
-    const rate = $('r-money-rate');
-    setText('r-money-rate', (net >= 0 ? '+' : '') + net.toFixed(1));
-    rate.className = net >= 0 ? 'pos' : 'neg';
-    setText('r-mp', fmtNum(me.mp));
-    setText('r-mp-rate', '+' + me.mpRate.toFixed(1));
-    $('r-mp-rate').className = 'pos';
-    let owned = 0;
-    for (const P of s.provs) if (P.o === this.pid) owned++;
-    setText('r-provs', String(owned));
-    setText('r-goal', '/' + Math.ceil(s.provs.length * s.victoryShare));
-    if (me.rs) {
-      setText('r-rs', RESEARCH[me.rs.k].name.slice(0, 12));
-      $('r-rs-bar').style.width = Math.min(100, ((me.rs.t + this.session.alpha()) / me.rs.total) * 100) + '%';
-    } else {
-      setText('r-rs', 'нет');
-      $('r-rs-bar').style.width = '0%';
-    }
-    setText('game-time', fmtTime(s.time));
-
-    this.boardT -= dt;
-    if (this.boardT <= 0) { this.boardT = 0.5; this.renderBoard(); }
-    this.panelT -= dt;
-    if (this.panelT <= 0) { this.panelT = 0.2; this.renderPanel(); }
-    if (!$('modal-research').hidden && Math.floor(s.time * 2) !== this._rsT) { this._rsT = Math.floor(s.time * 2); this.renderResearch(); }
-
-    if (s.winner !== null && !this.endShown) { this.endShown = true; this.showEnd(); }
-    else if (!me.alive && !this.deadShown && s.winner === null) { this.deadShown = true; this.showEnd(true); }
+    this.updateHint();
+    this.checkEnd(dt);
   }
 
-  renderBoard() {
-    const s = this.s;
-    const counts = s.players.map(() => 0);
-    for (const P of s.provs) if (P.o >= 0) counts[P.o]++;
-    const order = s.players.map((p, i) => i).sort((a, b) => counts[b] - counts[a]);
-    $('board').innerHTML = '<h3 style="margin:0 0 .4em">Державы</h3>' + order.map((i) => {
-      const p = s.players[i];
-      return `<div class="pl ${p.alive ? '' : 'dead'} ${i === this.pid ? 'me' : ''}" title="${p.ai ? 'ИИ' : 'Игрок'}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(p.name)}</span><b>${counts[i]}</b></div>`;
-    }).join('');
+  applyPan() {
+    const k = this.keyPan;
+    let x = k.r - k.l, y = k.d - k.u;
+    const m = this.mouse;
+    if (this.app.settings.edgeScroll && m.inWin && m.down < 0 && !this.app.anyModal()) {
+      const e = 6, W = window.innerWidth, H = window.innerHeight;
+      if (m.cx <= e) x = -1;
+      else if (m.cx >= W - 1 - e) x = 1;
+      if (m.cy <= e) y = -1;
+      else if (m.cy >= H - 1 - e) y = 1;
+    }
+    this.r.keys.x = Math.sign(x);
+    this.r.keys.y = Math.sign(y);
   }
 
-  renderPanel() {
-    const sel = this.r.selected;
-    const panel = $('panel');
-    if (sel < 0) { panel.hidden = true; this.lastPanel = ''; return; }
-    const html = this.panelHTML(sel);
-    if (html !== this.lastPanel) {
-      const scroll = panel.scrollTop;
-      panel.innerHTML = html;
-      panel.scrollTop = scroll;
-      this.lastPanel = html;
-    }
-    panel.hidden = false;
+  updateDockHeight() {
+    const dock = $('hud-bottom');
+    const h = dock.hidden ? 0 : dock.offsetHeight;
+    if (h > 0 || dock.hidden) $('screen-game').style.setProperty('--dock-h', h + 'px');
   }
 
-  panelHTML(i) {
-    const s = this.s, P = s.provs[i], mp = this.r.map.provinces[i], me = this.me;
-    const own = P.o === this.pid;
-    const owner = P.o >= 0 ? s.players[P.o] : null;
-    const color = owner ? owner.color : '#888';
-    const game = this.session.game || this.helper();
-    let h = `<div class="p-head"><span class="dot" style="background:${color}"></span><h2>Провинция ${i + 1}</h2><span class="p-close" data-act="close">✕</span></div>`;
-    h += `<div class="kv"><span>Владелец</span><span>${owner ? esc(owner.name) : 'Нейтральная'}</span>`;
-    h += `<span>Рельеф</span><span>${TERRAIN[mp.terrain].name} (×${TERRAIN[mp.terrain].def})</span>`;
-    h += `<span>Население</span><span>${fmtNum(P.pop)} / ${fmtNum(popCap(mp, P))}</span>`;
-    h += `<span>Оборона</span><span>${fmtNum(game.defensePower(i))}</span>`;
-    if (mp.sea.length) h += `<span>Морские пути</span><span>${mp.sea.length}</span>`;
-    if (P.unrest > 0) h += `<span>Беспорядки</span><span class="warn">${Math.ceil(P.unrest)} с</span>`;
-    h += '</div>';
-    h += '<div class="troops">' + UNIT_KEYS.map((k) => `<div title="${UNITS[k].name}"><img src="${spriteURL(k, color, 3)}">${fmtNum(P.t[k])}</div>`).join('') + '</div>';
-
-    if (!own) {
-      const blds = BUILDING_KEYS.filter((k) => P.b[k] > 0).map((k) => `${BUILDINGS[k].name} ${P.b[k]}`).join(', ');
-      h += `<div class="kv"><span>Постройки</span><span>${blds || '—'}</span></div>`;
-      h += '<p class="muted small">Выберите свою провинцию и нажмите ПКМ по этой, чтобы атаковать. Ракеты и БПЛА — из панели своей провинции.</p>';
-      return h;
-    }
-
-    h += '<div class="section"><h3>Армия</h3><div class="frac">' + [0.25, 0.5, 0.75, 1].map((f) =>
-      `<button class="btn tiny ${this.frac === f ? 'on' : ''}" data-act="frac" data-v="${f}">${f * 100}%</button>`).join('') + '</div>';
-    h += `<div class="actions"><button class="btn" data-act="mode-move" ${troopCount(P.t) ? '' : 'disabled'}>Отправить войска</button></div>`;
-    h += '<p class="muted small">или ПКМ по цели на карте</p>';
-    h += '<h3>Набор</h3>';
-    for (const k of UNIT_KEYS) {
-      const U = UNITS[k];
-      const ok = !U.needs || P.b[U.needs] > 0;
-      const max = Math.floor(Math.min(me.money / U.cost, me.mp / U.mp));
-      const dis = (n) => (!ok || max < n ? 'disabled' : '');
-      h += `<div class="unit-row" title="Атака ${U.atk}, оборона ${U.def}, содержание ${U.upkeep}$/с${U.needs ? '. Нужна фабрика' : ''}"><img src="${spriteURL(k, color, 2)}"><span>${U.short} ${U.cost}$</span>`;
-      h += `<button class="btn" data-act="recruit" data-u="${k}" data-n="1" ${dis(1)}>+1</button>`;
-      h += `<button class="btn" data-act="recruit" data-u="${k}" data-n="10" ${dis(10)}>+10</button>`;
-      h += `<button class="btn" data-act="recruit" data-u="${k}" data-n="50" ${dis(50)}>+50</button>`;
-      h += `<button class="btn" data-act="recruit" data-u="${k}" data-n="max" ${dis(1)}>MAX</button></div>`;
-      if (!ok) h += '<div class="warn">Танки и артиллерия — только в провинции с фабрикой</div>';
-    }
-    h += '</div>';
-
-    if (P.b.airbase > 0 || P.b.silo > 0) {
-      h += '<div class="section"><h3>Удары</h3>';
-      if (P.cd > 0) h += `<p class="warn">Перезарядка: ${Math.ceil(P.cd)} с</p>`;
-      h += '<div class="actions">';
-      if (P.b.airbase > 0) {
-        for (const [k, D] of Object.entries(DRONES)) {
-          const lock = me.research.drone < D.lvl;
-          h += `<button class="btn" data-act="mode-drone" data-d="${k}" ${lock || P.cd > 0 || me.money < D.cost ? 'disabled' : ''} title="${lock ? 'Нужно исследование БПЛА ур. ' + D.lvl : 'Радиус ' + droneRange(P.b.airbase, me.research.drone)}">${D.name} ${D.cost}$</button>`;
-        }
-      }
-      if (P.b.silo > 0) {
-        const r = missileRange(me.research.missile);
-        h += `<button class="btn danger" data-act="mode-missile" ${P.cd > 0 || me.money < MISSILE.cost ? 'disabled' : ''} title="Радиус ${r > 9000 ? 'глобальный' : r}">Ракета ${MISSILE.cost}$</button>`;
-      }
-      h += '</div></div>';
-    }
-
-    h += '<div class="section"><h3>Постройки</h3>';
-    for (const k of BUILDING_KEYS) {
-      const B = BUILDINGS[k];
-      const lvl = P.b[k];
-      const building = P.build && P.build.k === k;
-      h += `<div class="bld" title="${B.desc}"><img src="${spriteURL(k, color, 3)}"><div>${B.name}<br><span class="pips">${pips(lvl, B.max)}</span>`;
-      if (building) h += `<div class="progress"><span style="width:${Math.min(100, (P.build.t / P.build.total) * 100)}%"></span></div>`;
-      h += '</div>';
-      if (building) h += '<button class="btn" data-act="cancel">Отмена</button>';
-      else if (lvl >= B.max) h += '<span class="lv">МАКС</span>';
-      else {
-        const err = game.canBuild(this.pid, i, k);
-        const cost = game.buildCost(this.pid, k, lvl + 1);
-        const locked = B.req && me.research[B.req[0]] < B.req[1];
-        h += `<button class="btn" data-act="build" data-k="${k}" ${err ? 'disabled' : ''} title="${err ? esc(err) : ''}">${locked ? 'ИССЛ.' : lvl ? '↑' : '+'} ${cost}$</button>`;
-      }
-      h += '</div>';
-    }
-    h += '</div>';
-    return h;
-  }
-
-  helper() {
-    if (!this._helper || this._helper.s !== this.s) {
-      const G = this.app.GameClass;
-      this._helper = new G(this.r.map, this.s);
-    }
-    return this._helper;
-  }
-
-  onPanelAction(el) {
-    const act = el.dataset.act, sel = this.r.selected;
-    play('click');
-    if (act === 'close') { this.select(-1); return; }
-    if (act === 'frac') { this.frac = Number(el.dataset.v); this.lastPanel = ''; return; }
-    if (act === 'recruit') {
-      let n = el.dataset.n;
-      if (n === 'max') n = 10000;
-      if (this.cmd({ c: 'recruit', p: sel, u: el.dataset.u, n: Number(n) })) play('recruit');
+  updateSpawn() {
+    const s = this.s, ov = $('spawn-overlay');
+    if (s.phase !== 'spawn') {
+      show(ov, false);
       return;
     }
-    if (act === 'build') { this.cmd({ c: 'build', p: sel, k: el.dataset.k }); return; }
-    if (act === 'cancel') { this.cmd({ c: 'cancelBuild', p: sel }); return; }
-    if (act === 'mode-move') return this.setMode({ kind: 'move', from: sel });
-    if (act === 'mode-drone') return this.setMode({ kind: 'drone', from: sel, d: el.dataset.d });
-    if (act === 'mode-missile') return this.setMode({ kind: 'missile', from: sel });
+    show(ov, true);
+    const total = spawnTicks(s);
+    const left = Math.max(0, total - s.tick - this.session.alpha());
+    setText($('spawn-time'), Math.ceil(left / TICKS_PER_SEC));
+    $('spawn-bar').style.width = (total > 0 ? (left / total) * 100 : 0).toFixed(1) + '%';
+    const me = this.me;
+    setText(ov.querySelector('.spawn-text b'), me && me.spawned ? 'Место старта выбрано' : 'Выберите место старта');
+  }
+
+  updateSpeed() {
+    const sp = this.session.paused ? 0 : this.session.speed;
+    for (const b of $('speed-ctrl').querySelectorAll('[data-speed]')) toggle(b, 'on', Number(b.dataset.speed) === sp);
+  }
+
+  updateTop() {
+    const g = this.game, s = g.s, me = this.me;
+    if (!me) return;
+    setText($('r-gold'), me.gold < 1e6 ? fmtInt(Math.floor(me.gold)) : fmtNum(me.gold));
+    const net = me.income - me.upkeep;
+    const inc = $('r-income');
+    setText(inc, (net >= 0 ? '+' : '−') + fmtNum(Math.abs(net)) + '/с');
+    toggle(inc, 'pos', net >= 0);
+    toggle(inc, 'neg', net < 0);
+    setText($('r-troops'), fmtNum(me.troops));
+    setText($('r-maxtroops'), fmtNum(me.maxTroops));
+    const c = me.composition || { inf: 1, tank: 0, art: 0 };
+    const ti = Math.round(c.tank * 100), ai = Math.round(c.art * 100), ii = 100 - ti - ai;
+    $('r-comp-inf').style.width = ii + '%';
+    $('r-comp-tank').style.width = ti + '%';
+    $('r-comp-art').style.width = ai + '%';
+    setText($('r-comp-inf-v'), ii);
+    setText($('r-comp-tank-v'), ti);
+    setText($('r-comp-art-v'), ai);
+    const land = g.map.landCount || 1;
+    const pct = (me.tiles * 100) / land;
+    setText($('r-terr'), fmtPct(pct, pct < 1 ? 2 : 1));
+    const alive = s.players.filter((p) => p.alive);
+    const rank = me.alive ? alive.filter((p) => p.tiles > me.tiles).length + 1 : 0;
+    setText($('r-rank'), me.alive && s.phase !== 'spawn' ? `#${rank} из ${alive.length}` : '');
+    this.updateGoals(g, s, me, alive, land);
+    const rs = me.researching;
+    if (rs) {
+      const lvl = me.research[rs.key] + 1;
+      setText($('r-rs'), `${RESEARCH[rs.key].name} ${ROMAN[lvl] || lvl}`);
+      $('r-rs-bar').style.width = clamp((rs.progress / rs.total) * 100, 0, 100).toFixed(1) + '%';
+      setText($('r-rs-time'), fmtSec((rs.total - rs.progress) / TICKS_PER_SEC));
+    } else {
+      setText($('r-rs'), 'Нет');
+      $('r-rs-bar').style.width = '0%';
+      setText($('r-rs-time'), '');
+    }
+    setText($('game-time'), fmtClock(s.tick / TICKS_PER_SEC));
+  }
+
+  updateGoals(g, s, me, alive, land) {
+    const v = s.settings.victory;
+    show($('g-terr'), v.territory);
+    if (v.territory) {
+      const goal = v.territoryPct;
+      const my = (me.tiles * 100) / land;
+      $('g-terr-bar').style.width = clamp((my / goal) * 100, 0, 100).toFixed(1) + '%';
+      let best = null;
+      for (const p of alive) if (p.id !== me.id && p.tiles > 0 && (!best || p.tiles > best.tiles)) best = p;
+      const lead = $('g-terr-lead');
+      show(lead, !!best);
+      if (best) {
+        const bp = (best.tiles * 100) / land;
+        lead.style.left = clamp((bp / goal) * 100, 0, 100).toFixed(1) + '%';
+        lead.style.background = safeColor(best.color);
+        lead.title = `${best.name}: ${fmtPct(bp)}`;
+      }
+      setText($('g-terr-v'), `${my < 10 ? my.toFixed(1).replace('.', ',') : Math.floor(my)} / ${goal}%`);
+      toggle($('g-terr'), 'done', my >= goal);
+    }
+    show($('g-econ'), v.economy);
+    if (v.economy) {
+      const need = v.economyMinutes * 60 * TICKS_PER_SEC;
+      const L = s.econLeader, t = L >= 0 ? s.econLeadTicks : 0;
+      const lp = L >= 0 ? s.players[L] : null;
+      const who = L === me.id ? 'Вы' : lp ? lp.name : 'Нет лидера';
+      const bar = $('g-econ-bar');
+      bar.style.width = clamp((t / need) * 100, 0, 100).toFixed(1) + '%';
+      bar.style.background = lp ? safeColor(lp.color) : '';
+      setText($('g-econ-v'), `${who} · ${fmtSec(t / TICKS_PER_SEC)} / ${fmtSec(need / TICKS_PER_SEC)}`);
+      toggle($('g-econ'), 'done', L === me.id);
+    }
+    show($('g-surv'), !v.territory && !v.economy);
+    setText($('g-surv-v'), `Осталось стран: ${alive.length}`);
+  }
+
+  updateBoard() {
+    const s = this.s, me = this.pid, land = this.game.map.landCount || 1;
+    const alive = s.players.filter((p) => p.alive).sort((a, b) => b.tiles - a.tiles || a.id - b.id);
+    const list = alive.slice(0, 8).map((p) => [alive.indexOf(p) + 1, p]);
+    const mine = s.players[me];
+    if (mine && !list.some(([, p]) => p.id === me)) list.push([mine.alive ? alive.indexOf(mine) + 1 : 0, mine]);
+    const ol = $('board-list');
+    while (ol.children.length < list.length) ol.appendChild(tpl('tpl-board-row'));
+    while (ol.children.length > list.length) ol.lastElementChild.remove();
+    list.forEach(([rank, p], k) => {
+      const li = ol.children[k];
+      li.dataset.pid = p.id;
+      toggle(li, 'me', p.id === me);
+      toggle(li, 'dead', !p.alive);
+      setText(li.querySelector('.rank'), rank || '—');
+      li.querySelector('.dot').style.background = safeColor(p.color);
+      setText(li.querySelector('.nm'), p.name);
+      setText(li.querySelector('.pct'), fmtPct((p.tiles * 100) / land));
+      li.title = `${p.name}: ${fmtNum(p.troops)} войск`;
+    });
+  }
+
+  updateCards() {
+    const s = this.s, me = this.pid;
+    const reqs = s.requests.filter((r) => r.to === me);
+    const ids = new Set(reqs.map((r) => r.id));
+    for (const [id, el] of this.cards) {
+      if (!ids.has(id)) {
+        el.remove();
+        this.cards.delete(id);
+      }
+    }
+    const stack = $('diplo-stack');
+    for (const r of reqs) {
+      let el = this.cards.get(r.id);
+      const from = s.players[r.from];
+      if (!el) {
+        el = tpl('tpl-diplo-card');
+        el.classList.add(r.type);
+        el.dataset.req = r.id;
+        el.querySelector('.dot').style.background = safeColor(from ? from.color : '');
+        el.querySelector('.dcard-from').textContent = from ? from.name : '?';
+        el.querySelector('.dcard-type').textContent = DIP_TYPES[r.type] || r.type;
+        el.querySelector('.dcard-text').textContent = (DIP_TEXT[r.type] || '') + (from && from.traitorUntil > s.tick ? ' Внимание: эта страна — предатель.' : '');
+        el.querySelector('.dcard-accept').dataset.accept = r.id;
+        el.querySelector('.dcard-decline').dataset.decline = r.id;
+        stack.appendChild(el);
+        this.cards.set(r.id, el);
+      }
+      const left = clamp(((r.expires - s.tick) / DIPLO.requestTicks) * 100, 0, 100);
+      el.querySelector('.dcard-timer > span').style.width = left.toFixed(1) + '%';
+    }
+    const badge = $('countries-badge');
+    show(badge, reqs.length > 0);
+    setText(badge, reqs.length);
+  }
+
+  onCardAction(e) {
+    const a = e.target.closest('[data-accept]'), d = e.target.closest('[data-decline]');
+    const id = a ? Number(a.dataset.accept) : d ? Number(d.dataset.decline) : NaN;
+    if (!Number.isFinite(id)) return;
+    if (this.send({ c: 'respond', id, accept: !!a })) {
+      play(a ? 'select' : 'click');
+      const el = this.cards.get(id);
+      if (el) el.remove();
+      this.cards.delete(id);
+    }
+  }
+
+  updateHint() {
+    const m = this.r.mode, s = this.s, ses = this.session;
+    let ic = '', text = '', cancel = true;
+    if (m) {
+      if (m.kind === 'build') {
+        const cost = buildCost(this.game, this.pid, m.type);
+        ic = m.type;
+        text = `Строительство: ${BUILDINGS[m.type].name} · ${fmtInt(cost)} — клик по своей территории, Shift — несколько`;
+      } else if (m.kind === 'rail') {
+        ic = 'rail';
+        text = m.from ? 'Ж/д: выберите второе здание — фабрику, порт или дом' : 'Ж/д: выберите первое здание — фабрику, порт или дом';
+      } else if (m.kind === 'strike') {
+        ic = m.strike;
+        const def = STRIKES[m.strike];
+        text = m.strike === 'mega'
+          ? 'Мегабомба: укажите точку распада — боеголовки поразят всех врагов'
+          : def.point ? `${def.name}: выберите вражеское здание` : `${def.name}: выберите цель на вражеской территории`;
+      } else if (m.kind === 'boat') {
+        ic = 'boat';
+        text = 'Высадка: кликните по чужой или ничьей земле за морем, Shift — несколько';
+      }
+    } else if (ses.waiting > 0) {
+      ic = 'hourglass';
+      text = ses.mode === 'host' ? `Ожидание загрузки игроков: ${ses.waiting}` : 'Ожидание хоста…';
+      cancel = false;
+    } else if (ses.paused && s.phase !== 'over') {
+      ic = 'pause';
+      text = ses.canControl ? 'Пауза — нажмите Пробел, чтобы продолжить' : 'Хост поставил игру на паузу';
+      cancel = false;
+    } else if (this.r.selection && this.r.selection.kind === 'ship') {
+      const u = this.game.unitById(this.r.selection.id);
+      if (u && u.owner === this.pid && u.type === 'warship') {
+        ic = 'ship';
+        text = 'Корабль выбран: ПКМ по воде — задать курс';
+      }
+    }
+    const key = ic + '|' + text + '|' + cancel;
+    if (key === this.hintKey) return;
+    this.hintKey = key;
+    const h = $('hint');
+    if (!text) {
+      h.hidden = true;
+      return;
+    }
+    $('hint-icon').innerHTML = icon(ic);
+    $('hint-text').textContent = text;
+    $('hint-cancel').hidden = !cancel;
+    h.hidden = false;
+  }
+
+  cancelHint() {
+    if (this.r.mode) this.setMode(null);
+    else this.clearSelection();
   }
 
   setMode(m) {
-    this.r.targetMode = m;
-    const hint = $('hint');
-    if (!m) { hint.hidden = true; return; }
-    const txt = { move: 'Выберите цель для войск', drone: `Цель для «${m.d && DRONES[m.d].name}»`, missile: 'Цель для ракетного удара' }[m.kind];
-    hint.textContent = txt + ' — ЛКМ. Esc — отмена';
-    hint.hidden = false;
+    this.r.mode = m;
+    this.tipDirty = true;
+    this.timers.dock = 0;
+    this.hintKey = '';
+    if (m) {
+      this.closeCtx();
+      play('toggle');
+    }
+    this.updateDock();
+    this.updateHover();
   }
 
-  select(p) {
-    this.r.selected = p;
-    this.lastPanel = '';
-    this.panelT = 0;
+  modeIs(kind, sub) {
+    const m = this.r.mode;
+    if (!m || m.kind !== kind) return false;
+    if (sub === undefined) return true;
+    return kind === 'build' ? m.type === sub : kind === 'strike' ? m.strike === sub : true;
   }
 
-  order(target) {
-    const from = this.r.selected;
-    if (from < 0 || target < 0 || from === target) return;
-    if (this.s.provs[from].o !== this.pid) { this.toast('Сначала выберите свою провинцию'); return; }
-    if (this.cmd({ c: 'move', from, to: target, frac: this.frac })) play('move');
+  needPlay() {
+    if (this.s.phase === 'play') return true;
+    this.toast(this.s.phase === 'spawn' ? 'Сначала выберите место старта и дождитесь начала игры' : 'Игра окончена');
+    return false;
   }
 
-  clickTarget(p) {
-    const m = this.r.targetMode;
-    if (!m || p < 0) return;
-    let ok = false;
-    if (m.kind === 'move') { this.r.selected = m.from; this.order(p); ok = true; }
-    else if (m.kind === 'drone') ok = this.cmd({ c: 'drone', from: m.from, to: p, d: m.d });
-    else if (m.kind === 'missile') ok = this.cmd({ c: 'missile', from: m.from, to: p });
-    if (ok) this.setMode(null);
+  updateDock() {
+    const g = this.game, s = g.s, me = this.me, pid = this.pid;
+    if (!me) return;
+    setText($('atk-troops'), fmtNum(Math.floor(me.troops * this.ratio)));
+    for (const type of BUILDING_KEYS) {
+      const el = $('tool-' + type);
+      const def = BUILDINGS[type];
+      const cost = buildCost(g, pid, type);
+      setText($('cost-' + type), fmtInt(cost));
+      const locked = !!def.req && me.research[def.req[0]] < def.req[1];
+      toggle(el, 'locked', locked);
+      toggle(el, 'poor', !locked && me.gold < cost);
+      toggle(el, 'on', this.modeIs('build', type));
+    }
+    toggle($('tool-rail'), 'on', this.modeIs('rail'));
+    for (const kind of Object.keys(STRIKES)) {
+      const el = $('tool-' + kind);
+      const def = STRIKES[kind];
+      const resOk = me.research[def.req[0]] >= def.req[1];
+      const src = g.buildingsOf(pid, def.src).filter((b) => g.buildingActive(b));
+      const ready = src.filter((b) => !(b.cd > 0));
+      setText($('cost-' + kind), fmtInt(def.cost));
+      toggle(el, 'locked', !resOk || !src.length);
+      toggle(el, 'poor', resOk && src.length > 0 && me.gold < def.cost);
+      toggle(el, 'on', this.modeIs('strike', kind));
+      const cnt = $('cnt-' + kind);
+      show(cnt, resOk && src.length > 0);
+      setText(cnt, ready.length);
+      const cool = resOk && src.length > 0 && !ready.length;
+      toggle(el, 'cooldown', cool);
+      if (cool) {
+        let best = 0;
+        for (const b of src) {
+          const tot = b.type === 'silo' ? siloReload(b.level) : airbaseReload(b.level);
+          best = Math.max(best, 1 - b.cd / tot);
+        }
+        el.style.setProperty('--cd', (clamp(best, 0, 1) * 100).toFixed(0) + '%');
+      }
+    }
+    setText($('cnt-boats'), `${countUnits(g, pid, 'transport')} / ${SHIPS.transport.maxActive}`);
+    toggle($('btn-boat'), 'on', this.modeIs('boat'));
+    const ports = g.buildingsOf(pid, 'port').filter((b) => g.buildingActive(b));
+    const sc = shipCost(g, pid);
+    setText($('cost-warship'), fmtInt(sc));
+    toggle($('btn-warship'), 'locked', !ports.length);
+    toggle($('btn-warship'), 'poor', ports.length > 0 && me.gold < sc);
+    void s;
+  }
+
+  setRatio(v, silent = false) {
+    this.ratio = clamp(Math.round(clamp(Number(v) || 0.01, 0.01, 1) * 100) / 100, 0.01, 1);
+    const el = $('atk-ratio');
+    const pv = Math.round(this.ratio * 100);
+    if (Number(el.value) !== pv) el.value = pv;
+    setRangeFill(el);
+    setText($('atk-ratio-v'), pv + '%');
+    const me = this.me;
+    if (me) setText($('atk-troops'), fmtNum(Math.floor(me.troops * this.ratio)));
+    if (!silent) {
+      this.app.settings.ratio = this.ratio;
+      this.app.saveSettingsSoon();
+      this.tipDirty = true;
+    }
+  }
+
+  stepRatio(d) {
+    const cur = Math.round(this.ratio * 100);
+    let next;
+    if (Math.abs(d) >= RATIO_STEP && cur % RATIO_STEP) next = d > 0 ? Math.ceil(cur / RATIO_STEP) * RATIO_STEP : Math.floor(cur / RATIO_STEP) * RATIO_STEP;
+    else next = cur + d;
+    this.setRatio(clamp(next, 1, 100) / 100);
+  }
+
+  setSpeed(v) {
+    if (!this.session.canControl) return;
+    if (v <= 0) this.session.setPaused(true);
+    else this.session.setSpeed(v);
+    play('click');
+    this.updateSpeed();
+  }
+
+  stepSpeed(dir) {
+    const ses = this.session;
+    if (!ses.canControl) return;
+    const list = ses.speeds.filter((x) => x > 0);
+    if (!list.length) return;
+    if (ses.paused) {
+      if (dir > 0) ses.setPaused(false);
+    } else {
+      const k = list.indexOf(ses.speed);
+      const n = k + dir;
+      if (n < 0) ses.setPaused(true);
+      else ses.setSpeed(list[Math.min(list.length - 1, n)]);
+    }
+    play('click');
+    this.updateSpeed();
+  }
+
+  togglePause() {
+    if (!this.session.canControl || this.s.phase === 'over') return;
+    this.session.togglePause();
+    play('click');
+    this.updateSpeed();
+  }
+
+  toggleAA() {
+    this.r.showAA = !this.r.showAA;
+    $('btn-aa').classList.toggle('on', this.r.showAA);
+    play('toggle');
+  }
+
+  onBuildTool(type) {
+    if (type === 'rail') {
+      this.toggleRail();
+      return;
+    }
+    if (!BUILDINGS[type]) return;
+    if (this.modeIs('build', type)) {
+      this.setMode(null);
+      return;
+    }
+    if (!this.needPlay()) return;
+    const def = BUILDINGS[type], me = this.me;
+    if (def.req && me.research[def.req[0]] < def.req[1]) {
+      this.toast(`Нужно исследование «${RESEARCH[def.req[0]].name}» ${def.req[1]} ур.`);
+      return;
+    }
+    this.setMode({ kind: 'build', type });
+  }
+
+  toggleRail() {
+    if (this.modeIs('rail')) {
+      this.setMode(null);
+      return;
+    }
+    if (!this.needPlay()) return;
+    const sel = this.r.selection;
+    const b = sel && sel.kind === 'building' ? this.game.buildingById(sel.id) : null;
+    const from = b && b.owner === this.pid && RAIL_TYPES[b.type] && this.game.buildingActive(b) ? b.id : null;
+    this.setMode({ kind: 'rail', from });
+  }
+
+  toggleBoat() {
+    if (this.modeIs('boat')) {
+      this.setMode(null);
+      return;
+    }
+    if (!this.needPlay()) return;
+    this.setMode({ kind: 'boat' });
+  }
+
+  viewCenter() {
+    return this.r.screenToTile(this.r.viewW / 2, this.r.viewH / 2);
+  }
+
+  strikeLock(kind) {
+    const def = STRIKES[kind], me = this.me, g = this.game;
+    if (me.research[def.req[0]] < def.req[1]) return `Нужно исследование «${RESEARCH[def.req[0]].name}» ${def.req[1]} ур.`;
+    if (!g.buildingsOf(this.pid, def.src).some((b) => g.buildingActive(b))) return SRC_NEED[def.src];
+    return null;
+  }
+
+  onStrikeTool(kind) {
+    if (!STRIKES[kind]) return;
+    if (this.modeIs('strike', kind)) {
+      this.setMode(null);
+      return;
+    }
+    if (!this.needPlay()) return;
+    const lock = this.strikeLock(kind);
+    if (lock) {
+      this.toast(lock);
+      return;
+    }
+    const [cx, cy] = this.viewCenter();
+    const src = this.bestSource(kind, cx, cy);
+    this.setMode({ kind: 'strike', strike: kind, from: src ? src.id : null });
+  }
+
+  bestSource(kind, x, y) {
+    const def = STRIKES[kind], g = this.game;
+    if (!def) return null;
+    const list = g.buildingsOf(this.pid, def.src).filter((b) => g.buildingActive(b));
+    if (!list.length) return null;
+    const range = strikeRange(g, this.pid, kind);
+    let best = null, bs = Infinity;
+    for (const b of list) {
+      const dx = b.x + 0.5 - x, dy = b.y + 0.5 - y;
+      const d2 = dx * dx + dy * dy;
+      const inRange = !Number.isFinite(range) || d2 <= range * range;
+      const score = (b.cd > 0 ? 1e12 + b.cd * 1e6 : 0) + (inRange ? 0 : 1e11) + d2;
+      if (score < bs || (score === bs && b.id < best.id)) {
+        bs = score;
+        best = b;
+      }
+    }
+    return best;
+  }
+
+  buildWarship() {
+    if (!this.needPlay()) return;
+    const g = this.game, pid = this.pid;
+    const sel = this.r.selection;
+    let port = sel && sel.kind === 'building' ? g.buildingById(sel.id) : null;
+    if (!port || port.type !== 'port' || port.owner !== pid) port = null;
+    if (!port) {
+      const ports = g.buildingsOf(pid, 'port').filter((b) => g.buildingActive(b));
+      if (!ports.length) {
+        this.toast('Нужен готовый порт (клавиша 3)');
+        return;
+      }
+      const [cx, cy] = this.viewCenter();
+      let bd = Infinity;
+      for (const b of ports) {
+        const d = (b.x - cx) ** 2 + (b.y - cy) ** 2 + (buildShipError(g, pid, b.id) ? 1e12 : 0);
+        if (d < bd) {
+          bd = d;
+          port = b;
+        }
+      }
+    }
+    this.send({ c: 'buildShip', port: port.id });
+  }
+
+  focusHome(zoom) {
+    const me = this.me, g = this.game;
+    if (!me) return;
+    let t = me.capital;
+    if (!(t >= 0) || g.tileOwner(t) !== this.pid) t = this.playerAnchor(this.pid);
+    if (t < 0) {
+      if (zoom === undefined) this.toast('У вас нет территории', 'info');
+      return;
+    }
+    const W = g.W;
+    this.r.focus((t % W) + 0.5, Math.floor(t / W) + 0.5, zoom || Math.max(this.r.zoom, 4));
+  }
+
+  playerAnchor(pid) {
+    const g = this.game, p = g.s.players[pid];
+    if (!p) return -1;
+    if (p.capital >= 0 && g.tileOwner(p.capital) === pid) return p.capital;
+    const list = g.borderList(pid);
+    if (!list.length) return -1;
+    const W = g.W;
+    let sx = 0, sy = 0, n = 0;
+    const step = Math.max(1, Math.floor(list.length / 400));
+    for (let k = 0; k < list.length; k += step) {
+      sx += list[k] % W;
+      sy += Math.floor(list[k] / W);
+      n++;
+    }
+    sx /= n;
+    sy /= n;
+    let best = list[0], bd = Infinity;
+    for (let k = 0; k < list.length; k += step) {
+      const d = (list[k] % W - sx) ** 2 + (Math.floor(list[k] / W) - sy) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = list[k];
+      }
+    }
+    return best;
+  }
+
+  focusPlayer(pid) {
+    const t = this.playerAnchor(pid);
+    if (t < 0) {
+      this.toast('У этой страны нет территории', 'info');
+      return;
+    }
+    const W = this.game.W;
+    this.r.focus((t % W) + 0.5, Math.floor(t / W) + 0.5, Math.max(this.r.zoom, 3));
+    play('click');
+  }
+
+  pickUnit(sx, sy, ownWarship) {
+    const s = this.s, r = this.r, dpr = r.dpr, z = r.cam.z;
+    const rad = Math.max(11 * dpr, 2.4 * z);
+    let best = null, bd = rad * rad;
+    for (const u of s.units) {
+      if (u.type === 'train' || u.type === 'truck') continue;
+      if (ownWarship && (u.owner !== this.pid || u.type !== 'warship')) continue;
+      const [ux, uy] = r.unitPos(u);
+      const d = (r.sx(ux) - sx) ** 2 + (r.sy(uy) - sy) ** 2;
+      if (d <= bd) {
+        bd = d;
+        best = u;
+      }
+    }
+    return best;
+  }
+
+  pickBuilding(sx, sy, filter) {
+    const s = this.s, r = this.r, g = this.game, me = this.pid;
+    const rad = Math.max(9 * r.dpr, r.markerRadius() + 4 * r.dpr);
+    let best = null, bd = rad * rad;
+    for (const b of s.buildings) {
+      if (filter === 'own' && b.owner !== me) continue;
+      if (filter === 'enemy' && (b.owner === me || !g.isHostile(me, b.owner))) continue;
+      const d = (r.sx(b.x + 0.5) - sx) ** 2 + (r.sy(b.y + 0.5) - sy) ** 2;
+      if (d <= bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
+  }
+
+  select(kind, id) {
+    this.r.selection = { kind, id };
+    this.timers.panel = 0;
+    this.hintKey = '';
+    play('select');
+  }
+
+  clearSelection() {
+    if (!this.r.selection) return;
+    this.r.selection = null;
+    $('panel').hidden = true;
+    this.hintKey = '';
+    this.updateHover();
+  }
+
+  onMouseDown(e) {
+    this.app.unlockAudio();
+    if (e.button === 0 || e.button === 1) {
+      const m = this.mouse;
+      m.down = e.button;
+      m.ox = m.lx = e.clientX;
+      m.oy = m.ly = e.clientY;
+      m.drag = false;
+      if (e.button === 1) e.preventDefault();
+    }
+    if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  onMouseMove(e) {
+    const m = this.mouse;
+    m.cx = e.clientX;
+    m.cy = e.clientY;
+    m.inWin = true;
+    m.inside = e.target === this.canvas;
+    if (m.down >= 0) {
+      if (!m.drag && Math.hypot(e.clientX - m.ox, e.clientY - m.oy) > 5) {
+        m.drag = true;
+        this.canvas.style.cursor = 'grabbing';
+        $('tip').hidden = true;
+      }
+      if (m.drag) this.r.pan((e.clientX - m.lx) * this.r.dpr, (e.clientY - m.ly) * this.r.dpr);
+      m.lx = e.clientX;
+      m.ly = e.clientY;
+    }
+    this.updateHover();
+  }
+
+  onMouseUp(e) {
+    const m = this.mouse;
+    if (m.down < 0) return;
+    const was = m.down, drag = m.drag;
+    m.down = -1;
+    m.drag = false;
+    this.canvas.style.cursor = '';
+    if (was === 0 && e.button === 0 && !drag && e.target === this.canvas) this.onLeftClick(e);
+    this.updateHover();
+  }
+
+  onWheel(e) {
+    e.preventDefault();
+    let d = e.deltaY || e.deltaX;
+    if (e.deltaMode === 1) d *= 16;
+    else if (e.deltaMode === 2) d *= 400;
+    if (!d) return;
+    if (e.shiftKey) {
+      this.stepRatio(d > 0 ? -2 : 2);
+      return;
+    }
+    const [sx, sy] = this.r.canvasPoint(e.clientX, e.clientY);
+    this.r.zoomAt(sx, sy, Math.exp(-clamp(d, -240, 240) * 0.0018));
+  }
+
+  updateHover() {
+    const r = this.r, m = this.mouse;
+    if (!m.inside || !r.map) {
+      r.hoverTile = -1;
+      this.hoverIndex = -1;
+      return;
+    }
+    const [sx, sy] = r.canvasPoint(m.cx, m.cy);
+    let i = r.tileAtScreen(sx, sy);
+    const mode = r.mode, W = r.map.W;
+    let cursor = '';
+    if (mode && (mode.kind === 'rail' || (mode.kind === 'strike' && STRIKES[mode.strike] && STRIKES[mode.strike].point))) {
+      const b = this.pickBuilding(sx, sy, mode.kind === 'rail' ? 'own' : 'enemy');
+      if (b) i = b.y * W + b.x;
+    }
+    if (mode && mode.kind === 'strike' && !mode.fixed && i >= 0) {
+      const src = this.bestSource(mode.strike, (i % W) + 0.5, Math.floor(i / W) + 0.5);
+      if (src && src.id !== mode.from) mode.from = src.id;
+    }
+    if (!mode && m.down < 0 && this.s.phase === 'play' && (this.pickUnit(sx, sy, true) || this.pickBuilding(sx, sy, 'own'))) cursor = 'pointer';
+    if (m.drag) cursor = 'grabbing';
+    if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
+    if (i !== this.hoverIndex) this.tipDirty = true;
+    else if (!$('tip').hidden) this.placeTip();
+    r.hoverTile = i;
+    this.hoverIndex = i;
+  }
+
+  tileXY(i) {
+    const W = this.game.W;
+    return [i % W, Math.floor(i / W)];
+  }
+
+  onLeftClick(e) {
+    const r = this.r, g = this.game, s = g.s, me = this.pid;
+    const [sx, sy] = r.canvasPoint(e.clientX, e.clientY);
+    this.mouse.inside = true;
+    this.updateHover();
+    const i = this.hoverIndex;
+    if (i < 0) return;
+    const [x, y] = this.tileXY(i);
+    const shift = e.shiftKey;
+    if (s.phase === 'spawn') {
+      if (this.send({ c: 'spawn', x, y })) play('select');
+      return;
+    }
+    if (s.phase !== 'play') return;
+    const mode = r.mode;
+    if (mode) {
+      this.onModeClick(mode, sx, sy, i, x, y, shift);
+      return;
+    }
+    const u = this.pickUnit(sx, sy, true);
+    if (u) {
+      this.select('ship', u.id);
+      return;
+    }
+    const b = this.pickBuilding(sx, sy, 'own');
+    if (b) {
+      this.select('building', b.id);
+      return;
+    }
+    if (!g.isLandTile(i)) {
+      this.clearSelection();
+      return;
+    }
+    if (g.tileOwner(i) === me) {
+      this.clearSelection();
+      return;
+    }
+    this.sendAttack(x, y, true);
+  }
+
+  onModeClick(mode, sx, sy, i, x, y, shift) {
+    const g = this.game;
+    switch (mode.kind) {
+      case 'build':
+        if (this.send({ c: 'build', type: mode.type, x, y })) {
+          play('build');
+          if (!shift) this.setMode(null);
+        }
+        break;
+      case 'boat':
+        if (this.send({ c: 'boat', x, y, ratio: this.ratio }) && !shift) this.setMode(null);
+        break;
+      case 'rail':
+        this.onRailClick(mode, sx, sy, i, shift);
+        break;
+      case 'strike': {
+        const kind = mode.strike;
+        let from = mode.from;
+        if (!mode.fixed) {
+          const src = this.bestSource(kind, x + 0.5, y + 0.5);
+          if (src) from = src.id;
+        }
+        const cmd = { c: 'strike', kind, from, x, y };
+        if (kind === 'mega') {
+          const v = this.session.validate(cmd);
+          if (!v.ok) {
+            this.toast(v.error);
+            return;
+          }
+          this.app.confirm('Мегабомба «Судный день»', `Запустить мегабомбу за ${fmtInt(STRIKES.mega.cost)} золота? Боеголовки поразят все враждебные страны, кроме ваших союзников и партнёров по пакту.`, 'Запустить', () => {
+            if (this.send(cmd)) this.setMode(null);
+          });
+          return;
+        }
+        if (this.send(cmd) && !shift) this.setMode(null);
+        break;
+      }
+      default:
+        break;
+    }
+    void g;
+  }
+
+  onRailClick(mode, sx, sy, i, shift) {
+    const g = this.game, me = this.pid;
+    const b = this.pickBuilding(sx, sy, 'own') || g.buildingAt(i);
+    if (!b || b.owner !== me) {
+      this.toast('Выберите своё здание: фабрику, порт или жилой квартал');
+      return;
+    }
+    if (!RAIL_TYPES[b.type]) {
+      this.toast('Ж/д соединяет только фабрики, порты и жилые кварталы');
+      return;
+    }
+    if (!mode.from || !g.buildingById(mode.from)) {
+      if (!g.buildingActive(b)) {
+        this.toast('Здание ещё строится');
+        return;
+      }
+      this.setMode({ kind: 'rail', from: b.id });
+      return;
+    }
+    if (b.id === mode.from) {
+      this.setMode({ kind: 'rail', from: null });
+      return;
+    }
+    if (this.send({ c: 'rail', a: mode.from, b: b.id })) {
+      play('build');
+      this.setMode(shift ? { kind: 'rail', from: b.id } : null);
+    }
+  }
+
+  sendAttack(x, y, allowBoat) {
+    const g = this.game, me = this.pid, i = g.tileAt(x, y);
+    const cmd = { c: 'attack', x, y, ratio: this.ratio };
+    const v = g.validate(me, cmd);
+    if (v.ok) {
+      if (this.session.send(cmd).ok) play('attack');
+      return true;
+    }
+    if (allowBoat && g.isLandTile(i) && g.tileOwner(i) !== me && !g.bordersByLand(me, i)) {
+      return this.send({ c: 'boat', x, y, ratio: this.ratio });
+    }
+    this.toast(v.error);
+    return false;
+  }
+
+  onRightClick(e) {
+    this.app.unlockAudio();
+    this.closeCtx();
+    const r = this.r, g = this.game, s = g.s;
+    if (r.mode) {
+      this.setMode(null);
+      return;
+    }
+    const [sx, sy] = r.canvasPoint(e.clientX, e.clientY);
+    const i = r.tileAtScreen(sx, sy);
+    if (i < 0 || s.phase !== 'play') return;
+    const [x, y] = this.tileXY(i);
+    const sel = r.selection;
+    if (sel && sel.kind === 'ship' && !g.isLandTile(i)) {
+      const u = g.unitById(sel.id);
+      if (u && u.owner === this.pid && u.type === 'warship') {
+        if (this.send({ c: 'moveShip', id: u.id, x: x + 0.5, y: y + 0.5 })) play('click');
+        return;
+      }
+    }
+    if (!g.isLandTile(i)) return;
+    const o = g.tileOwner(i);
+    if (o === this.pid) return;
+    this.openCtx(e.clientX, e.clientY, i, x, y, o);
+  }
+
+  shortErr(err) {
+    if (!err) return '';
+    if (err.startsWith('Нет общей границы')) return 'нет границы';
+    if (err.startsWith('Недостаточно войск')) return 'мало войск';
+    if (err.startsWith('Нужно ') && err.endsWith(' золота')) return 'мало золота';
+    if (err.startsWith('Не больше')) return 'нет кораблей';
+    if (err.startsWith('Перезарядка')) return err.replace('Перезарядка: ', '⟳ ');
+    if (err.length > 22) return 'недоступно';
+    return err.toLowerCase();
+  }
+
+  openCtx(cx, cy, i, x, y, o) {
+    const g = this.game, s = g.s, me = this.pid;
+    const p = o >= 0 ? s.players[o] : null;
+    this.ctx = { pid: o, x, y, i };
+    $('ctx-dot').style.background = p ? safeColor(p.color) : 'var(--muted)';
+    $('ctx-title').textContent = p ? p.name : 'Ничья земля';
+    $('ctx-sub').textContent = p ? this.relText(o) : TERRAIN[g.map.terrain[i]].name;
+    const troops = fmtNum(Math.floor(this.me.troops * this.ratio));
+    const va = g.validate(me, { c: 'attack', x, y, ratio: this.ratio });
+    const vb = g.validate(me, { c: 'boat', x, y, ratio: this.ratio });
+    const atk = $('ctx-attack'), boat = $('ctx-boat');
+    atk.disabled = !va.ok;
+    atk.title = va.ok ? '' : va.error;
+    setText($('ctx-attack-hint'), va.ok ? troops : this.shortErr(va.error));
+    boat.disabled = !vb.ok;
+    boat.title = vb.ok ? '' : vb.error;
+    setText($('ctx-boat-hint'), vb.ok ? troops : this.shortErr(vb.error));
+    const target = strikeTarget(g, me, x, y, 2);
+    for (const kind of ['kamikaze', 'cruise']) {
+      const b = $('ctx-' + kind);
+      const def = STRIKES[kind];
+      const resOk = this.me.research[def.req[0]] >= def.req[1];
+      b.hidden = !target || !resOk;
+      if (b.hidden) continue;
+      const src = this.bestSource(kind, target.x + 0.5, target.y + 0.5);
+      const v = src ? g.validate(me, { c: 'strike', kind, from: src.id, x: target.x, y: target.y }) : { ok: false, error: SRC_NEED[def.src] };
+      b.disabled = !v.ok;
+      b.title = v.ok ? `${BUILDINGS[target.type].name}: ${fmtInt(def.cost)} золота` : v.error;
+      setText($('ctx-' + kind + '-hint'), v.ok ? fmtInt(def.cost) : this.shortErr(v.error));
+    }
+    const rel = p ? g.relation(me, o) : null;
+    const type = rel ? rel.type : 'none';
+    for (const t of ['alliance', 'pact', 'trade']) {
+      const b = $('ctx-' + t);
+      const hide = !p || type === 'alliance' || type === t;
+      b.hidden = hide;
+      if (hide) continue;
+      const err = proposeError(g, me, o, t);
+      b.disabled = !!err;
+      b.title = err || '';
+    }
+    const br = $('ctx-break');
+    br.hidden = !p || type === 'none';
+    if (!br.hidden) labelNode(br).textContent = BREAK_TEXT[type] || 'Разорвать договор';
+    const em = $('ctx-embargo');
+    em.hidden = !p;
+    if (p) {
+      const on = embargoBy(g, me, o);
+      $('ctx-embargo-text').textContent = on ? 'Снять эмбарго' : 'Объявить эмбарго';
+      em.classList.toggle('on', on);
+    }
+    $('ctx-summary').hidden = !p;
+    const menu = $('ctx-menu');
+    menu.style.left = '0px';
+    menu.style.top = '0px';
+    menu.hidden = false;
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = Math.max(6, Math.min(cx + 4, window.innerWidth - w - 6)) + 'px';
+    menu.style.top = Math.max(6, Math.min(cy + 4, window.innerHeight - h - 6)) + 'px';
+    $('tip').hidden = true;
+    play('click');
+  }
+
+  closeCtx() {
+    if (!this.ctx) return;
+    this.ctx = null;
+    $('ctx-menu').hidden = true;
+  }
+
+  onCtxAction(act) {
+    const c = this.ctx;
+    this.closeCtx();
+    if (!c) return;
+    const g = this.game, me = this.pid;
+    switch (act) {
+      case 'attack':
+        this.sendAttack(c.x, c.y, false);
+        break;
+      case 'boat':
+        this.send({ c: 'boat', x: c.x, y: c.y, ratio: this.ratio });
+        break;
+      case 'kamikaze':
+      case 'cruise': {
+        const t = strikeTarget(g, me, c.x, c.y, 2);
+        if (!t) {
+          this.toast('Здание уже уничтожено');
+          return;
+        }
+        const src = this.bestSource(act, t.x + 0.5, t.y + 0.5);
+        if (!src) {
+          this.toast(SRC_NEED[STRIKES[act].src]);
+          return;
+        }
+        this.send({ c: 'strike', kind: act, from: src.id, x: t.x, y: t.y });
+        break;
+      }
+      case 'alliance':
+      case 'pact':
+      case 'trade':
+        if (this.send({ c: 'propose', to: c.pid, type: act })) play('click');
+        break;
+      case 'break':
+        this.breakWith(c.pid);
+        break;
+      case 'embargo':
+        if (this.send({ c: 'embargo', with: c.pid, on: !embargoBy(g, me, c.pid) })) play('click');
+        break;
+      case 'summary':
+        this.openCountries(c.pid);
+        break;
+      default:
+        break;
+    }
+  }
+
+  breakWith(q) {
+    const g = this.game, me = this.pid, s = g.s;
+    const rel = g.relation(me, q);
+    const p = s.players[q];
+    const traitor = rel.type === 'alliance' || (rel.type === 'pact' && rel.until > s.tick);
+    const doIt = () => { if (this.send({ c: 'break', with: q })) play('click'); };
+    if (!traitor) {
+      doIt();
+      return;
+    }
+    this.app.confirm('Разорвать договор?', `${rel.type === 'alliance' ? 'Союз' : 'Пакт о ненападении'} с «${p ? p.name : '?'}» будет разорван. Вы станете предателем, и другие страны долго не будут вам доверять.`, 'Разорвать', doIt);
+  }
+
+  relText(q) {
+    const g = this.game, s = g.s, me = this.pid;
+    const p = s.players[q];
+    if (!p) return '';
+    if (q === me) return 'Это вы';
+    if (!p.alive) return 'Выбыл';
+    const rel = g.relation(me, q);
+    const parts = [];
+    if (rel.type === 'alliance') parts.push('Союз');
+    else if (rel.type === 'pact') parts.push(`Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}`);
+    else if (rel.type === 'trade') parts.push('Торговый договор');
+    else parts.push(this.atWar(me, q) ? 'Война' : 'Нет договора');
+    if (rel.embargo) parts.push('эмбарго');
+    if (p.traitorUntil > s.tick) parts.push('предатель');
+    return parts.join(' · ');
+  }
+
+  atWar(a, b) {
+    for (const x of this.s.attacks) if ((x.attacker === a && x.target === b) || (x.attacker === b && x.target === a)) return true;
+    return false;
+  }
+
+  updateTip() {
+    this.tipDirty = false;
+    this.tipAt = performance.now();
+    const tip = $('tip');
+    if (!this.mouse.inside || this.mouse.drag || this.ctx || this.app.anyModal() || this.hoverIndex < 0) {
+      tip.hidden = true;
+      return;
+    }
+    let html = '';
+    try {
+      html = this.tipHTML();
+    } catch (err) {
+      html = '';
+    }
+    if (!html) {
+      tip.hidden = true;
+      return;
+    }
+    setHTML(tip, html);
+    tip.hidden = false;
+    this.placeTip();
+  }
+
+  placeTip() {
+    const tip = $('tip'), m = this.mouse;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = m.cx + 18, y = m.cy + 20;
+    if (x + w > window.innerWidth - 6) x = m.cx - w - 14;
+    if (y + h > window.innerHeight - 6) y = m.cy - h - 14;
+    tip.style.left = Math.max(6, x) + 'px';
+    tip.style.top = Math.max(6, y) + 'px';
+  }
+
+  tipHTML() {
+    const g = this.game, s = g.s, me = this.pid, r = this.r;
+    const i = this.hoverIndex;
+    const [x, y] = this.tileXY(i);
+    const t = g.map.terrain[i];
+    const land = t >= 2;
+    const o = land ? g.tileOwner(i) : -1;
+    const p = o >= 0 ? s.players[o] : null;
+    const rows = [];
+    let head, act = '';
+    const [sx, sy] = r.canvasPoint(this.mouse.cx, this.mouse.cy);
+    const unit = !r.mode && s.phase === 'play' ? this.pickUnit(sx, sy, false) : null;
+    if (unit) {
+      const up = s.players[unit.owner];
+      head = `<div class="tip-head"><span class="dot" style="background:${safeColor(up && up.color)}"></span>${UNIT_NAMES[unit.type] || unit.type}</div>`;
+      rows.push(['Владелец', unit.owner === me ? 'Вы' : esc(up ? up.name : '?')]);
+      if (unit.maxHp > 1) rows.push(['Прочность', `${fmtInt(unit.hp)} / ${fmtInt(unit.maxHp)}`]);
+      if (unit.type === 'transport') rows.push(['Десант', fmtNum(unit.troops)]);
+      if (unit.type === 'trade') rows.push(['Груз', fmtInt(unit.cargo)]);
+      if (unit.owner === me && unit.type === 'warship') act = this.tipAct('ok', 'target', 'ЛКМ — выбрать корабль');
+      return head + this.tipRows(rows) + act;
+    }
+    if (land) {
+      head = `<div class="tip-head"><span class="dot" style="background:${p ? safeColor(p.color) : 'var(--muted)'}"></span>${p ? esc(p.name) + (o === me ? ' (вы)' : '') : 'Ничья земля'}</div>`;
+      rows.push(['Местность', TERRAIN[t].name]);
+      if (p && o !== me) {
+        rows.push(['Войска', fmtNum(p.troops)]);
+        rows.push(['Отношения', esc(this.relText(o))]);
+      }
+      if (s.fallout[i]) rows.push(['Радиация', fmtSec(s.fallout[i] / TICKS_PER_SEC)]);
+      const b = g.buildingAt(i) || this.pickBuilding(sx, sy);
+      if (b) rows.push(['Здание', `${BUILDINGS[b.type].name} ${ROMAN[b.level] || b.level}`]);
+    } else {
+      const lake = g.map.waterBody[i] >= 0 && !g.map.oceanBodies.has(g.map.waterBody[i]);
+      head = `<div class="tip-head">${lake ? 'Озеро' : TERRAIN[t].name}</div>`;
+    }
+    act = this.tipAction(i, x, y, land, o, sx, sy);
+    if (!land && !act) return '';
+    return head + this.tipRows(rows) + act;
+  }
+
+  tipRows(rows) {
+    return rows.map(([k, v]) => `<div class="tip-row"><span>${k}</span><b>${v}</b></div>`).join('');
+  }
+
+  tipAct(cls, ic, text) {
+    return `<div class="tip-act ${cls}">${icon(ic)}<span>${esc(text)}</span></div>`;
+  }
+
+  tipAction(i, x, y, land, o, sx, sy) {
+    const g = this.game, s = g.s, me = this.pid, m = this.r.mode;
+    const val = (cmd) => g.validate(me, cmd);
+    const troops = fmtNum(Math.floor(this.me.troops * this.ratio));
+    if (s.phase === 'spawn') {
+      const v = val({ c: 'spawn', x, y });
+      return v.ok ? this.tipAct('ok', 'pin', 'ЛКМ — начать здесь') : this.tipAct('bad', 'alert', v.error);
+    }
+    if (s.phase !== 'play') return '';
+    if (m) {
+      if (m.kind === 'build') {
+        const v = val({ c: 'build', type: m.type, x, y });
+        const ex = g.buildingAt(i);
+        const up = ex && ex.owner === me && ex.type === m.type;
+        const cost = up ? upgradeCost(g, ex) : buildCost(g, me, m.type);
+        return v.ok ? this.tipAct('build', m.type, `ЛКМ — ${up ? 'улучшить' : 'построить'} · ${fmtInt(cost)}`) : this.tipAct('bad', 'alert', v.error);
+      }
+      if (m.kind === 'strike') {
+        const v = m.from ? val({ c: 'strike', kind: m.strike, from: m.from, x, y }) : { ok: false, error: SRC_NEED[STRIKES[m.strike].src] };
+        return v.ok ? this.tipAct('strike', m.strike, `ЛКМ — ${STRIKE_SHORT[m.strike]} · ${fmtInt(STRIKES[m.strike].cost)}`) : this.tipAct('bad', 'alert', v.error);
+      }
+      if (m.kind === 'boat') {
+        const v = this.boatValid(x, y);
+        return v.ok ? this.tipAct('boat', 'boat', `ЛКМ — высадка · ${troops} войск`) : this.tipAct('bad', 'alert', v.error);
+      }
+      if (m.kind === 'rail') {
+        const b = g.buildingAt(i);
+        if (!m.from) return b && b.owner === me && RAIL_TYPES[b.type] ? this.tipAct('ok', 'rail', 'ЛКМ — начать дорогу отсюда') : this.tipAct('bad', 'rail', 'Выберите фабрику, порт или дом');
+        if (!b || b.id === m.from) return this.tipAct('bad', 'rail', 'Выберите второе здание');
+        const v = val({ c: 'rail', a: m.from, b: b.id });
+        if (!v.ok) return this.tipAct('bad', 'alert', v.error);
+        const A = g.buildingById(m.from);
+        const len = Math.hypot(A.x - b.x, A.y - b.y);
+        return this.tipAct('build', 'rail', `ЛКМ — проложить · ${fmtInt(Math.round(ECON.railCostPerTile * len))}`);
+      }
+      return '';
+    }
+    const sel = this.r.selection;
+    if (!land) {
+      if (sel && sel.kind === 'ship') {
+        const u = g.unitById(sel.id);
+        if (u && u.owner === me && u.type === 'warship') return this.tipAct('ok', 'ship', 'ПКМ — плыть сюда');
+      }
+      return '';
+    }
+    if (o === me) {
+      const b = this.pickBuilding(sx, sy, 'own');
+      return b ? this.tipAct('ok', b.type, 'ЛКМ — выбрать здание') : '';
+    }
+    const va = val({ c: 'attack', x, y, ratio: this.ratio });
+    if (va.ok) return this.tipAct('attack', 'sword', `ЛКМ — атака · ${troops} войск`);
+    if (!g.bordersByLand(me, i)) {
+      const vb = this.boatValid(x, y);
+      return vb.ok ? this.tipAct('boat', 'boat', `ЛКМ — высадка · ${troops} войск`) : this.tipAct('bad', 'alert', vb.error);
+    }
+    return this.tipAct('bad', 'alert', va.error);
+  }
+
+  boatValid(x, y) {
+    const key = `${x},${y},${Math.floor(this.s.tick / 5)},${this.ratio}`;
+    if (this.boatCache.key === key) return this.boatCache.v;
+    const v = this.game.validate(this.pid, { c: 'boat', x, y, ratio: this.ratio });
+    this.boatCache = { key, v };
+    return v;
+  }
+
+  updatePanel() {
+    const sel = this.r.selection, panel = $('panel');
+    if (!sel) {
+      show(panel, false);
+      return;
+    }
+    const g = this.game;
+    const obj = sel.kind === 'building' ? g.buildingById(sel.id) : g.unitById(sel.id);
+    if (!obj) {
+      this.r.selection = null;
+      show(panel, false);
+      this.hintKey = '';
+      return;
+    }
+    const d = sel.kind === 'building' ? this.buildingPanel(obj) : this.unitPanel(obj);
+    setHTML($('panel-icon'), icon(d.icon));
+    setText($('panel-title'), d.title);
+    setHTML($('panel-sub'), d.sub);
+    setHTML($('panel-body'), d.body);
+    show(panel, true);
+  }
+
+  buildingPanel(b) {
+    const g = this.game, s = g.s, me = this.pid, def = BUILDINGS[b.type], owner = s.players[b.owner];
+    const mine = b.owner === me;
+    const lvl = b.level;
+    let body = '';
+    if (b.build > 0) {
+      const tot = b.total || 1;
+      body += pbar(b.up ? `Улучшение до ур. ${lvl + 1}` : 'Строительство', fmtSec(b.build / TICKS_PER_SEC), (1 - b.build / tot) * 100, 'blue');
+    }
+    const rows = [['Владелец', mine ? 'Вы' : esc(owner ? owner.name : '?')], ['Уровень', `${lvl} из ${def.max}`]];
+    switch (b.type) {
+      case 'house':
+        rows.push(['Максимум войск', '+' + fmtInt(ECON.houseTroops * lvl)]);
+        rows.push(['Доход', `+${fmtInt(ECON.houseIncome * lvl)}/с`]);
+        break;
+      case 'factory': {
+        rows.push(['Груз', fmtInt(ECON.cargoPerLevel * lvl) + ' золота']);
+        rows.push(['Отправка', `каждые ${Math.round(factoryInterval(lvl) / TICKS_PER_SEC)} с`]);
+        const port = nearestPort(g, b.owner, b.x, b.y);
+        if (!port) rows.push(['Порт', `нет · +${fmtInt(ECON.factoryDirect * lvl)}/с`]);
+        else {
+          const route = railRoute(g, b.owner, b.id, port.id);
+          rows.push(['Доставка', route ? 'поездом (×2 быстрее)' : 'грузовиком']);
+          rows.push(['До порта', `${Math.round(Math.hypot(port.x - b.x, port.y - b.y))} кл.`]);
+        }
+        break;
+      }
+      case 'port':
+        rows.push(['Склад товаров', `${b.stock || 0} / ${TRADE.maxStock}`]);
+        rows.push(['Торговое судно', `каждые ${Math.round(TRADE.interval(lvl) / TICKS_PER_SEC)} с`]);
+        rows.push(['Военные корабли', `${portShips(g, b)} / ${portShipCap(b)}`]);
+        break;
+      case 'fort':
+        rows.push(['Радиус', `${ECON.fortRadius} кл.`]);
+        rows.push(['Оборона', '×' + (ECON.fortBonus * (1 + ECON.fortLevelBonus * (lvl - 1))).toFixed(2).replace('.', ',')]);
+        break;
+      case 'sam': {
+        const aa = owner ? owner.research.aa : 0;
+        rows.push(['Радиус', `${SAM.radius(lvl)} кл.`]);
+        rows.push(['Перезарядка', `${(SAM.reload(lvl) / TICKS_PER_SEC).toFixed(1).replace('.', ',')} с`]);
+        rows.push(['Перехват ракеты', fmtPct(interceptChance('cruise', aa) * 100, 0)]);
+        rows.push(['Содержание', `${(BUILDINGS.sam.upkeep * lvl).toFixed(1).replace('.', ',')}/с`]);
+        break;
+      }
+      case 'airbase':
+      case 'silo': {
+        const tot = b.type === 'silo' ? siloReload(lvl) : airbaseReload(lvl);
+        rows.push(['Перезарядка', `${Math.round(tot / TICKS_PER_SEC)} с`]);
+        rows.push(['Содержание', `${fmtInt(def.upkeep)}/с`]);
+        if (b.build === 0 && b.cd > 0) body = pbar('Перезарядка', fmtSec(b.cd / TICKS_PER_SEC), (1 - b.cd / tot) * 100, 'warn') + body;
+        break;
+      }
+      default:
+        break;
+    }
+    body += kv(rows);
+    if (mine && this.s.phase === 'play') {
+      const acts = [];
+      if (lvl < def.max) {
+        const err = b.build > 0 ? (b.up ? 'Здание уже улучшается' : 'Здание ещё строится') : null;
+        acts.push(btn('upgrade', 'Улучшить', { icon: 'upgrade', cost: fmtInt(upgradeCost(g, b)), disabled: !!err, title: err || `Улучшить до ур. ${lvl + 1}` }));
+      } else acts.push(btn('noop', 'Макс. уровень', { icon: 'check', disabled: true }));
+      acts.push(btn('demolish', 'Снести', { icon: 'trash', cls: 'danger', cost: '+' + fmtInt(demolishRefund(b)), title: 'Снести здание и вернуть 25% затрат' }));
+      if (b.type === 'port') {
+        const err = buildShipError(g, me, b.id);
+        acts.push(btn('ship', 'Военный корабль', { icon: 'ship', full: true, cost: fmtInt(shipCost(g, me)), disabled: !!err && !/золота$/.test(err), title: err || 'Спустить на воду военный корабль' }));
+      }
+      if (RAIL_TYPES[b.type]) acts.push(btn('rail', 'Проложить ж/д отсюда', { icon: 'rail', full: true, disabled: !g.buildingActive(b), title: 'Соединить с другим зданием железной дорогой' }));
+      if (PANEL_STRIKES[b.type]) {
+        for (const kind of PANEL_STRIKES[b.type]) {
+          const sd = STRIKES[kind];
+          const resOk = this.me.research[sd.req[0]] >= sd.req[1];
+          acts.push(btn('strike', STRIKE_SHORT[kind], {
+            icon: kind, cost: fmtInt(sd.cost), data: { kind }, disabled: !resOk || !g.buildingActive(b),
+            title: resOk ? sd.name : `Нужно исследование «${RESEARCH[sd.req[0]].name}» ${sd.req[1]} ур.`,
+            cls: kind === 'mega' ? 'danger' : '',
+          }));
+        }
+      }
+      body += `<div class="sec-title">Действия</div><div class="panel-actions">${acts.join('')}</div>`;
+      if (b.type === 'port') body += '<p class="note">Порт сам отправляет торговые суда в порты других стран.</p>';
+    } else if (!mine) {
+      body += '<p class="note">Чужое здание: ПКМ по нему — удар камикадзе или крылатой ракетой.</p>';
+    }
+    return {
+      icon: b.type,
+      title: def.name,
+      sub: `${pips(lvl, def.max)} <span>Ур. ${lvl}</span>`,
+      body,
+    };
+  }
+
+  unitPanel(u) {
+    const g = this.game, s = g.s, me = this.pid, owner = s.players[u.owner];
+    const mine = u.owner === me;
+    let body = '';
+    if (u.maxHp > 1) {
+      const k = u.hp / u.maxHp;
+      body += pbar('Прочность', `${fmtInt(u.hp)} / ${fmtInt(u.maxHp)}`, k * 100, k < 0.35 ? 'danger' : 'hp');
+    }
+    const rows = [['Владелец', mine ? 'Вы' : esc(owner ? owner.name : '?')]];
+    if (u.type === 'warship') {
+      rows.push(['Урон за залп', fmtInt(warshipDamage(owner ? owner.research.naval : 0))]);
+      rows.push(['Дальность', `${SHIPS.warship.range} кл.`]);
+      rows.push(['Состояние', u.order ? 'Идёт по курсу' : u.chase >= 0 ? 'Преследует цель' : 'Ожидает приказа']);
+    } else if (u.type === 'transport') {
+      rows.push(['Десант', fmtInt(u.troops)]);
+      const tp = s.players[u.tp];
+      rows.push(['Цель', tp ? esc(tp.name) : 'Ничья земля']);
+    } else if (u.type === 'trade') {
+      rows.push(['Груз', fmtInt(u.cargo) + ' золота']);
+      const to = s.players[u.toOwner];
+      rows.push(['Направление', to ? esc(to.name) : '?']);
+    }
+    body += kv(rows);
+    if (mine && u.type === 'warship') body += '<p class="note">ПКМ по воде — задать курс. Корабль сам атакует враждебные суда поблизости.</p>';
+    return {
+      icon: UNIT_ICONS[u.type] || 'ship',
+      title: UNIT_NAMES[u.type] || u.type,
+      sub: `<span>${mine ? 'Ваш флот' : esc(owner ? owner.name : '')}</span>`,
+      body,
+    };
+  }
+
+  onPanelAction(e) {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const g = this.game, sel = this.r.selection;
+    const bd = sel && sel.kind === 'building' ? g.buildingById(sel.id) : null;
+    if (!bd) return;
+    switch (b.dataset.act) {
+      case 'upgrade':
+        if (this.send({ c: 'upgrade', id: bd.id })) play('build');
+        break;
+      case 'demolish':
+        this.app.confirm('Снести здание?', `${BUILDINGS[bd.type].name} (ур. ${bd.level}) будет снесено. Вернётся ${fmtInt(demolishRefund(bd))} золота.`, 'Снести', () => {
+          if (this.send({ c: 'demolish', id: bd.id })) {
+            play('smallboom');
+            this.clearSelection();
+          }
+        });
+        break;
+      case 'ship':
+        this.send({ c: 'buildShip', port: bd.id });
+        break;
+      case 'rail':
+        this.setMode({ kind: 'rail', from: bd.id });
+        break;
+      case 'strike': {
+        const kind = b.dataset.kind;
+        if (!STRIKES[kind]) return;
+        this.setMode({ kind: 'strike', strike: kind, from: bd.id, fixed: true });
+        break;
+      }
+      default:
+        return;
+    }
+    this.timers.panel = 0.05;
+  }
+
+  onKeyDown(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const code = e.code, rep = e.repeat;
+    const pan = { KeyW: 'u', ArrowUp: 'u', KeyS: 'd', ArrowDown: 'd', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' }[code];
+    if (pan) {
+      this.keyPan[pan] = 1;
+      e.preventDefault();
+      return true;
+    }
+    if (code === 'KeyQ') { this.stepRatio(e.shiftKey ? -1 : -RATIO_STEP); return true; }
+    if (code === 'KeyE') { this.stepRatio(e.shiftKey ? 1 : RATIO_STEP); return true; }
+    if (rep) return code === 'Tab' || code === 'Space';
+    const dm = /^(?:Digit|Numpad)([1-8])$/.exec(code);
+    if (dm) {
+      const n = Number(dm[1]);
+      this.onBuildTool(n <= 7 ? BUILDING_KEYS[n - 1] : 'rail');
+      return true;
+    }
+    switch (code) {
+      case 'Escape': this.onEscape(); return true;
+      case 'Tab': e.preventDefault(); this.openCountries(); return true;
+      case 'KeyR': this.openResearch(); return true;
+      case 'KeyV': this.toggleAA(); return true;
+      case 'KeyT': this.app.toggleTheme(); return true;
+      case 'KeyB': this.toggleBoat(); return true;
+      case 'Space': e.preventDefault(); this.togglePause(); return true;
+      case 'Minus':
+      case 'NumpadSubtract': this.stepSpeed(-1); return true;
+      case 'Equal':
+      case 'NumpadAdd': this.stepSpeed(1); return true;
+      case 'Home': e.preventDefault(); this.focusHome(); return true;
+      case 'Enter':
+      case 'NumpadEnter':
+        if (this.session.mode !== 'offline') {
+          e.preventDefault();
+          $('chat-input').focus();
+        }
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  onKeyUp(e) {
+    const pan = { KeyW: 'u', ArrowUp: 'u', KeyS: 'd', ArrowDown: 'd', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' }[e.code];
+    if (pan) this.keyPan[pan] = 0;
+  }
+
+  releaseKeys() {
+    this.keyPan = { l: 0, r: 0, u: 0, d: 0 };
+    this.r.keys.x = 0;
+    this.r.keys.y = 0;
+    this.mouse.down = -1;
+    this.mouse.drag = false;
+  }
+
+  onEscape() {
+    if (this.ctx) this.closeCtx();
+    else if (this.r.mode) this.setMode(null);
+    else if (this.r.selection) this.clearSelection();
+    else this.app.openPause();
+  }
+
+  updateModals() {
+    if (!$('modal-research').hidden) this.renderResearch();
+    if (!$('modal-countries').hidden) this.renderCountries(false);
   }
 
   openResearch() {
-    $('modal-research').hidden = false;
-    this.renderResearch();
-  }
-  renderResearch() {
-    const me = this.me;
-    $('research-list').innerHTML = RESEARCH_KEYS.map((k) => {
-      const R = RESEARCH[k], lvl = me.research[k];
-      const active = me.rs && me.rs.k === k;
-      const maxed = lvl >= R.max;
-      const cost = researchCost(k, lvl);
-      let btn;
-      if (active) btn = `<div class="progress"><span style="width:${(me.rs.t / me.rs.total) * 100}%"></span></div>`;
-      else if (maxed) btn = '<span class="muted">Изучено</span>';
-      else btn = `<button class="btn small" data-rs="${k}" ${me.rs || me.money < cost ? 'disabled' : ''}>Изучить: ${cost}$ · ${researchTime(lvl)}с</button>`;
-      return `<div class="rcard ${active ? 'active' : ''}"><h4>${R.name}</h4><span class="pips">${pips(lvl, R.max)}</span><span class="muted">${R.desc}</span>${btn}</div>`;
-    }).join('');
-  }
-
-  showEnd(dead = false) {
-    const s = this.s;
-    const won = s.winner === this.pid;
-    $('end-title').textContent = dead ? 'Ваша держава пала' : won ? 'ПОБЕДА!' : 'Поражение';
-    $('end-text').textContent = dead ? 'Можно продолжить наблюдение за картой.' : `Победитель: ${s.players[s.winner].name} · время ${fmtTime(s.time)}`;
-    const counts = s.players.map(() => 0);
-    for (const P of s.provs) if (P.o >= 0) counts[P.o]++;
-    $('end-stats').innerHTML = '<tr><th>Держава</th><th>Пров.</th><th>Захв.</th><th>Уничтож.</th></tr>' +
-      s.players.map((p, i) => `<tr><td><span class="dot" style="background:${p.color}"></span> ${esc(p.name)}</td><td>${counts[i]}</td><td>${p.stats.captured}</td><td>${fmtNum(p.stats.kills)}</td></tr>`).join('');
-    $('modal-end').hidden = false;
-  }
-
-  updateSpeedButtons() {
-    document.querySelectorAll('#speed-ctrl .btn').forEach((b) => b.classList.toggle('on', Number(b.dataset.speed) === this.session.speed));
-  }
-
-  bindInput() {
-    const cv = this.r.canvas;
-    const dpr = () => window.devicePixelRatio || 1;
-    const pos = (e) => { const rc = cv.getBoundingClientRect(); return [(e.clientX - rc.left) * dpr(), (e.clientY - rc.top) * dpr()]; };
-
-    this.listen(cv, 'pointerdown', (e) => {
-      const [x, y] = pos(e);
-      if (e.button === 2) {
-        const p = this.r.provAt(x, y);
-        if (this.r.targetMode) { this.setMode(null); return; }
-        this.order(p);
-        return;
-      }
-      if (e.button !== 0 && e.button !== 1) return;
-      this.mouse.down = true; this.mouse.drag = e.button === 1;
-      this.mouse.sx = x; this.mouse.sy = y; this.mouse.camX = this.r.cam.x; this.mouse.camY = this.r.cam.y;
-      cv.setPointerCapture(e.pointerId);
-    });
-    this.listen(cv, 'pointermove', (e) => {
-      const [x, y] = pos(e);
-      this.mouse.x = x; this.mouse.y = y; this.mouse.cx = e.clientX; this.mouse.cy = e.clientY; this.mouse.inside = true;
-      if (this.mouse.down) {
-        if (!this.mouse.drag && Math.hypot(x - this.mouse.sx, y - this.mouse.sy) > 6 * dpr()) this.mouse.drag = true;
-        if (this.mouse.drag) {
-          this.r.cam.x = this.mouse.camX - (x - this.mouse.sx) / this.r.cam.z;
-          this.r.cam.y = this.mouse.camY - (y - this.mouse.sy) / this.r.cam.z;
-          this.r.clampCam();
-        }
-      }
-      const p = this.r.provAt(x, y);
-      this.r.hover = p;
-      this.showTip(p, e.clientX, e.clientY);
-    });
-    this.listen(cv, 'pointerleave', () => { this.mouse.inside = false; this.r.hover = -1; $('tip').hidden = true; });
-    this.listen(cv, 'pointerup', (e) => {
-      if (!this.mouse.down) return;
-      this.mouse.down = false;
-      if (this.mouse.drag) return;
-      const [x, y] = pos(e);
-      const p = this.r.provAt(x, y);
-      if (this.r.targetMode) { this.clickTarget(p); return; }
-      this.select(p);
-      if (p >= 0) play('click');
-    });
-    this.listen(cv, 'contextmenu', (e) => e.preventDefault());
-    this.listen(cv, 'wheel', (e) => {
-      e.preventDefault();
-      const [x, y] = pos(e);
-      this.r.zoomAt(x, y, e.deltaY < 0 ? 1 : -1);
-    }, { passive: false });
-
-    this.listen($('panel'), 'pointerdown', (e) => {
-      const el = e.target.closest('[data-act]');
-      if (el && !el.disabled) { e.preventDefault(); this.onPanelAction(el); }
-    });
-    this.listen($('research-list'), 'pointerdown', (e) => {
-      const el = e.target.closest('[data-rs]');
-      if (el && !el.disabled) { play('click'); if (this.cmd({ c: 'research', k: el.dataset.rs })) setTimeout(() => this.renderResearch(), 50); }
-    });
-    this.listen($('r-research'), 'click', () => this.openResearch());
-    this.listen($('speed-ctrl'), 'click', (e) => {
-      const b = e.target.closest('[data-speed]');
-      if (b) { this.session.setSpeed(Number(b.dataset.speed)); this.updateSpeedButtons(); play('click'); }
-    });
-    this.listen($('btn-aa'), 'click', () => { this.r.showAA = !this.r.showAA; $('btn-aa').classList.toggle('on', this.r.showAA); });
-    this.listen($('btn-theme'), 'click', () => this.app.toggleTheme());
-    this.listen($('btn-menu'), 'click', () => this.app.openPause());
-    this.listen($('chat-form'), 'submit', (e) => {
-      e.preventDefault();
-      const v = $('chat-input').value.trim();
-      if (v) this.session.sendChat(v);
-      $('chat-input').value = '';
-      $('chat-input').blur();
-    });
-
-    this.listen(window, 'keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-        if (e.key === 'Escape') e.target.blur();
-        return;
-      }
-      if (this.app.anyModalOpen()) {
-        if (e.key === 'Escape') this.app.closeModals();
-        return;
-      }
-      const k = e.key.toLowerCase();
-      this.keys.add(k);
-      if (k === 'escape') {
-        if (this.r.targetMode) this.setMode(null);
-        else if (this.r.selected >= 0) this.select(-1);
-        else this.app.openPause();
-      } else if (k === ' ') { e.preventDefault(); this.session.setSpeed(this.session.speed ? 0 : 1); this.updateSpeedButtons(); }
-      else if (k === '1' || k === '2' || k === '3') { this.session.setSpeed(Number(k)); this.updateSpeedButtons(); }
-      else if (k === 'r') this.openResearch();
-      else if (k === 'v') $('btn-aa').click();
-      else if (k === 't') this.app.toggleTheme();
-      else if (k === 'z') this.frac = 0.25;
-      else if (k === 'x') this.frac = 0.5;
-      else if (k === 'c') this.frac = 0.75;
-      else if (k === 'b') this.frac = 1;
-      else if (k === 'enter' && this.session.mode !== 'offline') { e.preventDefault(); $('chat-input').focus(); }
-      else if (k === 'home') this.focusHome();
-      if ('zxcb'.includes(k)) this.lastPanel = '';
-    });
-    this.listen(window, 'keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    this.listen(window, 'blur', () => this.keys.clear());
-  }
-
-  focusHome() {
-    const i = this.s.provs.findIndex((P) => P.o === this.pid);
-    if (i >= 0) this.r.focus(i);
-  }
-
-  showTip(p, cx, cy) {
-    const tip = $('tip');
-    if (p < 0 || this.mouse.drag) { tip.hidden = true; return; }
-    const P = this.s.provs[p], mp = this.r.map.provinces[p];
-    const owner = P.o >= 0 ? this.s.players[P.o] : null;
-    const game = this.session.game || this.helper();
-    let h = `<b style="color:${owner ? owner.color : 'inherit'}">${owner ? esc(owner.name) : 'Нейтральная'}</b><br>`;
-    h += `${TERRAIN[mp.terrain].name} · нас. ${fmtNum(P.pop)}<br>Войска: ${fmtNum(troopCount(P.t))} · оборона ${fmtNum(game.defensePower(p))}`;
-    const sel = this.r.selected;
-    if (sel >= 0 && sel !== p && this.s.provs[sel].o === this.pid && P.o !== this.pid) {
-      const S = this.s.provs[sel];
-      const send = { inf: Math.floor(S.t.inf * this.frac), tank: Math.floor(S.t.tank * this.frac), art: Math.floor(S.t.art * this.frac) };
-      const att = game.attackPower(this.pid, send), def = game.defensePower(p, this.pid, send);
-      const odds = att / Math.max(1, def);
-      h += `<br>Атака ${Math.round(this.frac * 100)}%: <b style="color:${odds > 1 ? 'var(--good)' : 'var(--danger)'}">${fmtNum(att)} vs ${fmtNum(def)}</b>`;
+    if (!$('modal-research').hidden) {
+      this.app.closeModal('research');
+      return;
     }
-    tip.innerHTML = h;
-    tip.hidden = false;
-    tip.style.left = Math.min(window.innerWidth - 270, cx + 16) + 'px';
-    tip.style.top = Math.min(window.innerHeight - 90, cy + 16) + 'px';
+    this.renderResearch();
+    this.app.openModal('research');
+    this.closeCtx();
   }
-}
 
-function setText(id, v) {
-  const el = $(id);
-  if (el.textContent !== v) el.textContent = v;
+  startResearch(key) {
+    if (this.send({ c: 'research', key })) {
+      play('select');
+      this.pendingResearch = key;
+      setTimeout(() => this.renderResearch(), 250);
+    }
+  }
+
+  renderResearch() {
+    const me = this.me, list = $('research-list');
+    if (!me) return;
+    if (list.children.length !== RESEARCH_KEYS.length) {
+      list.innerHTML = '';
+      for (const key of RESEARCH_KEYS) {
+        const card = tpl('tpl-research-card');
+        card.dataset.key = key;
+        card.querySelector('.rcard-ic use').setAttribute('href', '#i-' + RESEARCH_ICONS[key]);
+        card.querySelector('h4').textContent = RESEARCH[key].name;
+        card.querySelector('.rcard-desc').textContent = RESEARCH[key].desc;
+        card.querySelector('.rcard-btn').dataset.research = key;
+        list.appendChild(card);
+      }
+    }
+    const rs = me.researching;
+    for (const card of list.children) {
+      const key = card.dataset.key, def = RESEARCH[key];
+      const lvl = me.research[key];
+      const maxed = lvl >= def.max;
+      const active = !!rs && rs.key === key;
+      const locked = !!def.req && me.research[def.req[0]] < def.req[1];
+      const cost = maxed ? 0 : researchCost(key, lvl);
+      const poor = !maxed && !active && me.gold < cost;
+      toggle(card, 'active', active);
+      toggle(card, 'maxed', maxed);
+      toggle(card, 'locked', locked && !maxed);
+      toggle(card, 'poor', poor && !locked);
+      setHTML(card.querySelector('.pips'), Array.from({ length: def.max }, (_, k) => `<i${k < lvl ? ' class="on"' : ''}></i>`).join(''));
+      setText(card.querySelector('.rc-cost b'), maxed ? '' : fmtInt(cost));
+      setText(card.querySelector('.rc-dur b'), maxed ? '' : fmtSec(researchTicks(lvl) / TICKS_PER_SEC));
+      setText(card.querySelector('.rcard-req'), locked && !maxed ? `Требуется: ${RESEARCH[def.req[0]].name} ${ROMAN[def.req[1]]}` : '');
+      card.querySelector('.rcard-bar > span').style.width = active ? clamp((rs.progress / rs.total) * 100, 0, 100).toFixed(1) + '%' : '0%';
+      const b = card.querySelector('.rcard-btn');
+      const label = active ? 'Изучается…' : maxed ? 'Изучено полностью' : `Исследовать ${ROMAN[lvl + 1] || lvl + 1}`;
+      setText(b, label);
+      const dis = active || maxed || locked || !!rs || this.s.phase === 'over' || !me.alive;
+      if (b.disabled !== dis) b.disabled = dis;
+      b.title = rs && !active ? 'Сначала дождитесь окончания текущего исследования' : '';
+      toggle(b, 'primary', !dis && !poor);
+    }
+    const cur = $('research-current');
+    toggle(cur, 'active', !!rs);
+    if (rs) {
+      const lvl = me.research[rs.key] + 1;
+      setText($('research-cur-name'), `${RESEARCH[rs.key].name} ${ROMAN[lvl] || lvl}`);
+      setText($('research-cur-time'), 'осталось ' + fmtSec((rs.total - rs.progress) / TICKS_PER_SEC));
+      $('research-cur-bar').style.width = clamp((rs.progress / rs.total) * 100, 0, 100).toFixed(1) + '%';
+    } else {
+      setText($('research-cur-name'), 'Ничего — выберите технологию');
+      setText($('research-cur-time'), '');
+      $('research-cur-bar').style.width = '0%';
+    }
+  }
+
+  openCountries(focus = -1) {
+    const modal = $('modal-countries');
+    if (!modal.hidden && focus < 0) {
+      this.app.closeModal('countries');
+      return;
+    }
+    this.focusPid = focus;
+    this.renderCountries(true);
+    this.app.openModal('countries');
+    this.closeCtx();
+    if (focus >= 0) {
+      const tr = this.rows.get(focus);
+      if (tr) requestAnimationFrame(() => tr.scrollIntoView({ block: 'center' }));
+    }
+  }
+
+  onCountriesClick(e) {
+    const th = e.target.closest('th[data-sort]');
+    if (th) {
+      const key = th.dataset.sort;
+      if (this.sort.key === key) this.sort.dir = -this.sort.dir;
+      else this.sort = { key, dir: key === 'name' ? 1 : -1 };
+      play('click');
+      this.renderCountries(false);
+      return;
+    }
+    const d = e.target.closest('button.dip');
+    if (d) {
+      if (d.disabled) return;
+      const q = Number(d.dataset.pid), act = d.dataset.dip;
+      const g = this.game;
+      if (act === 'break') this.breakWith(q);
+      else if (act === 'embargo') {
+        if (this.send({ c: 'embargo', with: q, on: !embargoBy(g, this.pid, q) })) play('click');
+      } else if (this.send({ c: 'propose', to: q, type: act })) play('click');
+      setTimeout(() => { if (!$('modal-countries').hidden) this.renderCountries(false); }, 150);
+      return;
+    }
+    const tr = e.target.closest('tr[data-pid]');
+    if (tr && !e.target.closest('.dip-actions')) {
+      this.app.closeModal('countries');
+      this.focusPlayer(Number(tr.dataset.pid));
+    }
+  }
+
+  renderCountries(rebuild) {
+    const g = this.game, s = g.s, me = this.pid;
+    const stats = g.countryStats();
+    const body = $('countries-body');
+    if (rebuild || this.rows.size !== stats.length || !body.children.length) {
+      body.innerHTML = '';
+      this.rows.clear();
+      for (const st of stats) {
+        const tr = tpl('tpl-country-row');
+        tr.dataset.pid = st.id;
+        for (const b of tr.querySelectorAll('.dip')) b.dataset.pid = st.id;
+        this.rows.set(st.id, tr);
+        body.appendChild(tr);
+      }
+    }
+    for (const st of stats) this.fillCountryRow(this.rows.get(st.id), st, g, s, me);
+    const key = this.sort.key, dir = this.sort.dir;
+    const val = (st) => {
+      switch (key) {
+        case 'name': return st.name.toLowerCase();
+        case 'terr': return st.tiles;
+        case 'income': return st.income - st.upkeep;
+        case 'ships': return st.warship;
+        default: return st[key] || 0;
+      }
+    };
+    const order = stats.slice().sort((a, b) => {
+      if (a.alive !== b.alive) return a.alive ? -1 : 1;
+      const va = val(a), vb = val(b);
+      const c = typeof va === 'string' ? va.localeCompare(vb, 'ru') : va - vb;
+      return c * dir || a.id - b.id;
+    });
+    const rows = order.map((st) => this.rows.get(st.id));
+    if (rows.some((tr, k) => body.children[k] !== tr)) for (const tr of rows) body.appendChild(tr);
+    for (const th of $('countries-table').querySelectorAll('th[data-sort]')) {
+      const on = th.dataset.sort === key;
+      toggle(th, 'sorted', on);
+      toggle(th, 'asc', on && dir > 0);
+      toggle(th, 'desc', on && dir < 0);
+    }
+    const alive = stats.filter((x) => x.alive).length, dead = stats.length - alive;
+    setText($('countries-sub'), `${alive} ${plural(alive, ['страна', 'страны', 'стран'])} в игре` + (dead ? ` · ${dead} ${plural(dead, ['выбыла', 'выбыли', 'выбыли'])}` : ''));
+  }
+
+  fillCountryRow(tr, st, g, s, me) {
+    const self = st.id === me;
+    toggle(tr, 'me', self);
+    toggle(tr, 'dead', !st.alive);
+    toggle(tr, 'focus', st.id === this.focusPid);
+    tr.querySelector('.cname .dot').style.background = safeColor(st.color);
+    setText(tr.querySelector('.cname b'), st.name);
+    const tag = tr.querySelector('.cname .tag');
+    let tt = '', tc = '';
+    if (self) { tt = 'Вы'; tc = 'you'; } else if (!st.alive) { tt = 'Выбыл'; tc = 'dead'; } else if (st.traitor) { tt = 'Предатель'; tc = 'traitor'; } else if (st.ai) { tt = 'Бот'; tc = 'bot'; }
+    setText(tag, tt);
+    tag.className = 'tag' + (tc ? ' ' + tc : '');
+    setText(tr.querySelector('.c-terr'), fmtPct(st.pct, st.pct < 1 && st.pct > 0 ? 2 : 1));
+    setText(tr.querySelector('.c-troops'), fmtNum(st.troops));
+    setText(tr.querySelector('.c-gold'), fmtNum(st.gold));
+    const net = st.income - st.upkeep;
+    const inc = tr.querySelector('.c-income');
+    setText(inc, (net >= 0 ? '+' : '−') + fmtNum(Math.abs(net)));
+    toggle(inc, 'pos', net > 0);
+    toggle(inc, 'neg', net < 0);
+    for (const [cls, v] of [['c-factory', st.factory], ['c-house', st.house], ['c-port', st.port], ['c-sam', st.sam], ['c-silo', st.silo], ['c-ships', st.warship]]) {
+      const td = tr.querySelector('.' + cls);
+      setText(td, v);
+      toggle(td, 'zero', !v);
+    }
+    setHTML(tr.querySelector('.c-rel'), this.relHTML(st, g, s, me));
+    const acts = tr.querySelector('.dip-actions');
+    const showActs = !self && st.alive && this.me && this.me.alive;
+    show(acts, showActs);
+    if (!showActs) return;
+    const rel = g.relation(me, st.id);
+    for (const b of acts.querySelectorAll('.dip')) {
+      const t = b.dataset.dip;
+      if (t === 'alliance' || t === 'pact' || t === 'trade') {
+        const hide = rel.type === 'alliance' || rel.type === t || (t === 'pact' && rel.type === 'alliance');
+        show(b, !hide);
+        if (hide) continue;
+        const pending = s.requests.some((r) => r.from === me && r.to === st.id && r.type === t);
+        const err = proposeError(g, me, st.id, t);
+        toggle(b, 'pending', pending);
+        b.disabled = !!err;
+        b.title = pending ? 'Предложение отправлено, ждём ответа' : err || { alliance: 'Предложить союз', pact: 'Предложить пакт о ненападении на 10 минут', trade: 'Предложить торговый договор' }[t];
+      } else if (t === 'break') {
+        show(b, rel.type !== 'none');
+        b.title = BREAK_TEXT[rel.type] || 'Разорвать договор';
+      } else if (t === 'embargo') {
+        const on = embargoBy(g, me, st.id);
+        toggle(b, 'on', on);
+        b.title = on ? 'Снять эмбарго' : 'Эмбарго: запретить торговлю';
+      }
+    }
+  }
+
+  relHTML(st, g, s, me) {
+    if (st.id === me) return '<span class="rel self">Это вы</span>';
+    if (!st.alive) return '<span class="rel dead">Выбыл</span>';
+    const rel = g.relation(me, st.id);
+    const out = [];
+    if (rel.type === 'alliance') out.push('<span class="rel alliance">Союз</span>');
+    else if (rel.type === 'pact') out.push(`<span class="rel pact">Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}</span>`);
+    else if (rel.type === 'trade') out.push('<span class="rel trade">Торговля</span>');
+    else if (this.atWar(me, st.id)) out.push('<span class="rel war">Война</span>');
+    else out.push('<span class="rel none">Нейтралитет</span>');
+    if (rel.embargo) out.push(`<span class="rel embargo">${embargoBy(g, me, st.id) ? 'Ваше эмбарго' : 'Эмбарго'}</span>`);
+    if (st.traitor) out.push('<span class="rel traitor">Предатель</span>');
+    return out.join('');
+  }
+
+  checkEnd(dt) {
+    const s = this.s, me = this.me;
+    if (s.phase === 'over') {
+      if (this.endShown) return;
+      this.endWait += dt;
+      if (this.endWait < 1.2) return;
+      this.endShown = true;
+      this.setMode(null);
+      this.showEnd(false);
+      return;
+    }
+    if (me && !me.alive && !this.deadShown && s.phase === 'play') {
+      this.deadShown = true;
+      this.setMode(null);
+      this.clearSelection();
+      $('hud-bottom').hidden = true;
+      this.updateDockHeight();
+      this.showEnd(true);
+    }
+  }
+
+  showEnd(dead) {
+    const g = this.game, s = g.s, me = this.pid, P = s.players;
+    const win = s.winner;
+    const mine = P[me];
+    const ally = win >= 0 && win !== me && mine && mine.alive && g.isAllied(me, win);
+    const won = !dead && (win === me || ally);
+    toggle($('end-hero'), 'lose', !won);
+    $('end-icon').innerHTML = icon(won ? 'trophy' : dead ? 'flag' : win < 0 ? 'globe' : 'flag');
+    $('end-title').textContent = dead ? 'Вы выбыли' : win < 0 ? 'Игра окончена' : won ? (ally ? 'Победа коалиции!' : 'Победа!') : 'Поражение';
+    let reason = '';
+    if (dead) reason = mine && mine.stats && s.tick && this.surrendered ? 'Вы сдались' : 'Ваша страна потеряла всю территорию';
+    else reason = WIN_REASONS[s.winReason] || '';
+    $('end-reason').textContent = reason;
+    const wp = win >= 0 ? P[win] : null;
+    $('end-winner').innerHTML = wp && !dead ? `<span class="dot" style="background:${safeColor(wp.color)}"></span>${esc(wp.name)}${win === me ? ' (вы)' : ''}` : '';
+    const time = fmtClock(s.tick / TICKS_PER_SEC);
+    $('end-text').textContent = dead
+      ? `Партия продолжается без вас (время ${time}). Можно наблюдать за картой или выйти в главное меню.`
+      : won ? `Партия длилась ${time}. Отличная работа, командир!` : `Партия длилась ${time}.`;
+    $('end-stats').innerHTML = this.statsTable();
+    $('end-continue').lastChild.textContent = dead ? 'Наблюдать' : 'Смотреть карту';
+    this.app.closeModals();
+    this.app.openModal('end');
+    if (dead && !won) play('defeat');
+  }
+
+  statsTable() {
+    const g = this.game, s = g.s, me = this.pid, land = g.map.landCount || 1;
+    const order = s.players.slice().sort((a, b) => {
+      if (a.id === s.winner) return -1;
+      if (b.id === s.winner) return 1;
+      if (a.alive !== b.alive) return a.alive ? -1 : 1;
+      if (!a.alive) return (b.eliminatedAt || 0) - (a.eliminatedAt || 0);
+      return b.tiles - a.tiles;
+    });
+    const head = '<thead><tr><th>Страна</th><th class="num">Территория</th><th class="num">Пик</th><th class="num">Захвачено клеток</th><th class="num">Уничтожено войск</th><th class="num">Потоплено судов</th><th class="num">Ядерные удары</th><th class="num">Заработано золота</th></tr></thead>';
+    const rows = order.map((p) => {
+      const st = p.stats || {};
+      const cls = [p.id === me ? 'me' : '', p.alive ? '' : 'dead'].filter(Boolean).join(' ');
+      return `<tr${cls ? ` class="${cls}"` : ''}><td class="cname"><span class="dot" style="background:${safeColor(p.color)}"></span>${esc(p.name)}</td>`
+        + `<td class="num">${fmtPct((p.tiles * 100) / land)}</td><td class="num">${fmtPct(((st.peakTiles || p.tiles) * 100) / land)}</td>`
+        + `<td class="num">${fmtInt(st.tilesCaptured || 0)}</td><td class="num">${fmtNum(st.kills || 0)}</td><td class="num">${fmtInt(st.shipsSunk || 0)}</td>`
+        + `<td class="num">${fmtInt(st.nukes || 0)}</td><td class="num">${fmtNum(st.goldEarned || 0)}</td></tr>`;
+    }).join('');
+    return head + '<tbody>' + rows + '</tbody>';
+  }
 }

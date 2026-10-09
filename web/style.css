@@ -1844,3 +1844,27 @@ output {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
   .modal, .modal-box, .sel-panel, .dcard, .ctx-menu, .spawn-banner, .mode-hint, .toast { animation-duration: 0.01ms !important; }
 }
+
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+}
+.loading-box {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.4rem;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  border: 1px solid var(--border-2);
+  box-shadow: var(--shadow);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.loading-box .spinner { width: 1.4rem; height: 1.4rem; }

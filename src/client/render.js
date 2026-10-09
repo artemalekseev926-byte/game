@@ -1,10 +1,11 @@
-import { THEMES, hexToRgb, mix, shade, lighten, rgba, rgbStr, playerTones } from './theme.js';
-import { markerCanvas, unitCanvas, drawIcon } from './icons.js';
-import { SAM, STRIKES, WARHEAD, ECON, cruiseRange } from '../core/config.js';
+import { THEMES, hexToRgb, mix, shade, rgba, rgbStr, playerTones } from './theme.js';
+import { markerCanvas, unitCanvas } from './icons.js';
+import { SAM, STRIKES, WARHEAD, ECON, cruiseRange, siloReload, airbaseReload } from '../core/config.js';
 import { nearestCoastTile } from '../core/nav.js';
+import { boatPlan } from '../core/units.js';
 
 const CH = 256;
-const BLK = 64;
+const BLK = 32;
 const BPR = CH / BLK;
 const NBLK = BPR * BPR;
 const LEVELS = [2, 4, 8, 16, 32];
@@ -229,6 +230,55 @@ function makeCanvas(w, h) {
 
 const packRGBA = (r, g, b, a) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 
+export function mapPreview(map, width, height, themeName = 'dark', state = null) {
+  const th = THEMES[themeName] || THEMES.dark;
+  const W = map.W, H = map.H;
+  const w = Math.max(1, Math.round(width || 240));
+  const h = Math.max(1, Math.round(height || (w * H) / W));
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  const u = new Uint32Array(img.data.buffer);
+  const t = map.terrain, el = map.elev, wb = map.waterBody, ob = map.oceanBodies;
+  const own = state && state.owner ? state.owner : null;
+  const pc = [];
+  if (own && state.players) for (const p of state.players) pc.push(hexToRgb(p.color));
+  const K = 3, kx = W / w / K, ky = H / h / K;
+  for (let py = 0; py < h; py++) {
+    for (let px = 0; px < w; px++) {
+      let r = 0, g = 0, b = 0;
+      for (let sy = 0; sy < K; sy++) {
+        const ty = Math.min(H - 1, Math.floor((py * K + sy + 0.5) * ky));
+        for (let sx = 0; sx < K; sx++) {
+          const tx = Math.min(W - 1, Math.floor((px * K + sx + 0.5) * kx));
+          const i = ty * W + tx, tt = t[i];
+          let cr, cg, cb;
+          if (tt >= 2) {
+            const base = th.land[tt] || th.land[2];
+            const k = th.landGain * (0.86 + (el ? el[i] / 255 : 0.3) * 0.3);
+            cr = base[0] * k; cg = base[1] * k; cb = base[2] * k;
+            const o = own ? own[i] : 0;
+            if (o && pc[o - 1]) {
+              const q = pc[o - 1], a = th.fillA + 0.15;
+              cr += (q[0] - cr) * a; cg += (q[1] - cg) * a; cb += (q[2] - cb) * a;
+            }
+          } else {
+            const lake = wb && ob && wb[i] >= 0 && !ob.has(wb[i]);
+            const d = el ? clamp(el[i] / 60, 0, 1) : tt === 1 ? 0.2 : 0.8;
+            const q = lake ? th.lake : mix(mix(th.shallow, th.mid, smooth(0, 0.35, d)), th.deep, smooth(0.25, 1, d));
+            cr = q[0]; cg = q[1]; cb = q[2];
+          }
+          r += cr; g += cg; b += cb;
+        }
+      }
+      const n = 1 / (K * K);
+      u[py * w + px] = packRGBA(clamp(r * n, 0, 255) | 0, clamp(g * n, 0, 255) | 0, clamp(b * n, 0, 255) | 0, 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -280,7 +330,10 @@ export class Renderer {
     if (this.map) {
       this.bakeTheme();
       this.dropChunks();
-      if (this.game) this.rebuildTerritory();
+      if (this.game) {
+        this.buildPalette();
+        this.rebuildTerritory();
+      }
     }
   }
 
@@ -510,16 +563,23 @@ export class Renderer {
     const chh = this.canvas.clientHeight || this.canvas.height;
     const w = Math.max(1, Math.floor(cw * dpr));
     const h = Math.max(1, Math.floor(chh * dpr));
-    if (dpr !== this.dpr && this.cam) {
-      const k = dpr / this.dpr;
-      this.cam.z *= k;
-      this.cam.x += 0;
+    const ow = this.canvas.width, oh = this.canvas.height;
+    if (dpr === this.dpr && ow === w && oh === h) return;
+    const z0 = this.cam.z;
+    const cx = this.cam.x + ow / z0 / 2, cy = this.cam.y + oh / z0 / 2;
+    if (dpr !== this.dpr) {
+      this.cam.z = z0 * (dpr / this.dpr);
+      this.dpr = dpr;
+      this.anim = null;
     }
-    this.dpr = dpr;
-    if (this.canvas.width !== w || this.canvas.height !== h) {
+    if (ow !== w || oh !== h) {
       this.canvas.width = w;
       this.canvas.height = h;
     }
+    this.cam.x = cx - w / this.cam.z / 2;
+    this.cam.y = cy - h / this.cam.z / 2;
+    if (this.anim && this.anim.kind === 'zoom') this.anim = null;
+    this.clampCam();
   }
 
   get viewW() { return this.canvas.width; }
@@ -537,8 +597,10 @@ export class Renderer {
     this.anim = null;
   }
 
+  get zoom() { return this.cam.z / this.dpr; }
+
   focus(x, y, zoom, instant = false) {
-    const z1 = clamp(zoom || this.cam.z, this.minZoom, this.maxZoom);
+    const z1 = clamp(zoom ? zoom * this.dpr : this.cam.z, this.minZoom, this.maxZoom);
     if (instant) {
       this.cam.z = z1;
       this.cam.x = x - this.viewW / z1 / 2;
@@ -559,7 +621,7 @@ export class Renderer {
   }
 
   setZoom(z, instant = false) {
-    this.zoomAt(this.viewW / 2, this.viewH / 2, z / this.cam.z);
+    this.zoomAt(this.viewW / 2, this.viewH / 2, (z * this.dpr) / this.cam.z);
     if (instant) this.stepCamera(10);
   }
 
@@ -649,6 +711,8 @@ export class Renderer {
     this.labels.clear();
     this.labelAt = -1e9;
     this.allyKey = '';
+    this.boatKey = '';
+    this.validCache = { key: '', ok: true, error: '' };
     this.buildPalette();
     this.rebuildTerritory();
     if (typeof game.drainDirty === 'function') game.drainDirty();
@@ -735,43 +799,49 @@ export class Renderer {
   }
 
   applyDirty(tiles) {
-    const W = this.map.W, H = this.map.H, N = W * H;
-    const own = this.game.s.owner, e = this.edgeArr, st = this.stamp, u = this.terrU32;
+    const W = this.map.W, N = W * this.map.H;
+    if (tiles.length > N / 12) {
+      this.rebuildTerritory();
+      return;
+    }
+    const own = this.game.s.owner, e = this.edgeArr, st = this.stamp, u = this.terrU32, land = this.land;
+    const tb = this.tblocks, tbw = this.tbw;
     this.stampN = (this.stampN + 2) >>> 0;
-    if (this.stampN < 2) {
+    if (this.stampN < 2 || this.stampN > 0xfffffff0) {
       st.fill(0);
       this.stampN = 2;
     }
     const sA = this.stampN, sB = this.stampN + 1;
     this.stampN++;
-    const touched = [];
+    let touched = this.touchBuf;
+    if (!touched || touched.length < tiles.length * 5) touched = this.touchBuf = new Int32Array(Math.max(1024, tiles.length * 5));
+    let nt = 0;
     for (let k = 0; k < tiles.length; k++) {
       const i = tiles[k];
-      if (i < 0 || i >= N) continue;
+      if (!(i >= 0 && i < N)) continue;
       const x = i % W;
-      const list = [i, x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i >= W ? i - W : -1, i < N - W ? i + W : -1];
-      for (const j of list) {
-        if (j < 0 || st[j] === sA || st[j] === sB) continue;
+      for (let q = 0; q < 5; q++) {
+        const j = q === 0 ? i : q === 1 ? (x > 0 ? i - 1 : -1) : q === 2 ? (x < W - 1 ? i + 1 : -1) : q === 3 ? i - W : i + W;
+        if (j < 0 || j >= N || st[j] === sA || st[j] === sB) continue;
         st[j] = sA;
         const o = own[j];
-        e[j] = o && this.land[j] && this.isEdge(j, o) ? 1 : 0;
-        touched.push(j);
+        e[j] = o && land[j] && this.isEdge(j, o) ? 1 : 0;
+        touched[nt++] = j;
       }
     }
-    for (let k = 0; k < touched.length; k++) {
+    for (let k = 0; k < nt; k++) {
       const i = touched[k];
       const x = i % W;
-      const list = [i, x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i >= W ? i - W : -1, i < N - W ? i + W : -1];
-      for (const j of list) {
-        if (j < 0 || st[j] === sB) continue;
+      for (let q = 0; q < 5; q++) {
+        const j = q === 0 ? i : q === 1 ? (x > 0 ? i - 1 : -1) : q === 2 ? (x < W - 1 ? i + 1 : -1) : q === 3 ? i - W : i + W;
+        if (j < 0 || j >= N || st[j] === sB) continue;
         st[j] = sB;
         u[j] = this.cellColor(j);
         const jx = j % W, jy = (j - jx) / W;
-        this.tblocks[((jy / TB) | 0) * this.tbw + ((jx / TB) | 0)] = 1;
+        tb[((jy / TB) | 0) * tbw + ((jx / TB) | 0)] = 1;
       }
     }
     this.markChunkTiles(tiles);
-    void H;
   }
 
   flushTerritory() {
@@ -837,7 +907,7 @@ export class Renderer {
       for (let k = 0; k < tiles.length; k++) {
         const i = tiles[k];
         const x = i % W, y = (i - x) / W;
-        const x0 = x - 1, x1 = x + 2, y0 = y - 1, y1 = y + 2;
+        const x0 = x - 2, x1 = x + 3, y0 = y - 2, y1 = y + 3;
         const cxa = Math.floor(x0 / C), cxb = Math.floor((x1 - 0.001) / C);
         const cya = Math.floor(y0 / C), cyb = Math.floor((y1 - 0.001) / C);
         for (let cy = cya; cy <= cyb; cy++) {
@@ -881,7 +951,7 @@ export class Renderer {
     const fillA = th.fillA, rimA = th.rimA, darkA = th.darkA;
     const bwD = S <= 2 ? 0.95 : clamp(0.2 * S, 1.05, 4), bwR = bwD + (S <= 2 ? 0 : clamp(0.19 * S, 0.9, 4.4));
     const fHi = th.falloutHi, fLo = th.falloutLo, fA = th.falloutA;
-    const fPer = Math.max(6, Math.round(S * 0.9));
+    const fPer = Math.max(6, Math.round(S * 0.7)), fRim = 2 + S * 0.12;
     const shoreW = clamp(S * 0.12, 1, 3);
     const foam = th.foam, foamW = clamp(S * 0.3, 1.4, 5), foamA = th.foamA;
     const det = this.detail, detA = (th.detail / 127) * smooth(4, 20, S);
@@ -1119,15 +1189,27 @@ export class Renderer {
                 }
                 if (anyF) {
                   const F = f00 * w00 + f10 * w10 + f01 * w01 + f11 * w11;
-                  let fc = (F - 0.5) * S * 0.9 + 0.5;
+                  const fd = (F - 0.5) * S;
+                  let fc = fd * 0.9 + 0.5;
                   fc = fc < 0 ? 0 : fc > 1 ? 1 : fc;
                   if (fc > 0) {
-                    const st = ((gxb + px + gyb + py) % fPer) < fPer * 0.42;
-                    const hc = st ? fHi : fLo;
-                    const fa = (st ? fA : fA * 0.75) * fc * cov;
-                    r += (hc[0] - r) * fa;
-                    g += (hc[1] - g) * fa;
-                    b += (hc[2] - b) * fa;
+                    const k0 = fc * cov;
+                    let ba = fA * 0.55 * k0;
+                    r += (fLo[0] - r) * ba;
+                    g += (fLo[1] - g) * ba;
+                    b += (fLo[2] - b) * ba;
+                    const ph = (gxb + px + gyb + py) % fPer;
+                    let sa = fPer * 0.3 - ph;
+                    sa = sa < 0 ? 0 : sa > 1 ? 1 : sa;
+                    let eg = 1 - fd / fRim;
+                    eg = eg < 0 ? 0 : eg > 1 ? 1 : eg;
+                    ba = (fA * 0.8 * sa + 0.75 * eg * eg) * k0;
+                    if (ba > 1) ba = 1;
+                    if (ba > 0) {
+                      r += (fHi[0] - r) * ba;
+                      g += (fHi[1] - g) * ba;
+                      b += (fHi[2] - b) * ba;
+                    }
                   }
                 }
               }
@@ -1224,7 +1306,7 @@ export class Renderer {
     vis.sort((a, b) => a.dist - b.dist);
     const t0 = now();
     let blocks = 0;
-    const budget = this.anim || this.keys.x || this.keys.y ? this.budgetMs * 0.55 : this.budgetMs;
+    const budget = this.anim || this.keys.x || this.keys.y ? this.budgetMs * 0.45 : this.budgetMs;
     outer: for (const ch of vis) {
       if (!ch.pending) continue;
       for (let b = 0; b < NBLK; b++) {
@@ -1545,8 +1627,8 @@ export class Renderer {
 
   markerRadius() {
     const z = this.cam.z / this.dpr;
-    const r = z < 2 ? 3.2 + z * 0.9 : z * 1.25;
-    return Math.round(clamp(r, 3.5, 15) * this.dpr);
+    const r = z < 2 ? 2.2 + z * 1.2 : 2.6 + z * 1.1;
+    return Math.round(clamp(r, 2.5, 18) * this.dpr);
   }
 
   drawBuildings(ctx, s) {
@@ -1571,7 +1653,7 @@ export class Renderer {
         const pr = clamp(1 - (b.build - this.alpha) / b.total, 0, 1);
         this.ring(ctx, x, y, r + 2.2 * dpr, pr, th.progress, 2.6 * dpr);
       } else if (b.owner === me && b.cd > 0 && (b.type === 'silo' || b.type === 'airbase')) {
-        const tot = b.type === 'silo' ? Math.round(300 / Math.max(1, b.level)) : Math.round(100 / Math.max(1, b.level));
+        const tot = b.type === 'silo' ? siloReload(b.level) : airbaseReload(b.level);
         this.ring(ctx, x, y, r + 2 * dpr, clamp(1 - b.cd / tot, 0, 1), th.reload, 2 * dpr);
       }
     }
@@ -1867,14 +1949,36 @@ export class Renderer {
     } else if (m.kind === 'boat') {
       const v = this.validate({ c: 'boat', x: hx, y: hy, ratio: 0.3 });
       const col = v.ok ? th.ok : th.bad;
-      const key = hx + ',' + hy + ',' + s.tick;
-      if (this.boatKey !== key) {
-        this.boatKey = key;
-        this.boatFrom = me >= 0 ? nearestCoastTile(this.map, s.owner, me + 1, hx + 0.5, hy + 0.5) : -1;
-      }
-      const fi = this.boatFrom;
-      if (fi >= 0) {
-        const W = this.map.W;
+      const plan = this.boatPreview(hx, hy, s.tick);
+      if (plan && plan.path && plan.path.length > 1) {
+        const P = plan.path, W = this.map.W;
+        const lx = (plan.landing % W) + 0.5, ly = Math.floor(plan.landing / W) + 0.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 4 * dpr;
+        ctx.beginPath();
+        this.tracePath(ctx, P[0][0], P[0][1], P, 1);
+        ctx.lineTo(this.sx(lx), this.sy(ly));
+        ctx.stroke();
+        ctx.strokeStyle = rgba(col, 0.95);
+        ctx.lineWidth = 2 * dpr;
+        ctx.setLineDash([6 * dpr, 6 * dpr]);
+        ctx.lineDashOffset = -this.time * 20 * dpr;
+        ctx.beginPath();
+        this.tracePath(ctx, P[0][0], P[0][1], P, 1);
+        ctx.lineTo(this.sx(lx), this.sy(ly));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const e = P[P.length - 1], f = P[P.length - 2];
+        this.arrowHead(ctx, this.sx(f[0]), this.sy(f[1]), this.sx(e[0]), this.sy(e[1]), 10 * dpr, rgba(col, 0.95));
+        const sx0 = this.sx(P[0][0]), sy0 = this.sy(P[0][1]);
+        ctx.fillStyle = rgba(col, 0.95);
+        ctx.beginPath();
+        ctx.arc(sx0, sy0, 3.5 * dpr, 0, TAU);
+        ctx.fill();
+      } else if (plan && plan.from >= 0) {
+        const W = this.map.W, fi = plan.from;
         const fx = this.sx((fi % W) + 0.5), fy = this.sy(Math.floor(fi / W) + 0.5);
         ctx.strokeStyle = rgba(col, 0.85);
         ctx.lineWidth = 2 * dpr;
@@ -1910,6 +2014,24 @@ export class Renderer {
       }
     }
     ctx.restore();
+  }
+
+  boatPreview(x, y, tick) {
+    const g = this.game, me = this.localPid;
+    if (!g || me < 0) return null;
+    const key = x + ',' + y + ',' + Math.floor(tick / 5);
+    if (this.boatKey === key) return this.boatCache;
+    this.boatKey = key;
+    let plan = null;
+    try {
+      const r = boatPlan(g, me, x, y);
+      if (r && !r.error) plan = { path: r.path, landing: r.landing, from: r.start };
+    } catch (e) {
+      plan = null;
+    }
+    if (!plan) plan = { path: null, landing: -1, from: nearestCoastTile(this.map, g.s.owner, me + 1, x + 0.5, y + 0.5) };
+    this.boatCache = plan;
+    return plan;
   }
 
   modeStrikeKind(m) {
@@ -2290,7 +2412,7 @@ export class Renderer {
       switch (e.k) {
         case 'nuke': {
           const r = e.r || 14;
-          this.fx.push({ k: 'nuke', x: e.x, y: e.y, r, t: 0, life: 4.4 });
+          this.fx.push({ k: 'nuke', x: e.x, y: e.y, r, t: 0, life: 5.5 });
           this.debris(e.x, e.y, 0, Math.min(70, 22 + r), r * 0.75, 'fire', 0.05);
           this.debris(e.x, e.y, 0, Math.min(40, 12 + r * 0.5), r * 0.4, 'smoke', 0.7);
           if (this.inView(e.x, e.y, r * this.cam.z)) {
@@ -2545,87 +2667,101 @@ export class Renderer {
     const R = Math.max(f.r * z, 16 * dpr);
     const t = f.t, life = f.life;
     ctx.save();
-    const sc = 1 - clamp((t - 1.2) / (life - 1.2), 0, 1);
+    const sc = 1 - clamp((t - life * 0.55) / (life * 0.45), 0, 1);
     if (sc > 0) {
-      const g0 = ctx.createRadialGradient(x, y, 0, x, y, R);
-      g0.addColorStop(0, `rgba(40,22,14,${0.5 * sc})`);
-      g0.addColorStop(0.7, `rgba(70,40,24,${0.32 * sc})`);
-      g0.addColorStop(1, 'rgba(70,40,24,0)');
+      const g0 = ctx.createRadialGradient(x, y, 0, x, y, R * 1.05);
+      g0.addColorStop(0, `rgba(30,16,10,${0.62 * sc})`);
+      g0.addColorStop(0.55, `rgba(58,32,18,${0.42 * sc})`);
+      g0.addColorStop(0.85, `rgba(120,60,24,${0.22 * sc})`);
+      g0.addColorStop(1, 'rgba(120,60,24,0)');
       ctx.fillStyle = g0;
       ctx.beginPath();
-      ctx.arc(x, y, R, 0, TAU);
+      ctx.arc(x, y, R * 1.05, 0, TAU);
       ctx.fill();
     }
-    const sw = clamp(t / 1.5, 0, 1);
+    const sw = clamp(t / 1.7, 0, 1);
     if (sw < 1) {
-      const rr = R * (0.35 + 2.1 * easeOut(sw));
-      ctx.fillStyle = `rgba(255,240,220,${0.1 * (1 - sw)})`;
+      const rr = R * (0.3 + 2.5 * easeOut(sw));
+      const g1 = ctx.createRadialGradient(x, y, rr * 0.6, x, y, rr);
+      g1.addColorStop(0, 'rgba(255,240,220,0)');
+      g1.addColorStop(1, `rgba(255,240,220,${0.16 * (1 - sw)})`);
+      ctx.fillStyle = g1;
       ctx.beginPath();
       ctx.arc(x, y, rr, 0, TAU);
       ctx.fill();
-      ctx.strokeStyle = `rgba(255,248,232,${0.9 * (1 - sw)})`;
-      ctx.lineWidth = Math.max(1.5 * dpr, R * 0.09 * (1 - sw));
+      ctx.strokeStyle = `rgba(255,250,236,${0.95 * (1 - sw)})`;
+      ctx.lineWidth = Math.max(1.5 * dpr, R * 0.1 * (1 - sw));
       ctx.stroke();
     }
     ctx.globalCompositeOperation = 'lighter';
-    if (t < 0.5) {
-      const a = 1 - t / 0.5;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, R * 1.7);
+    if (t < 0.6) {
+      const a = 1 - t / 0.6;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, R * 2);
       g.addColorStop(0, `rgba(255,255,255,${a})`);
-      g.addColorStop(0.45, `rgba(255,244,210,${a * 0.65})`);
+      g.addColorStop(0.35, `rgba(255,246,214,${a * 0.75})`);
       g.addColorStop(1, 'rgba(255,200,120,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(x, y, R * 1.7, 0, TAU);
+      ctx.arc(x, y, R * 2, 0, TAU);
       ctx.fill();
     }
-    const fa = clamp(1 - (t - 0.6) / 2.2, 0, 1);
+    const fa = clamp(1 - (t - 0.8) / 2.4, 0, 1);
     if (fa > 0) {
-      const fr = R * (0.38 + 0.42 * easeOut(t / 1.1));
+      const fr = R * (0.35 + 0.5 * easeOut(t / 0.9));
       const g2 = ctx.createRadialGradient(x, y, 0, x, y, fr);
-      g2.addColorStop(0, `rgba(255,252,230,${fa})`);
-      g2.addColorStop(0.28, `rgba(255,214,110,${fa * 0.95})`);
-      g2.addColorStop(0.62, `rgba(245,110,40,${fa * 0.7})`);
-      g2.addColorStop(1, 'rgba(150,30,10,0)');
+      g2.addColorStop(0, `rgba(255,252,236,${fa})`);
+      g2.addColorStop(0.25, `rgba(255,222,120,${fa * 0.95})`);
+      g2.addColorStop(0.6, `rgba(250,120,40,${fa * 0.75})`);
+      g2.addColorStop(1, 'rgba(160,30,10,0)');
       ctx.fillStyle = g2;
       ctx.beginPath();
       ctx.arc(x, y, fr, 0, TAU);
       ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
-    const m = clamp((t - 0.35) / (life - 0.35), 0, 1);
+    const m = clamp((t - 0.3) / (life - 0.3), 0, 1);
     if (m > 0) {
-      const rise = easeOut(clamp(m * 1.6, 0, 1));
-      const lift = R * 0.95 * rise;
-      const cr = R * (0.38 + 0.36 * rise);
-      const a = Math.min(1, m * 6) * (1 - m) * 0.85;
-      const sw2 = cr * 0.22;
-      ctx.fillStyle = `rgba(96,78,66,${a * 0.75})`;
+      const rise = easeOut(clamp(m * 1.8, 0, 1));
+      const lift = R * 1.2 * rise;
+      const cr = R * (0.32 + 0.46 * rise);
+      const a = Math.min(1, m * 5) * (1 - m * m) * 0.92;
+      const hot = clamp(1 - m * 2.4, 0, 1);
+      const cy = y - lift;
+      const sw2 = cr * 0.24;
+      const gs = ctx.createLinearGradient(x - sw2, 0, x + sw2, 0);
+      gs.addColorStop(0, `rgba(70,58,52,${a * 0.8})`);
+      gs.addColorStop(0.45, `rgba(${(150 + 90 * hot) | 0},${(120 + 40 * hot) | 0},${(100 - 30 * hot) | 0},${a * 0.85})`);
+      gs.addColorStop(1, `rgba(60,50,46,${a * 0.8})`);
+      ctx.fillStyle = gs;
       ctx.beginPath();
-      ctx.moveTo(x - sw2 * 1.3, y);
-      ctx.quadraticCurveTo(x - sw2 * 0.6, y - lift * 0.5, x - sw2, y - lift);
-      ctx.lineTo(x + sw2, y - lift);
-      ctx.quadraticCurveTo(x + sw2 * 0.6, y - lift * 0.5, x + sw2 * 1.3, y);
+      ctx.moveTo(x - sw2 * 1.6, y);
+      ctx.quadraticCurveTo(x - sw2 * 0.55, y - lift * 0.45, x - sw2, cy + cr * 0.3);
+      ctx.lineTo(x + sw2, cy + cr * 0.3);
+      ctx.quadraticCurveTo(x + sw2 * 0.55, y - lift * 0.45, x + sw2 * 1.6, y);
       ctx.closePath();
       ctx.fill();
-      const cy = y - lift;
-      const g3 = ctx.createRadialGradient(x, cy - cr * 0.25, cr * 0.1, x, cy, cr);
-      g3.addColorStop(0, `rgba(190,150,120,${a})`);
-      g3.addColorStop(0.55, `rgba(120,96,82,${a * 0.92})`);
-      g3.addColorStop(1, `rgba(70,62,58,0)`);
+      const ry = y - lift * 0.5;
+      ctx.fillStyle = `rgba(200,190,182,${a * 0.28})`;
+      ctx.beginPath();
+      ctx.ellipse(x, ry, cr * 0.62, cr * 0.16, 0, 0, TAU);
+      ctx.fill();
+      const g3 = ctx.createRadialGradient(x - cr * 0.15, cy - cr * 0.35, cr * 0.08, x, cy, cr);
+      g3.addColorStop(0, `rgba(${(214 + 41 * hot) | 0},${(180 + 40 * hot) | 0},${(150 - 40 * hot) | 0},${a})`);
+      g3.addColorStop(0.5, `rgba(${(132 + 100 * hot) | 0},${(104 + 30 * hot) | 0},${(88 - 30 * hot) | 0},${a * 0.95})`);
+      g3.addColorStop(0.85, `rgba(78,66,60,${a * 0.75})`);
+      g3.addColorStop(1, 'rgba(60,52,48,0)');
       ctx.fillStyle = g3;
       ctx.beginPath();
-      ctx.ellipse(x, cy, cr, cr * 0.72, 0, 0, TAU);
+      ctx.ellipse(x, cy, cr, cr * 0.7, 0, 0, TAU);
       ctx.fill();
-      const glow = clamp(1 - m * 2.2, 0, 1);
-      if (glow > 0) {
+      if (hot > 0) {
         ctx.globalCompositeOperation = 'lighter';
-        const g4 = ctx.createRadialGradient(x, cy + cr * 0.25, 0, x, cy + cr * 0.25, cr * 0.8);
-        g4.addColorStop(0, `rgba(255,150,60,${0.55 * glow})`);
+        const g4 = ctx.createRadialGradient(x, cy + cr * 0.25, 0, x, cy + cr * 0.25, cr * 0.85);
+        g4.addColorStop(0, `rgba(255,150,60,${0.6 * hot})`);
         g4.addColorStop(1, 'rgba(255,90,30,0)');
         ctx.fillStyle = g4;
         ctx.beginPath();
-        ctx.arc(x, cy + cr * 0.25, cr * 0.8, 0, TAU);
+        ctx.arc(x, cy + cr * 0.25, cr * 0.85, 0, TAU);
         ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
       }

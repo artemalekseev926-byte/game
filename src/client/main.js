@@ -1,462 +1,709 @@
-import { VERSION, PLAYER_COLORS } from '../core/config.js';
-import { MAPS, generateMap, parseCustomMap } from '../core/mapgen.js';
-import { createState, Game } from '../core/game.js';
+import { VERSION, PLAYER_COLORS, DEFAULT_SETTINGS } from '../core/config.js';
+import { generateMap, parseCustomMap } from '../core/map.js';
 import { Renderer } from './render.js';
-import { Hud } from './hud.js';
-import { Session } from './session.js';
-import { HostLobby, ClientLobby } from './lobby.js';
-import { SteamTransport, LanHostTransport, LanClientTransport, hasNative, DEFAULT_PORT } from './net.js';
-import { setVolume, play } from './audio.js';
-import { THEMES, hexToRgb, mix } from './theme.js';
+import { Hud, $, esc, tpl, setRangeFill, fmtClock, fmtPct } from './hud.js';
+import { Menus, MapPreviews, descKey, startPreviewWorker } from './menus.js';
+import { startOffline, loadOffline } from './session.js';
+import { hasNative, DEFAULT_PORT } from './net.js';
+import { setVolume, play, unlock } from './audio.js';
 import mapKrest from '../../maps/krest.json';
 import mapShahmaty from '../../maps/shahmaty.json';
 
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const SCRIPT_URL = typeof document !== 'undefined' && document.currentScript ? document.currentScript.src : '';
+const SETTINGS_KEY = 'pc2_settings';
+const MAPS_KEY = 'pc2_custom_maps';
+const SAVE_KEY = 'pc2_save_';
+const META_KEY = 'pc2_save_meta_';
+const SLOTS = ['auto', '1', '2', '3'];
+const AUTOSAVE_SEC = 60;
+const NO_BACKDROP_CLOSE = { end: true, msg: true, confirm: true };
+
 const store = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  get(k, d) {
+    try {
+      const v = localStorage.getItem(k);
+      return v === null ? d : JSON.parse(v);
+    } catch {
+      return d;
+    }
+  },
+  set(k, v) {
+    try {
+      localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  del(k) {
+    try { localStorage.removeItem(k); } catch { return; }
+  },
 };
-const SAVE_SLOTS = ['auto', '1', '2', '3'];
+
+function defaults() {
+  return {
+    theme: 'dark', volume: 50, ui: 1, edgeScroll: false, name: 'Командир', color: PLAYER_COLORS[0],
+    bots: 5, difficulty: 'normal', map: 'world', victory: { ...DEFAULT_SETTINGS.victory },
+    ratio: 0.3, boardCollapsed: false, lanPort: DEFAULT_PORT, lanAddr: '',
+  };
+}
+
+function loadSettings() {
+  const d = defaults();
+  const s = Object.assign(d, store.get(SETTINGS_KEY, {}));
+  if (s.theme !== 'light') s.theme = 'dark';
+  s.volume = Math.max(0, Math.min(100, Number(s.volume) || 0));
+  if (![0.85, 1, 1.15, 1.3].includes(Number(s.ui))) s.ui = 1;
+  s.ui = Number(s.ui);
+  s.victory = { ...DEFAULT_SETTINGS.victory, ...(s.victory || {}) };
+  s.bots = Math.max(1, Math.min(11, Number(s.bots) || 5));
+  if (!['easy', 'normal', 'hard', 'mixed'].includes(s.difficulty)) s.difficulty = 'normal';
+  if (!PLAYER_COLORS.includes(s.color)) s.color = PLAYER_COLORS[0];
+  return s;
+}
+
+const isTyping = (el) => !!el && (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+  || (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit', 'file'].includes(el.type)));
+
+const nextPaint = () => new Promise((resolve) => {
+  let done = false;
+  const fin = () => {
+    if (done) return;
+    done = true;
+    resolve();
+  };
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(fin, 0)));
+  setTimeout(fin, 200);
+});
 
 class App {
   constructor() {
-    this.GameClass = Game;
-    this.settings = Object.assign({ theme: 'dark', volume: 50, ui: 1, name: 'Командир', edgeScroll: false }, store.get('pc_settings', {}));
-    this.customMaps = [parseCustomMap(mapKrest), parseCustomMap(mapShahmaty)];
-    for (const m of store.get('pc_custom_maps', [])) if (!this.customMaps.some((c) => c.name === m.name)) this.customMaps.push(m);
-    this.sp = { map: 'world', custom: null, seed: (Math.random() * 1e9) | 0 };
+    this.settings = loadSettings();
+    this.screen = 'menu';
     this.session = null;
-    this.lobby = null;
+    this.hud = null;
+    this.mapCache = [];
+    this.pausedByMenu = false;
+    this.msgClose = null;
+    this.saveTimer = 0;
+    this.autosaveT = AUTOSAVE_SEC;
+    this.lastFrame = 0;
+    this.fs = false;
     this.renderer = new Renderer($('map'));
-    this.applySettings();
-    this.bindMenus();
-    this.menuBackground();
+    this.renderer.setTheme(this.settings.theme);
+    this.previews = new MapPreviews(SCRIPT_URL);
+    this.customMaps = [];
+    for (const [src, name] of [[mapKrest, 'krest'], [mapShahmaty, 'shahmaty']]) {
+      try {
+        this.customMaps.push({ ...parseCustomMap(src), builtin: name });
+      } catch (e) {
+        console.warn('Карта пропущена', name, e.message);
+      }
+    }
+    for (const m of store.get(MAPS_KEY, [])) {
+      try {
+        this.addCustomMap(parseCustomMap(m), false);
+      } catch {
+        continue;
+      }
+    }
+    this.menus = new Menus(this);
+    this.lobbyView = this.menus.lobby;
+    this.multiplayer = this.menus.mp;
     $('ver').textContent = VERSION;
     document.querySelectorAll('.native-only').forEach((el) => { el.hidden = !hasNative(); });
-    if (!hasNative()) $('btn-quit').hidden = true;
-    this.bindSteamInvites();
+    this.bindGlobal();
+    this.bindSettings();
+    this.bindPause();
+    this.applySettings();
+    this.show('menu');
     this.loadNativeMaps();
+    this.bindSteamInvites();
+    setInterval(() => this.background(), 250);
+    setTimeout(() => this.menus.warmup(), 1200);
   }
 
-  saveSettings() { store.set('pc_settings', this.settings); }
-  applySettings() {
-    document.documentElement.dataset.theme = this.settings.theme;
-    document.documentElement.style.setProperty('--ui', this.settings.ui);
-    this.renderer.setTheme(this.settings.theme);
-    setVolume(this.settings.volume / 100);
-    $('set-theme').value = this.settings.theme;
-    $('set-vol').value = this.settings.volume;
-    $('set-vol-v').textContent = this.settings.volume + '%';
-    $('set-ui').value = String(this.settings.ui);
-    $('set-edge').checked = !!this.settings.edgeScroll;
-    $('sp-name').value = this.settings.name;
-    $('mp-name').value = this.settings.name;
-    this.bgDirty = true;
+  saveSettings() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = 0;
+    store.set(SETTINGS_KEY, this.settings);
   }
-  toggleTheme() {
-    this.settings.theme = this.settings.theme === 'dark' ? 'light' : 'dark';
+
+  saveSettingsSoon() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.saveSettings(), 400);
+  }
+
+  unlockAudio() { unlock(); }
+
+  applySettings() {
+    const s = this.settings;
+    document.documentElement.dataset.theme = s.theme;
+    this.applyUi();
+    setVolume(s.volume / 100);
+    const th = document.querySelector(`#set-theme input[value="${s.theme}"]`);
+    if (th) th.checked = true;
+    const ui = document.querySelector(`#set-ui input[value="${s.ui}"]`);
+    if (ui) ui.checked = true;
+    $('set-vol').value = s.volume;
+    setRangeFill($('set-vol'));
+    $('set-vol-v').textContent = s.volume + '%';
+    $('set-edge').checked = !!s.edgeScroll;
+    $('set-fs').checked = this.fs;
+  }
+
+  applyUi() {
+    const want = Number(this.settings.ui) || 1;
+    const w = window.innerWidth;
+    let ui = want;
+    if (w < 1400) ui = Math.min(ui, 1.15);
+    if (w < 1300) ui = Math.min(ui, 1);
+    document.documentElement.style.setProperty('--ui', String(ui));
+  }
+
+  setTheme(name) {
+    const t = name === 'light' ? 'light' : 'dark';
+    if (t === this.settings.theme) return;
+    this.settings.theme = t;
     this.saveSettings();
     this.applySettings();
-    if (this.previewDesc) this.drawPreview();
+    this.renderer.setTheme(t);
+    this.menus.onTheme();
+  }
+
+  toggleTheme() {
+    this.setTheme(this.settings.theme === 'dark' ? 'light' : 'dark');
+    play('toggle');
+  }
+
+  toggleFullscreen() {
+    if (window.native && window.native.toggleFullscreen) {
+      window.native.toggleFullscreen();
+      this.fs = !this.fs;
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+      this.fs = false;
+    } else if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      this.fs = true;
+    }
+    $('set-fs').checked = this.fs;
   }
 
   show(id) {
     document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === 'screen-' + id));
     this.screen = id;
-    if (id === 'setup') this.renderMapList();
-    if (id === 'mp') this.checkSteam();
+    this.menus.onShow(id);
   }
-  anyModalOpen() { return [...document.querySelectorAll('.modal')].some((m) => !m.hidden); }
-  closeModals() { document.querySelectorAll('.modal').forEach((m) => { m.hidden = true; }); }
-  openModal(id) { $('modal-' + id).hidden = false; }
+
+  modal(name) { return $('modal-' + name); }
+
+  anyModal() {
+    for (const m of document.querySelectorAll('.modal')) if (!m.hidden) return true;
+    return false;
+  }
+
+  topModal() {
+    let top = null;
+    for (const m of document.querySelectorAll('.modal')) if (!m.hidden) top = m;
+    return top;
+  }
+
+  openModal(name) {
+    const m = this.modal(name);
+    if (!m) return;
+    if (name === 'settings') this.applySettings();
+    m.hidden = false;
+    if (this.hud) {
+      this.hud.closeCtx();
+      $('tip').hidden = true;
+    }
+  }
+
+  closeModal(name) {
+    const m = this.modal(name);
+    if (!m || m.hidden) return;
+    m.hidden = true;
+    if (name === 'pause') this.resumeFromPause();
+    if (name === 'confirm') $('confirm-ok').onclick = null;
+    if (name === 'msg' && this.msgClose) {
+      const f = this.msgClose;
+      this.msgClose = null;
+      f();
+    }
+  }
+
+  closeModals() {
+    for (const m of document.querySelectorAll('.modal')) m.hidden = true;
+    this.pausedByMenu = false;
+    this.msgClose = null;
+  }
+
   showMessage(title, text, onClose) {
     $('msg-title').textContent = title;
     $('msg-text').textContent = text;
-    $('modal-msg').hidden = false;
-    this.onMsgClose = onClose || null;
-  }
-  openPause() {
-    this.openModal('pause');
-    if (this.session && this.session.mode === 'offline' && this.session.speed) { this.pausedSpeed = this.session.speed; this.session.setSpeed(0); this.hud.updateSpeedButtons(); }
+    this.msgClose = onClose || null;
+    this.openModal('msg');
   }
 
-  bindMenus() {
+  confirm(title, text, okText, fn) {
+    $('confirm-title').textContent = title;
+    $('confirm-text').textContent = text;
+    const ok = $('confirm-ok');
+    ok.textContent = okText || 'Подтвердить';
+    ok.onclick = () => {
+      this.closeModal('confirm');
+      play('click');
+      fn();
+    };
+    this.openModal('confirm');
+  }
+
+  showLoading(text) {
+    $('loading-text').textContent = text || 'Загрузка…';
+    $('loading').hidden = false;
+    return nextPaint();
+  }
+
+  hideLoading() { $('loading').hidden = true; }
+
+  bindGlobal() {
     document.addEventListener('click', (e) => {
       const go = e.target.closest('[data-go]');
-      if (go) { play('click'); this.show(go.dataset.go); }
-      const m = e.target.closest('[data-modal]');
-      if (m) { play('click'); this.openModal(m.dataset.modal); }
+      if (go) {
+        play('click');
+        this.show(go.dataset.go);
+        return;
+      }
+      const mo = e.target.closest('[data-modal]');
+      if (mo) {
+        play('click');
+        this.openModal(mo.dataset.modal);
+        return;
+      }
       const c = e.target.closest('[data-close]');
       if (c) {
         play('click');
-        const modal = c.closest('.modal');
-        modal.hidden = true;
-        if (modal.id === 'modal-pause' && this.pausedSpeed && this.session) { this.session.setSpeed(this.pausedSpeed); this.pausedSpeed = 0; this.hud.updateSpeedButtons(); }
-        if (modal.id === 'modal-msg' && this.onMsgClose) { const f = this.onMsgClose; this.onMsgClose = null; f(); }
+        const m = c.closest('.modal');
+        if (m) this.closeModal(m.id.slice(6));
+        return;
+      }
+      if (e.target.classList && e.target.classList.contains('modal')) {
+        const name = e.target.id.slice(6);
+        if (!NO_BACKDROP_CLOSE[name]) this.closeModal(name);
       }
     });
-    $('theme-link').onclick = (e) => { e.preventDefault(); this.toggleTheme(); };
-    $('btn-quit').onclick = () => window.native && window.native.quit();
-
-    $('set-theme').onchange = (e) => { this.settings.theme = e.target.value; this.saveSettings(); this.applySettings(); };
-    $('set-vol').oninput = (e) => { this.settings.volume = Number(e.target.value); this.saveSettings(); this.applySettings(); };
-    $('set-vol').onchange = () => play('click');
-    $('set-ui').onchange = (e) => { this.settings.ui = Number(e.target.value); this.saveSettings(); this.applySettings(); };
-    $('set-edge').onchange = (e) => { this.settings.edgeScroll = e.target.checked; this.saveSettings(); };
-    $('set-fs').onchange = () => window.native && window.native.toggleFullscreen();
-    window.addEventListener('keydown', (e) => { if (e.key === 'F11' && window.native) { e.preventDefault(); window.native.toggleFullscreen(); } });
-    for (const id of ['sp-name', 'mp-name']) $(id).onchange = (e) => { this.settings.name = e.target.value.trim().slice(0, 20) || 'Командир'; this.saveSettings(); this.applySettings(); };
-
-    $('sp-bots').oninput = (e) => { $('sp-bots-v').textContent = e.target.value; };
-    $('sp-vic').oninput = (e) => { $('sp-vic-v').textContent = e.target.value + '%'; };
-    $('sp-seed').value = this.sp.seed;
-    $('sp-seed').onchange = (e) => { this.sp.seed = Number(e.target.value) | 0; this.selectMap(this.sp.map, this.sp.custom); };
-    $('sp-reseed').onclick = () => { this.sp.seed = (Math.random() * 1e9) | 0; $('sp-seed').value = this.sp.seed; this.selectMap(this.sp.map, this.sp.custom); };
-    $('sp-start').onclick = () => this.startSingle();
-    $('custom-map-file').onchange = (e) => this.importCustomMap(e.target.files[0]);
-
-    $('btn-exit').onclick = () => { this.closeModals(); this.exitGame(); };
-    $('btn-save').onclick = () => this.openSaves('save');
-    $('btn-load-game').onclick = () => this.openSaves('load');
-    $('btn-load-menu').onclick = () => this.openSaves('load');
+    document.addEventListener('pointerdown', () => unlock(), { once: true });
+    window.addEventListener('keydown', (e) => this.onKeyDown(e));
+    window.addEventListener('resize', () => this.applyUi());
+    window.addEventListener('beforeunload', () => {
+      const s = this.session;
+      if (s && s.mode === 'offline' && s.s.phase === 'play') this.saveTo('auto', s, true);
+    });
+    $('theme-link').onclick = () => this.toggleTheme();
+    $('btn-quit').onclick = () => { if (window.native) window.native.quit(); };
+    $('btn-load-menu').onclick = () => { play('click'); this.openSaves('load'); };
     $('save-slots').onclick = (e) => this.onSaveSlot(e);
-    $('end-continue').onclick = () => { $('modal-end').hidden = true; };
-    $('end-menu').onclick = () => { $('modal-end').hidden = true; this.exitGame(); };
-
-    $('steam-host').onclick = () => this.hostSteam();
-    $('steam-join').onclick = () => this.joinSteam($('steam-lobby-id').value.trim());
-    $('steam-refresh').onclick = () => this.refreshLobbies();
-    $('steam-lobbies').onclick = (e) => { const b = e.target.closest('[data-lobby]'); if (b) this.joinSteam(b.dataset.lobby); };
-    $('lobby-copy').onclick = () => {
-      const id = this.lobby && this.lobby.transport.lobbyId;
-      if (!id) return;
-      navigator.clipboard.writeText(id).then(() => { $('lobby-copy').textContent = 'Скопировано!'; setTimeout(() => { $('lobby-copy').textContent = 'Копировать ID'; }, 1500); }).catch(() => {});
-    };
-    $('lan-host').onclick = () => this.hostLan();
-    $('lan-join').onclick = () => this.joinLan();
-    $('lobby-leave').onclick = () => this.leaveLobby();
-    $('lobby-start').onclick = () => this.startLobby();
-    $('lobby-add-ai').onclick = () => this.lobby && this.lobby.addAI($('lobby-ai-diff').value);
-    $('lobby-invite').onclick = () => this.lobby && this.lobby.transport.invite && this.lobby.transport.invite();
-    $('lobby-map').onchange = (e) => {
-      const v = e.target.value;
-      if (v.startsWith('custom:')) this.lobby.set({ custom: this.customMaps[Number(v.slice(7))] });
-      else this.lobby.set({ map: v, custom: null });
-    };
-    $('lobby-seed').onchange = (e) => this.lobby.set({ seed: Number(e.target.value) | 0 });
-    $('lobby-reseed').onclick = () => { const seed = (Math.random() * 1e9) | 0; $('lobby-seed').value = seed; this.lobby.set({ seed }); };
-    $('lobby-vic').oninput = (e) => { $('lobby-vic-v').textContent = e.target.value + '%'; this.lobby.set({ victory: Number(e.target.value) / 100 }); };
-    $('lobby-slots').onclick = (e) => {
-      const b = e.target.closest('[data-kick]');
-      if (b && this.lobby instanceof HostLobby) this.lobby.remove(Number(b.dataset.kick));
-    };
+    $('end-continue').onclick = () => { play('click'); this.closeModal('end'); };
+    $('end-menu').onclick = () => { play('click'); this.exitGame(); };
   }
 
-  menuBackground() {
-    const cv = $('menu-bg');
-    const map = generateMap({ id: 'world', seed: 7 });
-    const owners = new Int8Array(map.provinces.length).fill(-1);
-    for (let i = 0; i < 9; i++) owners[(i * 37) % map.provinces.length] = i;
-    let t = 0;
-    const tick = () => {
-      if (this.screen !== 'menu' && this.screen !== undefined) { this.bgDirty = true; requestAnimationFrame(tick); return; }
-      t++;
-      if (t % 20 === 0 || this.bgDirty) {
-        for (let k = 0; k < 3; k++) {
-          const i = (Math.random() * owners.length) | 0;
-          if (owners[i] < 0) continue;
-          const n = map.provinces[i].adj[(Math.random() * map.provinces[i].adj.length) | 0];
-          if (n !== undefined) owners[n] = owners[i];
+  bindSettings() {
+    $('set-theme').onchange = (e) => {
+      if (e.target.name === 'set-theme') this.setTheme(e.target.value);
+    };
+    $('set-vol').oninput = (e) => {
+      this.settings.volume = Number(e.target.value);
+      setRangeFill(e.target);
+      $('set-vol-v').textContent = this.settings.volume + '%';
+      setVolume(this.settings.volume / 100);
+      this.saveSettingsSoon();
+    };
+    $('set-vol').onchange = () => play('click');
+    $('set-ui').onchange = (e) => {
+      if (e.target.name !== 'set-ui') return;
+      this.settings.ui = Number(e.target.value);
+      this.saveSettings();
+      this.applyUi();
+      if (this.hud) setTimeout(() => this.hud && this.hud.updateDockHeight(), 50);
+    };
+    $('set-edge').onchange = (e) => {
+      this.settings.edgeScroll = e.target.checked;
+      this.saveSettings();
+    };
+    $('set-fs').onchange = () => this.toggleFullscreen();
+  }
+
+  bindPause() {
+    $('btn-save').onclick = () => { play('click'); this.openSaves('save'); };
+    $('btn-load-game').onclick = () => { play('click'); this.openSaves('load'); };
+    $('btn-surrender').onclick = () => {
+      const s = this.session;
+      if (!s || s.s.phase === 'over') return;
+      const me = s.s.players[s.localPid];
+      if (!me || !me.alive) {
+        this.showMessage('Сдаться', 'Ваша страна уже выбыла из игры.');
+        return;
+      }
+      this.confirm('Сдаться?', 'Вся ваша территория станет ничьей, здания и флот будут потеряны. Вы сможете наблюдать за игрой до конца.', 'Сдаться', () => {
+        if (!this.session) return;
+        const r = this.session.send({ c: 'surrender' });
+        if (!r.ok) {
+          this.showMessage('Сдаться', r.error);
+          return;
         }
-        if (owners.filter((o) => o < 0).length < 10) { owners.fill(-1); for (let i = 0; i < 9; i++) owners[(Math.random() * owners.length) | 0] = i; }
-        this.drawMini(cv, map, (p) => owners[p], 3);
-        this.bgDirty = false;
-      }
-      requestAnimationFrame(tick);
+        if (this.hud) this.hud.surrendered = true;
+        this.closeModal('pause');
+      });
     };
-    this.screen = 'menu';
-    tick();
-  }
-
-  drawMini(cv, map, ownerOf, scale) {
-    const th = THEMES[this.settings.theme];
-    cv.width = map.W * scale; cv.height = map.H * scale;
-    const ctx = cv.getContext('2d');
-    const img = ctx.createImageData(map.W, map.H);
-    const cols = PLAYER_COLORS.map(hexToRgb);
-    for (let i = 0; i < map.W * map.H; i++) {
-      const p = map.prov[i];
-      let c;
-      if (p < 0) c = ((i % map.W) + ((i / map.W) | 0)) % 2 ? th.water : th.water2;
-      else {
-        const o = ownerOf(p);
-        c = o >= 0 ? cols[o % cols.length] : mix([150, 170, 110], th.neutralMix, th.neutralAmt);
-        const x = i % map.W, y = (i / map.W) | 0;
-        if ((x > 0 && map.prov[i - 1] !== p && map.prov[i - 1] >= 0) || (y > 0 && map.prov[i - map.W] !== p && map.prov[i - map.W] >= 0)) c = c.map((v) => v * 0.75);
+    $('btn-exit').onclick = () => {
+      play('click');
+      const s = this.session;
+      if (s && s.mode !== 'offline' && s.s.phase !== 'over' && !s.ended) {
+        this.confirm('Покинуть игру?', s.mode === 'host'
+          ? 'Вы хост: игра закончится для всех игроков.'
+          : 'Вашей страной будет управлять компьютер. Вернуться в эту партию будет нельзя.', 'Выйти', () => this.exitGame());
+        return;
       }
-      img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
-    }
-    const tmp = document.createElement('canvas');
-    tmp.width = map.W; tmp.height = map.H;
-    tmp.getContext('2d').putImageData(img, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, cv.width, cv.height);
+      this.exitGame();
+    };
   }
 
-  renderMapList() {
-    $('map-list').innerHTML = MAPS.map((m) => `<button class="btn small ${this.sp.map === m.id && !this.sp.custom ? 'on' : ''}" data-map="${m.id}">${m.name}</button>`).join('');
-    $('custom-maps').innerHTML = this.customMaps.map((m, i) => `<button class="btn small ${this.sp.custom === m ? 'on' : ''}" data-cmap="${i}">★ ${esc(m.name)}</button>`).join('');
-    $('map-list').onclick = (e) => { const b = e.target.closest('[data-map]'); if (b) { play('click'); this.selectMap(b.dataset.map, null); } };
-    $('custom-maps').onclick = (e) => { const b = e.target.closest('[data-cmap]'); if (b) { play('click'); this.selectMap('custom', this.customMaps[Number(b.dataset.cmap)]); } };
-    if (!this.previewDesc) this.selectMap(this.sp.map, this.sp.custom);
-  }
-  selectMap(id, custom) {
-    this.sp.map = id; this.sp.custom = custom;
-    this.previewDesc = custom ? { ...custom, seed: this.sp.seed } : { id, seed: this.sp.seed };
-    this.renderMapListButtons();
-    this.drawPreview();
-  }
-  renderMapListButtons() {
-    document.querySelectorAll('#map-list [data-map]').forEach((b) => b.classList.toggle('on', !this.sp.custom && b.dataset.map === this.sp.map));
-    document.querySelectorAll('#custom-maps [data-cmap]').forEach((b) => b.classList.toggle('on', this.sp.custom === this.customMaps[Number(b.dataset.cmap)]));
-  }
-  drawPreview() {
-    const map = generateMap(this.previewDesc);
-    this.previewMap = map;
-    const scale = Math.max(1, Math.floor(720 / map.W));
-    this.drawMini($('map-preview'), map, () => -1, scale);
-    const info = MAPS.find((m) => m.id === this.sp.map);
-    $('map-desc').textContent = `${this.sp.custom ? this.sp.custom.name : info.name}: ${this.sp.custom ? 'пользовательская карта' : info.desc} Провинций: ${map.provinces.length}.`;
-  }
-  async importCustomMap(file) {
-    if (!file) return;
-    try {
-      const desc = parseCustomMap(await file.text());
-      this.customMaps = this.customMaps.filter((m) => m.name !== desc.name).concat(desc);
-      const userMaps = store.get('pc_custom_maps', []).filter((m) => m.name !== desc.name).concat(desc);
-      if (!store.set('pc_custom_maps', userMaps)) throw new Error('Не удалось сохранить карту (слишком большая)');
-      this.renderMapList();
-      this.selectMap('custom', desc);
-    } catch (e) {
-      this.showMessage('Ошибка карты', e.message);
+  openPause() {
+    if (!this.session) return;
+    const m = this.modal('pause');
+    if (!m.hidden) {
+      this.closeModal('pause');
+      return;
     }
-    $('custom-map-file').value = '';
+    play('click');
+    this.openModal('pause');
+    const s = this.session;
+    if (s.mode === 'offline' && !s.paused && s.s.phase !== 'over') {
+      s.setPaused(true);
+      this.pausedByMenu = true;
+      if (this.hud) this.hud.updateSpeed();
+    }
   }
+
+  resumeFromPause() {
+    if (this.pausedByMenu && this.session && this.session.paused) {
+      this.session.setPaused(false);
+      if (this.hud) this.hud.updateSpeed();
+    }
+    this.pausedByMenu = false;
+  }
+
+  onKeyDown(e) {
+    if (e.key === 'F11') {
+      e.preventDefault();
+      this.toggleFullscreen();
+      return;
+    }
+    if (isTyping(e.target)) {
+      if (e.key === 'Escape') e.target.blur();
+      return;
+    }
+    const top = this.topModal();
+    if (top) {
+      const name = top.id.slice(6);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeModal(name);
+      } else if (name === 'countries' && e.code === 'Tab') {
+        e.preventDefault();
+        this.closeModal(name);
+      } else if (name === 'research' && e.code === 'KeyR') {
+        this.closeModal(name);
+      } else if (name === 'confirm' && e.key === 'Enter') {
+        e.preventDefault();
+        $('confirm-ok').click();
+      } else if (name === 'msg' && e.key === 'Enter') {
+        e.preventDefault();
+        this.closeModal(name);
+      }
+      return;
+    }
+    if (this.screen === 'game' && this.hud) {
+      if (e.target && e.target.type === 'range') e.target.blur();
+      this.hud.onKeyDown(e);
+      return;
+    }
+    if (e.key === 'Escape' && (this.screen === 'setup' || this.screen === 'mp')) {
+      play('click');
+      this.show('menu');
+    }
+  }
+
+  addCustomMap(desc, persist) {
+    const d = { id: 'custom', name: desc.name, rows: desc.rows.slice(), ...(desc.scale ? { scale: desc.scale } : {}), seed: 0 };
+    const k = this.customMaps.findIndex((m) => m.name === d.name);
+    if (k >= 0 && this.customMaps[k].builtin) d.name += ' (2)';
+    const j = this.customMaps.findIndex((m) => m.name === d.name);
+    if (j >= 0) this.customMaps[j] = d;
+    else this.customMaps.push(d);
+    if (persist) {
+      const list = this.customMaps.filter((m) => !m.builtin && !m.native).map((m) => ({ name: m.name, rows: m.rows, ...(m.scale ? { scale: m.scale } : {}) }));
+      if (!store.set(MAPS_KEY, list)) throw new Error('Не удалось сохранить карту: недостаточно места в хранилище');
+    }
+    return d;
+  }
+
   async loadNativeMaps() {
     if (!window.native || !window.native.readCustomMaps) return;
     try {
       const files = await window.native.readCustomMaps();
+      let added = 0;
       for (const f of files) {
         try {
-          const desc = parseCustomMap(f.content);
-          if (!this.customMaps.some((m) => m.name === desc.name)) this.customMaps.push(desc);
-        } catch (e) { console.warn('Карта пропущена', f.name, e.message); }
+          const d = parseCustomMap(f.content);
+          if (this.customMaps.some((m) => m.name === d.name)) continue;
+          this.customMaps.push({ id: 'custom', name: d.name, rows: d.rows, ...(d.scale ? { scale: d.scale } : {}), seed: 0, native: true });
+          added++;
+        } catch (e) {
+          console.warn('Карта пропущена', f.name, e.message);
+        }
       }
-    } catch (e) { console.warn(e); }
+      if (added && this.screen === 'setup') this.menus.setup.renderGrid();
+    } catch (e) {
+      console.warn(e);
+    }
   }
 
-  startSingle() {
-    play('click');
-    const bots = Number($('sp-bots').value);
-    const diff = $('sp-diff').value;
-    const diffs = ['easy', 'normal', 'hard'];
-    const players = [{ name: this.settings.name, ai: null }];
-    for (let i = 0; i < bots; i++) players.push({ name: BOT_NAMES[i % BOT_NAMES.length], ai: diff === 'mixed' ? diffs[i % 3] : diff });
-    const desc = this.sp.custom ? { ...this.sp.custom, seed: this.sp.seed } : { id: this.sp.map, seed: this.sp.seed };
+  bindSteamInvites() {
+    const st = window.native && window.native.steam;
+    if (!st) return;
+    st.onJoinRequested((id) => this.multiplayer.joinSteam(id));
+    st.pendingJoin().then((id) => { if (id) this.multiplayer.joinSteam(id); }).catch(() => {});
+  }
+
+  getMap(desc) {
+    const key = descKey(desc);
+    const k = this.mapCache.findIndex((m) => m.key === key);
+    if (k >= 0) {
+      const [hit] = this.mapCache.splice(k, 1);
+      this.mapCache.push(hit);
+      return hit.map;
+    }
     const map = generateMap(desc);
-    const state = createState(map, { seed: this.sp.seed, players, victoryShare: Number($('sp-vic').value) / 100 });
-    this.enterGame(new Session({ map, state, localPid: 0, mode: 'offline' }));
-    this.sp.seed = (Math.random() * 1e9) | 0;
-    $('sp-seed').value = this.sp.seed;
-    this.previewDesc = null;
+    this.mapCache.push({ key, map });
+    while (this.mapCache.length > 2) this.mapCache.shift();
+    return map;
+  }
+
+  async startSingle(cfg) {
+    await this.showLoading('Генерация карты…');
+    try {
+      const map = this.getMap(cfg.desc);
+      const session = startOffline({ mapDesc: cfg.desc, seed: cfg.seed, players: cfg.players, settings: cfg.settings, map });
+      this.enterGame(session);
+    } catch (e) {
+      console.error(e);
+      this.hideLoading();
+      this.showMessage('Не удалось начать игру', (e && e.message) || String(e));
+    }
   }
 
   enterGame(session) {
+    if (this.hud) this.hud.destroy();
+    this.hud = null;
+    if (this.session && this.session !== session) this.session.close();
+    this.closeModals();
     this.session = session;
-    this.lobby = null;
+    this.lobbyView.lobby = null;
     this.show('game');
-    this.renderer.setMap(session.map);
-    this.renderer.selected = -1;
-    this.renderer.targetMode = null;
-    this.renderer.particles = [];
-    this.renderer.fit();
-    this.hud = new Hud(this, session, this.renderer);
-    const home = session.s.provs.findIndex((P) => P.o === session.localPid);
-    if (home >= 0) { this.renderer.focus(home, Math.max(this.renderer.cam.z * 2, 8)); this.renderer.selected = home; }
-    this.autosaveT = 60;
-    let last = performance.now();
+    const r = this.renderer;
+    r.setTheme(this.settings.theme);
+    r.setMap(session.map);
+    r.fit();
+    this.hud = new Hud(this, session, r);
+    this.hideLoading();
+    if (session.s.phase !== 'spawn') {
+      const me = session.s.players[session.localPid];
+      if (me && me.capital >= 0) {
+        const W = session.map.W;
+        r.focus((me.capital % W) + 0.5, Math.floor(me.capital / W) + 0.5, 5, true);
+      } else this.hud.focusHome(4);
+    }
+    this.autosaveT = AUTOSAVE_SEC;
+    this.lastFrame = performance.now();
     const loop = (now) => {
       if (this.session !== session) return;
-      const dt = Math.min(0.1, (now - last) / 1000);
-      last = now;
-      session.update(dt);
-      this.renderer.draw(session, dt);
-      this.hud.update(dt);
-      if (session.mode === 'offline' && session.s.winner === null) {
-        this.autosaveT -= dt * (session.speed ? 1 : 0);
-        if (this.autosaveT <= 0) { this.autosaveT = 60; this.saveTo('auto'); }
-      }
+      this.frame(now);
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
   }
+
+  frame(now) {
+    const dt = Math.min(0.25, Math.max(0, (now - this.lastFrame) / 1000));
+    this.lastFrame = now;
+    const s = this.session;
+    try {
+      s.update(dt);
+    } catch (e) {
+      console.error(e);
+    }
+    if (this.session !== s) return;
+    this.renderer.draw(s, dt);
+    if (this.hud) this.hud.update(dt);
+    if (s.mode === 'offline' && s.s.phase === 'play' && !s.paused) {
+      this.autosaveT -= dt;
+      if (this.autosaveT <= 0) {
+        this.autosaveT = AUTOSAVE_SEC;
+        this.saveTo('auto', s, true);
+      }
+    }
+  }
+
+  background() {
+    const s = this.session;
+    if (!s || !document.hidden || s.mode === 'offline') return;
+    const now = performance.now();
+    const dt = Math.min(0.5, Math.max(0, (now - this.lastFrame) / 1000));
+    this.lastFrame = now;
+    try {
+      s.update(dt);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   exitGame() {
+    const s = this.session;
     if (this.hud) this.hud.destroy();
-    if (this.session) this.session.close();
-    this.session = null;
     this.hud = null;
+    this.session = null;
+    if (s) {
+      if (s.mode === 'offline' && s.s.phase === 'play') this.saveTo('auto', s, true);
+      s.close();
+    }
     this.closeModals();
+    this.hideLoading();
     this.show('menu');
+  }
+
+  onDisconnected(reason) {
+    if (!this.session) return;
+    this.showMessage('Игра прервана', reason || 'Соединение потеряно', () => this.exitGame());
+  }
+
+  saveMeta(slot) { return store.get(META_KEY + slot, null); }
+
+  saveTo(slot, ses = this.session, quiet = false) {
+    if (!ses || ses.mode !== 'offline') return false;
+    let data;
+    try {
+      data = JSON.stringify(ses.snapshot());
+    } catch (e) {
+      if (!quiet) this.showMessage('Не удалось сохранить', e.message);
+      return false;
+    }
+    const s = ses.s, me = s.players[ses.localPid];
+    const meta = {
+      date: Date.now(), map: ses.map.name, time: Math.floor(s.tick / 10), name: me ? me.name : '', color: me ? me.color : '',
+      pct: me && ses.map.landCount ? (me.tiles * 100) / ses.map.landCount : 0, players: s.players.length, size: data.length,
+    };
+    const write = () => store.set(SAVE_KEY + slot, data) && store.set(META_KEY + slot, meta);
+    let ok = write();
+    if (!ok && slot !== 'auto') {
+      store.del(SAVE_KEY + 'auto');
+      store.del(META_KEY + 'auto');
+      ok = write();
+    }
+    if (!ok) {
+      store.del(SAVE_KEY + slot);
+      store.del(META_KEY + slot);
+      if (!quiet) this.showMessage('Не удалось сохранить', 'Недостаточно места в хранилище браузера. Освободите другой слот сохранения.');
+    }
+    return ok;
   }
 
   openSaves(mode) {
     this.saveMode = mode;
     $('load-title').textContent = mode === 'save' ? 'Сохранить игру' : 'Загрузить игру';
-    $('save-slots').innerHTML = SAVE_SLOTS.map((k) => {
-      const meta = store.get('pc_save_meta_' + k, null);
-      const label = k === 'auto' ? 'Автосохранение' : 'Слот ' + k;
-      const info = meta ? `${esc(meta.map)} · ${new Date(meta.date).toLocaleString('ru-RU')}` : 'пусто';
-      const can = mode === 'save' ? k !== 'auto' : !!meta;
-      return `<li><span class="name">${label}<br><span class="tag">${info}</span></span><button class="btn small" data-slot="${k}" ${can ? '' : 'disabled'}>${mode === 'save' ? 'Сохранить' : 'Загрузить'}</button></li>`;
-    }).join('');
+    this.renderSaves();
     this.openModal('load');
   }
+
+  renderSaves() {
+    const mode = this.saveMode;
+    const ul = $('save-slots');
+    ul.innerHTML = '';
+    for (const k of SLOTS) {
+      const meta = this.saveMeta(k);
+      const li = tpl('tpl-save-slot');
+      li.classList.toggle('empty-slot', !meta);
+      li.querySelector('.save-name').textContent = k === 'auto' ? 'Автосохранение' : `Слот ${k}`;
+      const info = meta
+        ? `${meta.map} · ${fmtClock(meta.time)} · ${meta.name ? esc(meta.name) + ' ' + fmtPct(meta.pct || 0) + ' · ' : ''}${new Date(meta.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+        : k === 'auto' ? 'Пусто — сохраняется само каждую минуту' : 'Пусто';
+      li.querySelector('.save-meta').innerHTML = info;
+      const b = li.querySelector('.btn');
+      b.dataset.slot = k;
+      const can = mode === 'save' ? k !== 'auto' && !!this.session && this.session.mode === 'offline' : !!meta;
+      b.textContent = mode === 'save' ? (meta ? 'Перезаписать' : 'Сохранить') : 'Загрузить';
+      b.disabled = !can;
+      b.classList.toggle('primary', can);
+      if (mode === 'save' && k === 'auto') b.title = 'Автосохранение нельзя перезаписать вручную';
+      ul.appendChild(li);
+    }
+  }
+
   onSaveSlot(e) {
     const b = e.target.closest('[data-slot]');
-    if (!b) return;
-    play('click');
+    if (!b || b.disabled) return;
+    const slot = b.dataset.slot;
     if (this.saveMode === 'save') {
-      if (this.saveTo(b.dataset.slot)) this.openSaves('save');
-    } else this.loadFrom(b.dataset.slot);
-  }
-  saveTo(slot) {
-    if (!this.session || this.session.mode !== 'offline') return false;
-    const ok = store.set('pc_save_' + slot, { state: this.session.s, desc: this.session.map.desc })
-      && store.set('pc_save_meta_' + slot, { date: Date.now(), map: this.session.map.name });
-    if (!ok && slot !== 'auto') this.showMessage('Ошибка', 'Не удалось сохранить игру');
-    return ok;
-  }
-  loadFrom(slot) {
-    const data = store.get('pc_save_' + slot, null);
-    if (!data) return;
-    try {
-      const map = generateMap(data.desc);
-      if (map.provinces.length !== data.state.provs.length) throw new Error('Сохранение не соответствует карте');
-      if (this.session) { this.hud.destroy(); this.session.close(); this.session = null; }
-      this.closeModals();
-      const pid = data.state.players.findIndex((p) => !p.ai);
-      this.enterGame(new Session({ map, state: data.state, localPid: Math.max(0, pid), mode: 'offline' }));
-    } catch (e) {
-      this.showMessage('Ошибка загрузки', e.message);
-    }
-  }
-
-  async checkSteam() {
-    const st = $('steam-status');
-    const r = await SteamTransport.init();
-    this.steamOk = r.ok;
-    st.textContent = r.ok ? `Steam подключён: ${r.name}` : r.error || 'Steam недоступен';
-    $('steam-host').disabled = !r.ok;
-    $('steam-join').disabled = !r.ok;
-    $('steam-refresh').disabled = !r.ok;
-    if (r.ok) this.refreshLobbies();
-    $('lan-host').disabled = !hasNative();
-  }
-  async refreshLobbies() {
-    const ul = $('steam-lobbies');
-    ul.innerHTML = '<li class="muted">Поиск...</li>';
-    try {
-      const list = await SteamTransport.list();
-      ul.innerHTML = list.length
-        ? list.map((l) => `<li><span class="name">${esc(l.name)}</span><span class="tag">${l.members}/${l.max}</span><button class="btn small" data-lobby="${esc(l.id)}">Войти</button></li>`).join('')
-        : '<li class="muted">Открытых лобби нет</li>';
-    } catch (e) {
-      ul.innerHTML = `<li class="muted">${esc(e.message)}</li>`;
-    }
-  }
-  bindSteamInvites() {
-    if (!window.native || !window.native.steam) return;
-    window.native.steam.onJoinRequested((lobbyId) => this.joinSteam(lobbyId));
-    window.native.steam.pendingJoin().then((id) => { if (id) this.joinSteam(id); });
-  }
-  playerName() { return ($('mp-name').value.trim() || this.settings.name).slice(0, 20); }
-
-  async hostSteam() {
-    try {
-      const t = await SteamTransport.host(12, this.playerName());
-      this.openLobby(new HostLobby(t, this.playerName()), true);
-    } catch (e) { this.showMessage('Steam', e.message); }
-  }
-  async joinSteam(lobbyId) {
-    if (!lobbyId) return;
-    if (this.session) { this.showMessage('Steam', 'Сначала завершите текущую партию'); return; }
-    try {
-      const init = await SteamTransport.init();
-      if (!init.ok) throw new Error(init.error);
-      if (this.lobby) this.leaveLobby();
-      const t = await SteamTransport.join(lobbyId);
-      this.openLobby(new ClientLobby(t, this.playerName()), false);
-    } catch (e) { this.showMessage('Steam', 'Не удалось войти в лобби: ' + e.message); }
-  }
-  async hostLan() {
-    try {
-      const t = await LanHostTransport.host(Number($('lan-port').value) || DEFAULT_PORT);
-      this.openLobby(new HostLobby(t, this.playerName()), true);
-    } catch (e) { this.showMessage('Сеть', e.message); }
-  }
-  async joinLan() {
-    try {
-      const t = await LanClientTransport.connect($('lan-addr').value);
-      this.openLobby(new ClientLobby(t, this.playerName()), false);
-    } catch (e) { this.showMessage('Сеть', e.message); }
-  }
-
-  openLobby(lobby, isHost) {
-    this.lobby = lobby;
-    this.show('lobby');
-    document.querySelectorAll('#screen-lobby .host-only').forEach((el) => { el.hidden = !isHost; });
-    $('lobby-invite').hidden = lobby.transport.kind !== 'steam';
-    $('lobby-copy').hidden = lobby.transport.kind !== 'steam';
-    const t = lobby.transport;
-    let info = '';
-    if (t.kind === 'steam') info = `ID лобби: <b>${esc(t.lobbyId)}</b><br>Пригласите друзей через Steam или передайте им ID.`;
-    else if (isHost) info = `Адрес для подключения:<br>${t.ips.map((ip) => `<b>${esc(ip)}:${t.port}</b>`).join('<br>')}`;
-    else info = 'Подключено к хосту.';
-    $('lobby-connect').innerHTML = info;
-    if (isHost) {
-      $('lobby-map').innerHTML = MAPS.map((m) => `<option value="${m.id}">${m.name}</option>`).join('') +
-        this.customMaps.map((m, i) => `<option value="custom:${i}">★ ${esc(m.name)}</option>`).join('');
-      $('lobby-seed').value = lobby.settings.seed;
-      lobby.onChange = (v) => this.renderLobby(v, true);
-      lobby.sync();
+      if (this.saveTo(slot)) {
+        play('build');
+        this.renderSaves();
+        if (this.hud) this.hud.toast('Игра сохранена', 'ok');
+      }
     } else {
-      $('lobby-info').textContent = 'Ожидание данных от хоста...';
-      $('lobby-slots').innerHTML = '';
-      lobby.onChange = (v) => this.renderLobby(v, false);
-      lobby.onStart = (session) => this.enterGame(session);
-      lobby.onClosed = (reason) => { this.lobby = null; this.show('mp'); this.showMessage('Лобби', reason); };
+      play('click');
+      this.loadFrom(slot);
     }
   }
-  renderLobby(v, isHost) {
-    $('lobby-slots').innerHTML = v.slots.map((s, i) => `<li><span class="dot" style="background:${s.color}"></span><span class="name">${esc(s.name)}</span><span class="tag">${s.host ? 'Хост' : s.ai ? 'Бот · ' + ({ easy: 'лёгкий', normal: 'норм.', hard: 'сложный' })[s.ai] : 'Игрок'}</span>${isHost && i > 0 ? `<button class="btn tiny danger" data-kick="${i}">✕</button>` : ''}</li>`).join('');
-    $('lobby-info').innerHTML = `Карта: <b>${esc(v.mapName)}</b> · seed ${v.seed} · победа ${Math.round(v.victory * 100)}%`;
-    if (isHost) $('lobby-start').disabled = v.slots.length < 2;
-  }
-  leaveLobby() {
-    if (this.lobby) this.lobby.close();
-    this.lobby = null;
-    this.show('mp');
-  }
-  startLobby() {
-    if (!(this.lobby instanceof HostLobby)) return;
-    play('click');
-    this.enterGame(this.lobby.start());
+
+  async loadFrom(slot) {
+    let raw;
+    try {
+      raw = localStorage.getItem(SAVE_KEY + slot);
+    } catch {
+      raw = null;
+    }
+    if (!raw) {
+      this.showMessage('Ошибка загрузки', 'Сохранение не найдено');
+      return;
+    }
+    await this.showLoading('Загрузка сохранения…');
+    try {
+      const data = JSON.parse(raw);
+      const desc = data.mapDesc || (data.state && data.state.mapDesc);
+      const map = desc ? this.getMap(desc) : undefined;
+      const session = loadOffline(data, map);
+      this.enterGame(session);
+      if (this.hud) this.hud.toast('Игра загружена', 'ok');
+    } catch (e) {
+      console.error(e);
+      this.hideLoading();
+      this.showMessage('Ошибка загрузки', (e && e.message) || String(e));
+    }
   }
 }
 
-const BOT_NAMES = ['Северная Империя', 'Южный Союз', 'Восточная Орда', 'Западная Лига', 'Пиксельная Республика', 'Красный Блок', 'Синий Альянс', 'Железный Пакт', 'Островное Королевство', 'Пустынный Халифат', 'Ледяной Каганат'];
-
-window.addEventListener('DOMContentLoaded', () => {
-  window.app = new App();
-});
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const boot = () => {
+    try {
+      window.app = new App();
+    } catch (e) {
+      console.error(e);
+      document.body.insertAdjacentHTML('beforeend', `<pre style="position:fixed;inset:auto 1rem 1rem 1rem;z-index:99;padding:1rem;background:#300;color:#fff;white-space:pre-wrap">${esc(e && e.stack ? e.stack : String(e))}</pre>`);
+    }
+  };
+  if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', boot);
+  else boot();
+} else if (typeof self !== 'undefined' && typeof importScripts === 'function') {
+  startPreviewWorker();
+}
