@@ -1,5 +1,5 @@
 import {
-  STRIKES, WARHEAD, FALLOUT_TICKS, NUKE_TROOP_LOSS, SAM, RESEARCH, cruiseRange, siloReload, airbaseReload,
+  STRIKES, WARHEAD, FALLOUT_TICKS, NUKE_TROOP_LOSS, SAM, RESEARCH, INTERCEPT, cruiseRange, siloReload, airbaseReload,
   interceptChance, TICKS_PER_SEC,
 } from './config.js';
 import { sinkUnitsIn } from './units.js';
@@ -11,7 +11,6 @@ export const INTENTS = {
 };
 
 export const THREAT = { mega: 6, hbomb: 5, atom: 4, warhead: 4, cruise: 3, kamikaze: 2, drone: 1 };
-const VALUE = { silo: 600, sam: 400, airbase: 400, factory: 300, port: 300, house: 200, fort: 150 };
 export const strikeName = (kind) => (kind === 'warhead' ? 'Ядерная боеголовка' : STRIKES[kind] ? STRIKES[kind].name : kind);
 
 export const strikeRange = (game, pid, kind) => (kind === 'cruise' ? cruiseRange(game.s.players[pid].research.missile) : Infinity);
@@ -44,6 +43,17 @@ export function reloadOf(b) {
   return b.type === 'silo' ? siloReload(b.level) : airbaseReload(b.level);
 }
 
+export const megasUsed = (p) => (p && p.stats ? p.stats.megas | 0 : 0);
+
+export function strikeCost(game, pid, kind) {
+  const def = STRIKES[kind];
+  if (!def) return 0;
+  if (!def.incomeSec) return def.cost;
+  const p = game.s.players[pid];
+  const inc = p && Number.isFinite(p.income) ? Math.max(0, p.income) : 0;
+  return Math.max(def.cost, Math.ceil((inc * def.incomeSec) / 1000) * 1000);
+}
+
 function hostileVictims(game, pid) {
   const out = [];
   for (const q of game.s.players) if (q.alive && q.id !== pid && game.isHostile(pid, q.id) && q.tiles > 0) out.push(q.id);
@@ -61,7 +71,9 @@ export function strikeError(game, pid, kind, fromId, x, y) {
   if (b.type !== def.src) return def.src === 'silo' ? 'Запуск только из ракетной шахты' : 'Запуск только с аэродрома БПЛА';
   if (!game.buildingActive(b)) return 'Здание ещё строится';
   if (b.cd > 0) return `Перезарядка: ${Math.ceil(b.cd / TICKS_PER_SEC)} с`;
-  if (p.gold < def.cost) return `Нужно ${def.cost} золота`;
+  if (def.perGame && megasUsed(p) >= def.perGame) return 'Мегабомба уже применена: она одна на партию';
+  const cost = strikeCost(game, pid, kind);
+  if (p.gold < cost) return `Нужно ${cost} золота`;
   const aim = aimPoint(game, kind, x, y);
   if (!aim) return 'Точка вне карты';
   if (kind === 'mega') return hostileVictims(game, pid).length ? null : 'Нет враждебных стран для удара';
@@ -95,6 +107,15 @@ export function makeProjectile(game, owner, type, sx, sy, tx, ty, extra) {
   };
 }
 
+function boostPoint(game, def, sx, sy, aim) {
+  let dx = aim.x - sx, dy = aim.y - sy;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 1) { dx = 0; dy = -1; } else { dx /= d; dy /= d; }
+  const L = def.boost || 0;
+  const x = Math.min(game.W - 0.5, Math.max(0.5, sx + dx * L)), y = Math.min(game.H - 0.5, Math.max(0.5, sy + dy * L));
+  return { x, y };
+}
+
 function runStrike(game, pid, cmd) {
   const s = game.s, p = s.players[pid];
   const kind = cmd.kind, def = STRIKES[kind];
@@ -107,15 +128,21 @@ function runStrike(game, pid, cmd) {
     ty = t.y + 0.5;
     targetBuilding = t.id;
   }
-  p.gold -= def.cost;
-  b.cd = reloadOf(b);
   const sx = b.x + 0.5, sy = b.y + 0.5;
+  if (kind === 'mega') {
+    const bp = boostPoint(game, def, sx, sy, aim);
+    tx = bp.x;
+    ty = bp.y;
+  }
+  p.gold -= strikeCost(game, pid, kind);
+  b.cd = reloadOf(b);
   const pr = makeProjectile(game, pid, kind, sx, sy, tx, ty, { targetBuilding, from: b.id, lvl: p.research[def.req[0]] });
   s.projectiles.push(pr);
   if (def.nuke) p.stats.nukes++;
   game.emit({ k: 'launch', pid, kind, x: sx, y: sy, tx, ty, id: pr.id });
   if (kind === 'mega') {
-    game.msg(-1, `${p.name} запустил мегабомбу «Судный день»!`, 'danger');
+    p.stats.megas = megasUsed(p) + 1;
+    game.msg(-1, `${p.name} запустил мегабомбу «Судный день»! Через ${Math.ceil(pr.dur / TICKS_PER_SEC)} с она распадётся на боеголовки`, 'danger');
     return;
   }
   const i = game.tileAt(tx, ty);
@@ -130,6 +157,15 @@ function reload(game) {
   }
 }
 
+function interceptPoint(pr, bx, by, R) {
+  const dx = pr.x - bx, dy = pr.y - by;
+  if (dx * dx + dy * dy <= R * R) return { x: pr.x, y: pr.y };
+  const ex = pr.x - pr.tx, ey = pr.y - pr.ty;
+  const L = Math.sqrt(ex * ex + ey * ey) || 1;
+  const k = Math.min(L, R * 0.5) / L;
+  return { x: pr.tx + ex * k, y: pr.ty + ey * k };
+}
+
 function samDefense(game) {
   const s = game.s, P = s.players;
   let hit = false;
@@ -141,9 +177,13 @@ function samDefense(game) {
     const bx = b.x + 0.5, by = b.y + 0.5;
     let best = null, bp = -1, bd = Infinity;
     for (const pr of s.projectiles) {
-      if (pr.intercepted || pr.owner === b.owner || !game.isHostile(b.owner, pr.owner)) continue;
+      if (pr.intercepted || !INTERCEPT[pr.type] || pr.owner === b.owner || !game.isHostile(b.owner, pr.owner)) continue;
       const dx = pr.x - bx, dy = pr.y - by;
-      const d = dx * dx + dy * dy;
+      let d = dx * dx + dy * dy;
+      if (d > R2 && pr.type === 'warhead' && pr.dur - pr.t <= WARHEAD.terminal) {
+        const ex = pr.tx - bx, ey = pr.ty - by;
+        d = ex * ex + ey * ey;
+      }
       if (d > R2) continue;
       const th = THREAT[pr.type] || 0;
       if (th > bp || (th === bp && d < bd)) { best = pr; bp = th; bd = d; }
@@ -151,11 +191,13 @@ function samDefense(game) {
     if (!best) continue;
     b.cd = SAM.reload(b.level);
     const ok = game.rand() < interceptChance(best.type, owner.research.aa);
-    game.emit({ k: 'samShot', id: b.id, x: bx, y: by, tx: best.x, ty: best.y, hit: ok });
+    const aimAt = interceptPoint(best, bx, by, R);
+    game.emit({ k: 'samShot', id: b.id, x: bx, y: by, tx: aimAt.x, ty: aimAt.y, hit: ok });
     if (!ok) continue;
     best.intercepted = true;
     hit = true;
-    game.emit({ k: 'intercept', x: best.x, y: best.y, kind: best.type, by: b.owner, owner: best.owner });
+    const at = interceptPoint(best, bx, by, R);
+    game.emit({ k: 'intercept', x: at.x, y: at.y, kind: best.type, by: b.owner, owner: best.owner });
     game.msg(b.owner, `ПВО сбила цель: ${strikeName(best.type)}`, 'good');
     if (P[best.owner] && P[best.owner].alive) game.msg(best.owner, `${owner.name}: ПВО перехватила ваш удар`, 'danger');
   }
@@ -183,7 +225,7 @@ function pointHit(game, pr) {
 export function nukeArea(game, pr, r, selective) {
   const s = game.s, P = s.players, own = s.owner, W = game.W, H = game.H;
   const by = pr.owner;
-  const spare = (o) => selective && (o === by || !game.isHostile(by, o));
+  const spare = (o) => o === by || (selective && !game.isHostile(by, o));
   const dens = P.map((q) => q.troops / Math.max(1, q.tiles));
   const lost = new Float64Array(P.length);
   const cx = Math.floor(pr.tx), cy = Math.floor(pr.ty), r2 = r * r;
@@ -216,7 +258,7 @@ export function nukeArea(game, pr, r, selective) {
     if (n > 0) {
       q.stats.tilesLost += n;
       game.killTroops(q.id, Math.min(q.troops, n * dens[q.id] * NUKE_TROOP_LOSS), by);
-      if (q.id !== by && q.alive) game.msg(q.id, `Ядерный удар! Потеряно ${n} клеток`, 'danger');
+      if (q.id !== by && q.alive && pr.type !== 'warhead') game.msg(q.id, `Ядерный удар! Потеряно ${n} клеток`, 'danger');
     }
     if (selective || q.id === by || (!n && !sunk[q.id])) continue;
     const t = game.relation(by, q.id).type;
@@ -227,15 +269,17 @@ export function nukeArea(game, pr, r, selective) {
   return lost;
 }
 
-export function megaTargets(game, pid, perPlayer = STRIKES.mega.warheads) {
+export const megaCell = () => Math.max(1, Math.floor(WARHEAD.r * Math.SQRT2));
+
+export function megaTargets(game, pid) {
   const s = game.s, W = game.W, H = game.H, own = s.owner, P = s.players;
-  const G = WARHEAD.r;
+  const vic = hostileVictims(game, pid);
+  if (!vic.length) return [];
+  const G = megaCell();
   const gw = Math.ceil(W / G), gh = Math.ceil(H / G), C = gw * gh;
   const slot = new Int32Array(P.length).fill(-1);
-  const vic = hostileVictims(game, pid);
   vic.forEach((q, k) => { slot[q] = k; });
-  if (!vic.length) return [];
-  const cnt = new Float64Array(vic.length * C), sx = new Float64Array(vic.length * C), sy = new Float64Array(vic.length * C);
+  const per = new Int32Array(vic.length * C);
   const land = game.landList;
   for (let k = 0; k < land.length; k++) {
     const i = land[k];
@@ -244,41 +288,43 @@ export function megaTargets(game, pid, perPlayer = STRIKES.mega.warheads) {
     const v = slot[o - 1];
     if (v < 0) continue;
     const x = i % W, y = (i - x) / W;
-    const c = v * C + Math.floor(y / G) * gw + Math.floor(x / G);
-    cnt[c]++;
-    sx[c] += x;
-    sy[c] += y;
-  }
-  const score = Float64Array.from(cnt);
-  for (const b of s.buildings) {
-    const v = slot[b.owner];
-    if (v < 0) continue;
-    score[v * C + Math.floor(b.y / G) * gw + Math.floor(b.x / G)] += (VALUE[b.type] || 100) * b.level;
+    per[v * C + Math.floor(y / G) * gw + Math.floor(x / G)]++;
   }
   const out = [];
-  for (let v = 0; v < vic.length; v++) {
-    const base = v * C;
-    const cells = [];
-    for (let c = 0; c < C; c++) if (cnt[base + c] > 0) cells.push(c);
-    cells.sort((a, b) => score[base + b] - score[base + a] || a - b);
-    const picked = [];
-    const near = (c) => picked.some((q) => Math.abs((q % gw) - (c % gw)) <= 1 && Math.abs(Math.floor(q / gw) - Math.floor(c / gw)) <= 1);
-    for (const c of cells) if (picked.length < perPlayer && !near(c)) picked.push(c);
-    for (const c of cells) if (picked.length < perPlayer && !picked.includes(c)) picked.push(c);
-    for (const c of picked) {
-      const k = base + c;
-      out.push({ pid: vic[v], x: Math.floor(sx[k] / cnt[k]) + 0.5, y: Math.floor(sy[k] / cnt[k]) + 0.5 });
+  for (let c = 0; c < C; c++) {
+    let best = -1, bn = 0;
+    for (let v = 0; v < vic.length; v++) {
+      const n = per[v * C + c];
+      if (n > bn) { bn = n; best = v; }
     }
+    if (best < 0) continue;
+    const gx = c % gw, gy = (c - gx) / gw;
+    const x0 = gx * G, y0 = gy * G, x1 = Math.min(W, x0 + G), y1 = Math.min(H, y0 + G);
+    out.push({ pid: vic[best], x: Math.floor((x0 + x1 - 1) / 2) + 0.5, y: Math.floor((y0 + y1 - 1) / 2) + 0.5 });
   }
   return out;
 }
 
+export function warheadFlight(sx, sy, tx, ty, k) {
+  const dx = tx - sx, dy = ty - sy;
+  const base = Math.ceil(Math.sqrt(dx * dx + dy * dy) / WARHEAD.speed);
+  return Math.min(WARHEAD.maxFlight, Math.max(WARHEAD.minFlight, base)) + ((k * 7) % WARHEAD.stagger);
+}
+
 function splitMega(game, pr, spawned) {
+  const s = game.s, P = s.players;
   const targets = megaTargets(game, pr.owner);
-  for (const t of targets) {
-    spawned.push(makeProjectile(game, pr.owner, 'warhead', pr.x, pr.y, t.x, t.y, { victim: t.pid, sel: 1, from: pr.from }));
-  }
+  const per = new Int32Array(P.length);
+  targets.forEach((t, k) => {
+    const dur = warheadFlight(pr.x, pr.y, t.x, t.y, k);
+    spawned.push(makeProjectile(game, pr.owner, 'warhead', pr.x, pr.y, t.x, t.y, { victim: t.pid, sel: 1, from: pr.from, dur }));
+    per[t.pid]++;
+  });
   game.emit({ k: 'impact', kind: 'mega', x: pr.x, y: pr.y, r: 0, owner: pr.owner, warheads: targets.length });
+  for (const q of P) {
+    if (per[q.id] > 0 && q.alive) game.msg(q.id, `«Судный день»: на вашу страну летят ${per[q.id]} ядерных боеголовок!`, 'danger');
+  }
+  if (P[pr.owner]) game.msg(pr.owner, `Мегабомба распалась на ${targets.length} боеголовок`, 'info');
 }
 
 function impact(game, pr, spawned) {

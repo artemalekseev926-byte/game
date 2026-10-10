@@ -270,24 +270,72 @@ export function nearestPort(game, pid, x, y) {
   return best;
 }
 
-export function shipCargo(game, f) {
+export function railLength(game, route) {
+  let L = 0;
+  for (let k = 1; k < route.length; k++) {
+    const a = game.buildingById(route[k - 1]), b = game.buildingById(route[k]);
+    if (a && b) L += dist(a, b);
+  }
+  return L;
+}
+
+export function factoryRoute(game, f) {
+  let best = null;
+  for (const b of game.s.buildings) {
+    if (b.owner !== f.owner || b.type !== 'port' || !game.buildingActive(b)) continue;
+    const route = railRoute(game, f.owner, f.id, b.id);
+    if (!route) continue;
+    const len = railLength(game, route);
+    if (!best || len < best.len || (len === best.len && b.id < best.port.id)) best = { port: b, route, type: 'train', len };
+  }
+  if (best) return best;
   const port = nearestPort(game, f.owner, f.x, f.y);
   if (!port) return null;
-  const route = railRoute(game, f.owner, f.id, port.id);
-  const type = route ? 'train' : 'truck';
-  const stops = route ? route.map((id) => game.buildingById(id)) : [f, port];
+  return { port, route: null, type: 'truck', len: dist(f, port) };
+}
+
+export function factoryCycle(level, len, type) {
+  const trip = Math.ceil((2 * len) / LAND_UNITS[type].speed);
+  return Math.max(factoryInterval(level), trip);
+}
+
+export function factoryOutlook(game, f) {
+  const plan = factoryRoute(game, f);
+  if (!plan) return null;
+  const cargo = ECON.cargoPerLevel * f.level;
+  const perMin = (ticks) => (cargo * 60 * TICKS_PER_SEC) / ticks;
+  const cycle = factoryCycle(f.level, plan.len, plan.type);
+  const out = { ...plan, cargo, cycle, perMin: perMin(cycle), railPerMin: 0 };
+  if (plan.type === 'truck') out.railPerMin = perMin(factoryCycle(f.level, plan.len, 'train')) - out.perMin;
+  return out;
+}
+
+export function shipCargo(game, f) {
+  const plan = factoryRoute(game, f);
+  if (!plan) return null;
+  const stops = plan.route ? plan.route.map((id) => game.buildingById(id)) : [f, plan.port];
   const path = stops.map((b) => [b.x + 0.5, b.y + 0.5]);
   const u = {
-    owner: f.owner, type, x: path[0][0], y: path[0][1], path, pi: 1, hp: 1, maxHp: 1,
-    cargo: ECON.cargoPerLevel * f.level, from: f.id, to: port.id,
+    owner: f.owner, type: plan.type, x: path[0][0], y: path[0][1], path, pi: 1, hp: 1, maxHp: 1,
+    cargo: ECON.cargoPerLevel * f.level, from: f.id, to: plan.port.id, back: 0,
     heading: heading(path[1][0] - path[0][0], path[1][1] - path[0][1]),
   };
-  return game.spawnUnit(u);
+  game.spawnUnit(u);
+  f.veh = u.id;
+  return u;
+}
+
+function vehicleOut(game, b) {
+  if (!b.veh) return false;
+  const u = game.unitById(b.veh);
+  if (u && u.from === b.id && (u.type === 'train' || u.type === 'truck')) return true;
+  b.veh = 0;
+  return false;
 }
 
 function tickFactory(game, b) {
   if (b.cd > 0) b.cd--;
-  if (b.cd > 0) return;
+  if (b.cd > 0 || vehicleOut(game, b)) return;
   b.cd = factoryInterval(b.level);
   shipCargo(game, b);
 }
@@ -325,13 +373,28 @@ export function stepLandUnit(u) {
   return u.pi >= u.path.length;
 }
 
+function turnBack(u) {
+  u.back = 1;
+  u.cargo = 0;
+  u.path = u.path.slice().reverse();
+  u.pi = 1;
+}
+
 function tickLandUnits(game) {
   const s = game.s;
   let done = null;
   for (const u of s.units) {
     if (u.type !== 'train' && u.type !== 'truck') continue;
     if (!stepLandUnit(u)) continue;
-    deliverCargo(game, u);
+    if (!u.back) {
+      deliverCargo(game, u);
+      if (u.path.length > 1) {
+        turnBack(u);
+        continue;
+      }
+    }
+    const f = game.buildingById(u.from);
+    if (f && f.veh === u.id) f.veh = 0;
     (done || (done = new Set())).add(u);
   }
   if (done) s.units = s.units.filter((u) => !done.has(u));

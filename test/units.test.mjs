@@ -7,7 +7,7 @@ import {
   SHIPS, STRIKES, TRADE, LAND_UNITS, WARHEAD, FALLOUT_TICKS, siloReload, interceptChance,
 } from '../src/core/config.js';
 import { shipCost, warshipHp, tradeCargo } from '../src/core/units.js';
-import { megaTargets } from '../src/core/strikes.js';
+import { megaTargets, megaCell, strikeCost } from '../src/core/strikes.js';
 import { pathLength } from '../src/core/nav.js';
 import { makeRng } from '../src/core/rng.js';
 
@@ -411,8 +411,11 @@ test('атомная бомба: клетки ничьи, заражение, р
   assert.equal(P[0].stats.nukes, 1);
   assert.equal(P[0].gold < 1e6 - STRIKES.atom.cost + 100, true);
   assert.ok(g.events.some((e) => e.k === 'launch' && e.kind === 'atom'));
+  const mine = (x, y) => x >= 112 && x < 116 && y >= 40 && y < 44;
   let nuke = null, drop = 0, expect = 0;
   for (let t = 0; t < 100 && !nuke; t++) {
+    const pr = g.s.projectiles[0];
+    if (pr && pr.dur - pr.t <= 1) claim(g, 0, 112, 40, 116, 44);
     const T0 = P[1].troops, n0 = P[1].tiles;
     g.tick([]);
     nuke = g.events.find((e) => e.k === 'nuke');
@@ -429,6 +432,11 @@ test('атомная бомба: клетки ничьи, заражение, р
     if (dx * dx + dy * dy > r * r) continue;
     const i = (52 + dy) * g.W + 120 + dx;
     if (!g.isLandTile(i)) continue;
+    if (mine(120 + dx, 52 + dy)) {
+      assert.equal(g.tileOwner(i), 0, 'своя земля запустившего не сгорает');
+      assert.equal(g.s.fallout[i], 0);
+      continue;
+    }
     assert.equal(g.tileOwner(i), -1, 'клетка ничья');
     assert.ok(g.s.fallout[i] > 0 && g.s.fallout[i] <= FALLOUT_TICKS, 'заражение');
   }
@@ -443,7 +451,7 @@ test('атомная бомба: клетки ничьи, заражение, р
   assert.equal(g.s.fallout[52 * g.W + 120], 0, 'заражение проходит');
 });
 
-test('мегабомба поражает каждого врага и не трогает союзника', () => {
+test('мегабомба накрывает всю сушу врагов, не трогает союзника и не перехватывается', () => {
   const g = newGame(BIG, 4);
   begin(g, [[50, 50], [250, 50], [50, 150], [250, 150]]);
   claim(g, 0, 10, 10, 150, 100);
@@ -457,31 +465,67 @@ test('мегабомба поражает каждого врага и не тр
   const silo = readyBuilding(g, 0, 'silo', 40, 40);
   const factory = readyBuilding(g, 1, 'factory', 200, 50);
   const enemyHouse = readyBuilding(g, 2, 'house', 80, 140);
+  readyBuilding(g, 3, 'sam', 200, 150);
   P[0].gold = 1e6;
   const targets = megaTargets(g, 0);
-  assert.equal(targets.length, 2 * STRIKES.mega.warheads, 'по 6 боеголовок на врага');
+  const G = megaCell();
+  const need = Math.ceil(140 / G) * Math.ceil(90 / G);
+  assert.ok(targets.length >= need, `боеголовок ${targets.length}, клеток сетки ${need}`);
   assert.ok(targets.every((t) => t.pid === 2 || t.pid === 3));
+  const cost = strikeCost(g, 0, 'mega');
+  assert.ok(cost >= STRIKES.mega.cost);
   const t = P.map((p) => p.tiles);
+  const gold0 = P[0].gold;
   g.tick([{ pid: 0, cmd: { c: 'strike', kind: 'mega', from: silo.id, x: 150, y: 100 } }]);
+  assert.ok(Math.abs(gold0 - P[0].gold - cost) < 50, 'списана цена мегабомбы');
   assert.equal(g.s.projectiles.length, 1);
-  assert.equal(g.s.projectiles[0].type, 'mega');
+  const pr = g.s.projectiles[0];
+  assert.equal(pr.type, 'mega');
+  assert.ok(pr.dur <= 20, 'распад рядом с шахтой');
+  g.rand = () => 0;
   const evs = [];
   let warheads = 0;
-  for (let k = 0; k < 400 && (k === 0 || g.s.projectiles.length); k++) {
+  for (let k = 0; k < 400 && g.s.phase === 'play' && (k === 0 || g.s.projectiles.length); k++) {
     g.tick([]);
     evs.push(...g.events);
-    warheads = Math.max(warheads, g.s.projectiles.filter((p) => p.type === 'warhead').length);
+    warheads = Math.max(warheads, g.s.projectiles.filter((q) => q.type === 'warhead').length);
   }
-  assert.equal(warheads, 12);
-  assert.equal(evs.filter((e) => e.k === 'nuke').length, 12);
+  assert.ok(!evs.some((e) => e.k === 'intercept' && e.kind === 'mega'), 'носитель не сбивается');
+  assert.equal(warheads, targets.length);
+  const ic = evs.filter((e) => e.k === 'intercept').length;
+  assert.ok(ic > 0, 'ПВО сбивает часть боеголовок');
+  assert.equal(evs.filter((e) => e.k === 'nuke').length + ic, targets.length);
   assert.equal(P[0].tiles, t[0], 'запустивший не задет');
   assert.equal(P[1].tiles, t[1], 'союзник не задет');
   assert.ok(g.buildingById(factory.id), 'здания союзника целы');
-  assert.ok(P[2].tiles < t[2] * 0.5, `враг 2: ${t[2]} -> ${P[2].tiles}`);
+  assert.equal(P[2].tiles, 0, `враг 2 без ПВО уничтожен: ${t[2]} -> ${P[2].tiles}`);
   assert.ok(P[3].tiles < t[3] * 0.5, `враг 3: ${t[3]} -> ${P[3].tiles}`);
   assert.equal(g.buildingById(enemyHouse.id), null, 'здания врага уничтожены');
   assert.equal(g.relation(0, 1).type, 'alliance', 'союз сохранён');
   assert.equal(P[0].traitorUntil, 0);
+  assert.equal(P[0].stats.megas, 1);
+});
+
+test('мегабомба: одна на партию, цена растёт с доходом', () => {
+  const g = newGame(BIG, 2);
+  begin(g, [[50, 50], [250, 50]]);
+  claim(g, 0, 10, 10, 150, 190);
+  claim(g, 1, 150, 10, 290, 190);
+  const P = g.s.players;
+  P[0].research.missile = 1;
+  P[0].research.nuclear = 3;
+  const silo = readyBuilding(g, 0, 'silo', 40, 40);
+  const silo2 = readyBuilding(g, 0, 'silo', 60, 60);
+  P[0].income = 0;
+  assert.equal(strikeCost(g, 0, 'mega'), STRIKES.mega.cost);
+  P[0].income = 10000;
+  assert.equal(strikeCost(g, 0, 'mega'), 10000 * STRIKES.mega.incomeSec);
+  P[0].gold = 1e7;
+  const r = g.apply(0, { c: 'strike', kind: 'mega', from: silo.id });
+  assert.ok(r.ok, r.error);
+  const v = g.validate(0, { c: 'strike', kind: 'mega', from: silo2.id });
+  assert.equal(v.ok, false);
+  assert.match(v.error, /одна на партию/);
 });
 
 function script(g, rng) {

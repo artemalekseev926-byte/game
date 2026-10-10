@@ -4,7 +4,7 @@ import { buildMapFromLand, generateMap } from '../src/core/map.js';
 import { Game } from '../src/core/game.js';
 import { createState, serializeState, deserializeState, hashState } from '../src/core/state.js';
 import { BUILDINGS, ECON, LAND_UNITS, TICKS_PER_SEC, researchCost, researchTicks } from '../src/core/config.js';
-import { factoryInterval } from '../src/core/buildings.js';
+import { factoryInterval, factoryOutlook } from '../src/core/buildings.js';
 import { makeRng } from '../src/core/rng.js';
 
 function rectMap(rects, w = 200, h = 100, seed = 1) {
@@ -274,19 +274,22 @@ test('ж/д: поезд ровно в 2 раза быстрее грузовик
   const px = coast % g.W, py = Math.floor(coast / g.W);
   const port = readyBuilding(g, 0, 'port', px, py);
   const fac = readyBuilding(g, 0, 'factory', px + 60, py);
+  const fac2 = readyBuilding(g, 0, 'factory', px + 60, py + 12);
   fac.cd = 1;
+  fac2.cd = 50;
   g.tick([]);
   const truck = g.s.units.find((u) => u.type === 'truck');
   assert.ok(truck, 'без ж/д едет грузовик');
   assert.equal(truck.cargo, ECON.cargoPerLevel);
   assert.equal(fac.cd, factoryInterval(1));
   g.s.players[0].gold = 100000;
-  assert.ok(g.apply(0, { c: 'rail', a: fac.id, b: port.id }).ok);
-  assert.equal(g.validate(0, { c: 'rail', a: port.id, b: fac.id }).ok, false, 'уже соединены');
-  fac.cd = 1;
+  assert.ok(g.apply(0, { c: 'rail', a: fac2.id, b: port.id }).ok);
+  assert.equal(g.validate(0, { c: 'rail', a: port.id, b: fac2.id }).ok, false, 'уже соединены');
+  fac2.cd = 1;
   g.tick([]);
   const train = g.s.units.find((u) => u.type === 'train');
   assert.ok(train, 'по ж/д едет поезд');
+  assert.equal(train.from, fac2.id);
   const t0 = [truck.x, truck.y], r0 = [train.x, train.y];
   run(g, 10);
   const dt = Math.hypot(truck.x - t0[0], truck.y - t0[1]);
@@ -295,16 +298,47 @@ test('ж/д: поезд ровно в 2 раза быстрее грузовик
   assert.equal(LAND_UNITS.train.speed, 2 * LAND_UNITS.truck.speed);
   const gold = g.s.players[0].gold;
   const stock = port.stock;
-  run(g, 120);
-  assert.equal(g.s.units.filter((u) => u.type === 'train' || u.type === 'truck').length, 0, 'оба доехали');
+  const got = [];
+  for (let t = 0; t < 120; t++) { g.tick([]); got.push(...g.events); }
+  const cargo = got.filter((e) => e.k === 'cargo');
+  assert.equal(cargo.length, 2, 'оба доехали');
   assert.equal(port.stock, stock + 2);
   assert.ok(g.s.players[0].gold > gold + 2 * ECON.cargoPerLevel - 1);
-  assert.ok(g.events.length >= 0);
+  assert.ok(g.s.units.some((u) => u.type === 'truck' && u.back), 'грузовик возвращается на фабрику');
+  fac.level = 3;
+  fac2.level = 3;
+  const n = { truck: 0, train: 0 };
+  for (let t = 0; t < 3000; t++) {
+    g.tick([]);
+    for (const e of g.events) if (e.k === 'cargo') n[e.by]++;
+  }
+  assert.ok(n.train >= n.truck * 1.8, `ж/д возит больше: поезд ${n.train}, грузовик ${n.truck}`);
+  const truckPlan = factoryOutlook(g, fac), trainPlan = factoryOutlook(g, fac2);
+  assert.equal(truckPlan.type, 'truck');
+  assert.equal(trainPlan.type, 'train');
+  assert.ok(truckPlan.railPerMin > 0, 'панель покажет выгоду ж/д');
+  assert.ok(Math.abs(trainPlan.perMin / truckPlan.perMin - 2) < 0.1, `на 3 уровне ж/д даёт вдвое больше: ${trainPlan.perMin} / ${truckPlan.perMin}`);
   const hx = px + 30;
   const house = readyBuilding(g, 0, 'house', hx, py);
   assert.ok(g.apply(0, { c: 'rail', a: port.id, b: house.id }).ok);
   g.setOwner(py * g.W + hx, -1);
   assert.equal(g.s.rails.filter((r) => r.a === house.id || r.b === house.id).length, 0, 'рельс удалён вместе с концом');
+  let coast2 = -1;
+  for (let k = 0; k < g.N && coast2 < 0; k++) {
+    if (!g.oceanCoast[k] || g.tileOwner(k) !== 0) continue;
+    const x = k % g.W, y = Math.floor(k / g.W);
+    if (Math.abs(x - px) >= 5 || Math.abs(y - py) >= 5) {
+      if (Math.hypot(x - fac.x, y - fac.y) < Math.hypot(px - fac.x, py - fac.y) - 3 && !g.validate(0, { c: 'build', type: 'port', x, y }).error) coast2 = k;
+    }
+  }
+  assert.ok(coast2 >= 0, 'есть место для второго порта');
+  const near = readyBuilding(g, 0, 'port', coast2 % g.W, Math.floor(coast2 / g.W));
+  assert.equal(factoryOutlook(g, fac).port.id, near.id, 'без ж/д — ближайший порт');
+  g.s.players[0].gold = 1e6;
+  assert.ok(g.apply(0, { c: 'rail', a: fac.id, b: port.id }).ok);
+  const plan = factoryOutlook(g, fac);
+  assert.equal(plan.type, 'train');
+  assert.equal(plan.port.id, port.id, 'груз идёт в порт, связанный рельсами');
 });
 
 test('захват зданий: дома переходят, шахты уничтожаются', () => {

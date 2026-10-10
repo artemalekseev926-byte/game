@@ -4,10 +4,10 @@ import {
 import {
   buildError, buildCost, upgradeCost, upgradeError, railError, railRoute, railCost, nearestPort,
 } from './buildings.js';
-import { proposeError, embargoBy } from './diplomacy.js';
+import { proposeError, embargoBy, treaties } from './diplomacy.js';
 import { shipCost, portShips, portShipCap, canEngage, sharedSea } from './units.js';
 import { coastBodies } from './nav.js';
-import { strikeError } from './strikes.js';
+import { strikeError, strikeCost, megasUsed } from './strikes.js';
 
 const PLAN = [
   ['econ', 1], ['inf', 1], ['armor', 1], ['logistics', 1], ['econ', 2], ['drone', 1], ['missile', 1], ['art', 1],
@@ -33,7 +33,7 @@ export const AI_PROFILES = {
   hard: {
     expand: 0.33, expandMin: 0.25, attack: 0.45, warAt: 0.55, edge: 1.15, capPush: 0.9, reserve: 0.25, warGap: 40,
     builds: 3, houseEvery: 650, maxHouses: 24, maxFactories: 8, maxPorts: 5, airbases: 2, silos: 2,
-    ships: 1.5, maxShips: 10, nukes: 3, nukeEvery: 450, maxNuclear: 3, allies: 1, betray: 1,
+    ships: 1.5, maxShips: 10, nukes: 3, nukeEvery: 600, maxNuclear: 3, allies: 1, betray: 1,
     boatSend: 0.25, boatLocked: 0.6, boatRange: 300, boatEvery: 250, dipEvery: 400, strikeEvery: 1,
   },
 };
@@ -817,8 +817,15 @@ function droneTile(game, p, v, q, from) {
   return -1;
 }
 
-function nukeSpot(game, p, r, pref, from) {
+function nukePad(r, speed, from, cx, cy) {
+  const dx = cx - from.x, dy = cy - from.y;
+  const dur = Math.sqrt(dx * dx + dy * dy) / speed;
+  return 3 + Math.min(r, Math.ceil(dur / 8));
+}
+
+function nukeSpot(game, p, kind, pref, from) {
   const s = game.s, own = s.owner, W = game.W, H = game.H, P = s.players;
+  const r = STRIKES[kind].r, speed = STRIKES[kind].speed;
   const cands = [];
   for (const b of s.buildings) {
     if (b.owner === p.id || !game.isHostile(p.id, b.owner)) continue;
@@ -836,7 +843,7 @@ function nukeSpot(game, p, r, pref, from) {
     const cover = routeCover(game, p.id, from.x, from.y, cx, cy);
     if (cover > 1) continue;
     let enemy = 0, safe = true;
-    const R = r + 3, R2 = R * R;
+    const R = r + nukePad(r, speed, from, cx, cy), R2 = R * R;
     for (let dy = -R; dy <= R && safe; dy += step) {
       const y = cy + dy;
       if (y < 0 || y >= H) continue;
@@ -847,7 +854,7 @@ function nukeSpot(game, p, r, pref, from) {
         const o = own[y * W + x] - 1;
         if (o < 0) continue;
         if (o === p.id || !game.isHostile(p.id, o)) { safe = false; break; }
-        enemy++;
+        if (dx * dx + dy * dy <= r * r) enemy++;
       }
     }
     if (!safe) continue;
@@ -882,7 +889,7 @@ function rivalOf(game, p) {
 function launchNuke(game, p, st, v, prof, sl, war) {
   const s = game.s, R = p.research, W = game.W, gold = p.gold;
   if (s.tick < st.nukeAt || prof.nukes < 1) return false;
-  if (prof.nukes >= 3 && R.nuclear >= 3 && gold >= STRIKES.mega.cost + 20000 && s.tick >= (st.megaAt || 0)) {
+  if (prof.nukes >= 3 && R.nuclear >= 3 && !megasUsed(p) && gold >= strikeCost(game, p.id, 'mega') + 20000 && s.tick >= (st.megaAt || 0)) {
     const rival = rivalOf(game, p);
     const stuck = v.cnt[0] === 0 && v.hostileLand === 0 && p.troops >= p.maxTroops * prof.capPush;
     if (rival && (rival.tiles * 5 >= p.tiles * 3 || stuck)) {
@@ -900,9 +907,9 @@ function launchNuke(game, p, st, v, prof, sl, war) {
   if (prof.nukes >= 2 && R.nuclear >= 2 && gold >= STRIKES.hbomb.cost * 1.5 + 10000) kinds.push('hbomb');
   if (R.nuclear >= 1 && gold >= STRIKES.atom.cost * 1.6 + 5000) kinds.push('atom');
   for (const kind of kinds) {
-    const spot = nukeSpot(game, p, STRIKES[kind].r, war, sl);
+    const spot = nukeSpot(game, p, kind, war, sl);
     if (spot < 0 || !strike(game, p.id, kind, sl, spot % W, Math.floor(spot / W))) continue;
-    st.nukeAt = s.tick + (gold > 400000 ? 200 : prof.nukeEvery);
+    st.nukeAt = s.tick + Math.round(prof.nukeEvery * (gold > 400000 ? 0.75 : 1));
     return true;
   }
   return false;
@@ -945,6 +952,16 @@ function attacksBetween(game, a, b) {
     else if (x.attacker === b && x.target === a) ba += x.troops;
   }
   return { ab, ba };
+}
+
+function nukingNow(game, pid, q) {
+  const s = game.s, own = s.owner, W = game.W;
+  for (const pr of s.projectiles) {
+    if (pr.owner !== pid || (pr.type !== 'atom' && pr.type !== 'hbomb')) continue;
+    const i = Math.floor(pr.ty) * W + Math.floor(pr.tx);
+    if (own[i] === q + 1) return true;
+  }
+  return false;
 }
 
 function alliesOf(game, pid) {
@@ -1033,7 +1050,8 @@ function diplomacy(game, p, st, v, prof) {
     for (const b of s.buildings) {
       if (b.type !== 'port' || b.owner === pid || !game.buildingActive(b)) continue;
       const q = P[b.owner];
-      if (!q.alive || q.traitorUntil > s.tick || game.relation(pid, q.id).type !== 'none' || embargoBy(game, pid, q.id)) continue;
+      const rel = treaties(game, pid, q.id);
+      if (!q.alive || q.traitorUntil > s.tick || rel.trade || rel.type === 'alliance' || embargoBy(game, pid, q.id)) continue;
       if (st.war === q.id || v.inc[q.id] > 0) continue;
       if (!myPorts.some((m) => sharedSea(game, m, b) >= 0)) continue;
       if (propose(game, p, st, q.id, 'trade')) return;
@@ -1043,6 +1061,7 @@ function diplomacy(game, p, st, v, prof) {
   for (const q of P) {
     if (q.id === pid || !q.alive || q.traitorUntil > s.tick || !v.cnt[q.id + 1]) continue;
     if (game.relation(pid, q.id).type !== 'none' && game.relation(pid, q.id).type !== 'trade') continue;
+    if (nukingNow(game, pid, q.id)) continue;
     const ratio = atkPower(game, q) / Math.max(1, me);
     const calm = front && q.id !== lead.id && ratio >= 0.25;
     if ((ratio >= 1.6 || calm || (v.inc[q.id] > 0 && ratio >= 1)) && st.war !== q.id) {
@@ -1071,12 +1090,14 @@ export function aiRespond(game, pid, req) {
   const mine = atkPower(game, me), theirs = atkPower(game, from);
   const ratio = theirs / Math.max(1, mine);
   const war = attacksBetween(game, pid, req.from);
-  const cur = game.relation(pid, req.from).type;
+  const rel = treaties(game, pid, req.from);
+  const cur = rel.type;
   if (req.type === 'trade') {
-    if (cur === 'pact' || cur === 'alliance') return false;
+    if (cur === 'alliance' || rel.trade) return false;
     if (war.ba > 0 && ratio < 1) return false;
     return st.war !== req.from || ratio >= 1.2;
   }
+  if ((req.type === 'pact' || req.type === 'alliance') && nukingNow(game, pid, req.from)) return false;
   if (req.type === 'pact') {
     if (lead.id === req.from && dominant(game, lead) && lead.id !== pid && ratio < 2) return false;
     if (lead.id === pid && dominant(game, lead) && ratio < 1.2) return false;
@@ -1087,7 +1108,7 @@ export function aiRespond(game, pid, req) {
   }
   if (req.type === 'alliance') {
     if (prof.allies <= alliesOf(game, pid)) return false;
-    if (unitesAll(game, pid, req.from) && lead.id !== pid) return false;
+    if (unitesAll(game, pid, req.from)) return false;
     if (lead.id === req.from && dominant(game, lead)) return false;
     if (war.ab > 0 && ratio < 1) return false;
     return ratio >= 0.5 || (dominant(game, lead) && lead.id !== pid);

@@ -116,10 +116,13 @@ export const STRIKES = {
   cruise: { name: 'Крылатая ракета', src: 'silo', req: ['missile', 1], cost: 2000, r: 0, speed: 2.5, point: true, pick: 2 },
   atom: { name: 'Атомная бомба', src: 'silo', req: ['nuclear', 1], cost: 15000, r: 14, speed: 2.0, nuke: true },
   hbomb: { name: 'Водородная бомба', src: 'silo', req: ['nuclear', 2], cost: 50000, r: 40, speed: 2.0, nuke: true },
-  mega: { name: 'Мегабомба «Судный день»', src: 'silo', req: ['nuclear', 3], cost: 250000, r: 24, speed: 2.0, nuke: true, warheads: 6 },
+  mega: {
+    name: 'Мегабомба «Судный день»', src: 'silo', req: ['nuclear', 3], cost: 250000, r: 24, speed: 2.0, nuke: true,
+    boost: 30, incomeSec: 120, perGame: 1,
+  },
 };
 export const STRIKE_KEYS = Object.keys(STRIKES);
-export const WARHEAD = { r: 24, speed: 2.0 };
+export const WARHEAD = { r: 24, speed: 3.0, minFlight: 25, maxFlight: 160, stagger: 61, terminal: 30 };
 export const FALLOUT_TICKS = 600;
 export const NUKE_TROOP_LOSS = 1.5;
 export const TRAITOR_TICKS = 3000;
@@ -132,8 +135,8 @@ export const SAM = {
   radius: (lvl) => 40 + 10 * (lvl - 1),
   reload: (lvl) => Math.round(30 / Math.max(1, lvl)),
 };
-export const INTERCEPT = { drone: 0.6, kamikaze: 0.6, cruise: 0.5, atom: 0.45, warhead: 0.45, mega: 0.45, hbomb: 0.35 };
-export const interceptChance = (kind, aaLvl) => Math.min(0.95, (INTERCEPT[kind] ?? 0.45) + 0.1 * aaLvl);
+export const INTERCEPT = { drone: 0.6, kamikaze: 0.6, cruise: 0.5, atom: 0.45, warhead: 0.2, mega: 0, hbomb: 0.35 };
+export const interceptChance = (kind, aaLvl) => (INTERCEPT[kind] === 0 ? 0 : Math.min(0.95, (INTERCEPT[kind] ?? 0.45) + 0.1 * aaLvl));
 
 export const SHIPS = {
   warship: {
