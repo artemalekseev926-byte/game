@@ -1887,3 +1887,28 @@ output {
   font-weight: 600;
 }
 .loading-box .spinner { width: 1.4rem; height: 1.4rem; }
+
+#r-research, #btn-research { position: relative; }
+.rs-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--good);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--glass-strong, rgba(0, 0, 0, 0.4));
+  pointer-events: none;
+  animation: rs-pulse 1.6s ease-in-out infinite;
+}
+.rs-badge[hidden] { display: none; }
+.rs-ready { box-shadow: 0 0 0 1px var(--good), 0 0 14px -2px var(--good); }
+@keyframes rs-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .rs-badge { animation: none; } }
+#r-research .rs-badge { top: 0.2rem; right: 0.35rem; }

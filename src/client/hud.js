@@ -8,6 +8,7 @@ import { strikeTarget, strikeRange, strikeCost, megasUsed } from '../core/strike
 import { proposeError, embargoBy, hasTreaty, treaties, breakMakesTraitor } from '../core/diplomacy.js';
 import { coalitionWins } from '../core/victory.js';
 import { spawnTicks } from '../core/territory.js';
+import { researchError } from '../core/economy.js';
 import { NAV_SCALE, NAV_SEARCH, nearestOceanTile } from '../core/nav.js';
 import { fmtNum } from './render.js';
 import { play } from './audio.js';
@@ -249,7 +250,10 @@ export class Hud {
     this.endWait = 0;
     this.lastMsg = { text: '', at: 0, el: null, n: 1 };
     this.boatCache = { key: '', v: null };
-    this.timers = { top: 0, dock: 0, panel: 0, board: 0, cards: 0, modal: 0, tip: 0, ui: 1 };
+    this.timers = { top: 0, dock: 0, panel: 0, board: 0, cards: 0, modal: 0, tip: 0, ui: 1, rsAvail: 2 };
+    this.rsSeen = new Set();
+    this.rsWasBusy = false;
+    this.rsLastNote = -1e9;
     this.r.mode = null;
     this.r.selection = null;
     this.r.box = null;
@@ -463,6 +467,17 @@ export class Hud {
     return px >= 0 && py >= 0 && px <= this.r.viewW && py <= this.r.viewH;
   }
 
+  sfx(name, x, y, near = false) {
+    if (x == null || y == null || !this.r.viewW) { play(name); return; }
+    const [px, py] = this.r.tileToScreen(x, y);
+    const W = this.r.viewW, H = this.r.viewH;
+    const pan = clamp((px / W) * 2 - 1, -1, 1) * 0.85;
+    const dx = Math.max(0, -px, px - W) / W, dy = Math.max(0, -py, py - H) / H;
+    const off = Math.sqrt(dx * dx + dy * dy);
+    const gain = near ? Math.max(0.55, 1 - off * 0.5) : Math.max(0.25, 1 - off * 0.9);
+    play(name, { pan, gain, far: off > 0.3 });
+  }
+
   onEvents(events) {
     const me = this.pid;
     for (const e of events) {
@@ -479,27 +494,27 @@ export class Hud {
           if (e.pid === me) play('built');
           break;
         case 'destroyed':
-          if (e.owner === me || e.by === me || this.visible(e.x, e.y)) play('smallboom');
+          if (e.owner === me || e.by === me || this.visible(e.x, e.y)) this.sfx('smallboom', e.x, e.y, true);
           break;
         case 'launch':
           if (e.kind === 'mega') play('mega');
-          else if (e.pid === me) play(e.kind === 'drone' || e.kind === 'kamikaze' ? 'drone' : 'launch');
-          else if (this.visible(e.x, e.y)) play('launch');
+          else if (e.pid === me) this.sfx(e.kind === 'drone' || e.kind === 'kamikaze' ? 'drone' : 'launch', e.x, e.y, true);
+          else if (this.visible(e.x, e.y)) this.sfx('launch', e.x, e.y);
           break;
         case 'impact':
-          if ((e.kind === 'drone' || e.kind === 'kamikaze' || e.kind === 'cruise') && (e.owner === me || this.visible(e.x, e.y))) play('smallboom');
+          if ((e.kind === 'drone' || e.kind === 'kamikaze' || e.kind === 'cruise') && (e.owner === me || this.visible(e.x, e.y))) this.sfx('smallboom', e.x, e.y, true);
           break;
         case 'nuke':
-          play('nuke');
+          this.sfx('nuke', e.x, e.y, true);
           break;
         case 'intercept':
-          if (e.by === me || e.owner === me || this.visible(e.x, e.y)) play('intercept');
+          if (e.by === me || e.owner === me || this.visible(e.x, e.y)) this.sfx('intercept', e.x, e.y, true);
           break;
         case 'shipSunk':
-          if (e.owner === me || e.by === me || this.visible(e.x, e.y)) play('splash');
+          if (e.owner === me || e.by === me || this.visible(e.x, e.y)) this.sfx('splash', e.x, e.y, true);
           break;
         case 'ship':
-          if (e.pid === me) play(e.type === 'transport' ? 'boat' : 'ship');
+          if (e.pid === me) this.sfx(e.type === 'transport' ? 'boat' : 'ship', e.x, e.y, true);
           break;
         case 'trade':
           if (e.from === me || e.to === me) play('trade');
@@ -508,7 +523,10 @@ export class Hud {
           if (e.pid === me) play('cash');
           break;
         case 'research':
-          if (e.pid === me) play('research');
+          if (e.pid === me) {
+            play('research');
+            this.timers.rsAvail = 0.6;
+          }
           break;
         case 'request':
           if (e.req && e.req.to === me) {
@@ -662,6 +680,7 @@ export class Hud {
     if ((T.cards -= dt) <= 0) { T.cards = 0.2; this.updateCards(); }
     if ((T.modal -= dt) <= 0) { T.modal = 0.4; this.updateModals(); }
     if ((T.ui -= dt) <= 0) { T.ui = 2.5; if (this.app.checkUi) this.app.checkUi(); }
+    if ((T.rsAvail -= dt) <= 0) { T.rsAvail = 1; this.checkResearchAvail(); }
     this.trackCamera();
     T.tip -= dt;
     if (T.tip <= 0 || (this.tipDirty && performance.now() - this.tipAt > 50)) {
@@ -2365,6 +2384,53 @@ export class Hud {
   updateModals() {
     if (!$('modal-research').hidden) this.renderResearch();
     if (!$('modal-countries').hidden) this.renderCountries(false);
+  }
+
+  availableResearch() {
+    const g = this.game, me = this.me;
+    if (!g || !me || !me.alive || me.researching || this.s.phase !== 'play') return [];
+    return RESEARCH_KEYS.filter((key) => !researchError(g, me.id, key));
+  }
+
+  researchBadge(n) {
+    for (const id of ['r-research', 'btn-research']) {
+      const host = $(id);
+      if (!host) continue;
+      let b = host.querySelector('.rs-badge');
+      if (!b) {
+        b = document.createElement('span');
+        b.className = 'rs-badge';
+        host.appendChild(b);
+      }
+      b.hidden = n <= 0;
+      setText(b, n > 9 ? '9+' : String(n));
+      b.title = n > 0 ? `Доступно исследований: ${n}` : '';
+      toggle(host, 'rs-ready', n > 0);
+    }
+  }
+
+  checkResearchAvail() {
+    const me = this.me;
+    if (!me) return;
+    const busy = !!me.researching;
+    if (this.rsWasBusy && !busy) this.rsSeen.clear();
+    this.rsWasBusy = busy;
+    const avail = this.availableResearch();
+    this.researchBadge(avail.length);
+    const tags = avail.map((k) => k + ':' + me.research[k]);
+    const fresh = avail.filter((k, i) => !this.rsSeen.has(tags[i]));
+    for (const k of [...this.rsSeen]) if (!tags.includes(k)) this.rsSeen.delete(k);
+    if (!fresh.length) return;
+    const now = this.s.tick / TICKS_PER_SEC;
+    if (now - this.rsLastNote < 15 && this.rsSeen.size) return;
+    for (const t of tags) this.rsSeen.add(t);
+    this.rsLastNote = now;
+    const name = (k) => `${RESEARCH[k].name} ${ROMAN[me.research[k] + 1] || me.research[k] + 1}`;
+    const list = fresh.slice(0, 3).map(name).join(', ') + (fresh.length > 3 ? ` и ещё ${fresh.length - 3}` : '');
+    const text = (fresh.length === 1 ? 'Доступно исследование: ' : 'Доступны исследования: ') + list + ' — откройте «Исследования» (R)';
+    this.log(text, 'good');
+    this.toast(fresh.length === 1 ? `Доступно исследование: ${name(fresh[0])}` : `Доступно исследований: ${avail.length}`, 'info');
+    play('researchReady');
   }
 
   openResearch() {
