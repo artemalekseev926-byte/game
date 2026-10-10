@@ -1,4 +1,4 @@
-export const VERSION = '2.0.0';
+export const VERSION = '1.1.0';
 export const TICK_MS = 100;
 export const TICKS_PER_SEC = 10;
 export const sec = (s) => Math.round(s * TICKS_PER_SEC);

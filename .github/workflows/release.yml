@@ -20,16 +20,36 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: PixelConquest-windows
-          path: release/*.exe
       - id: ver
         shell: bash
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Zip archive
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          Rename-Item release/win-unpacked "Pixel Conquest"
+          Compress-Archive -Path "release/Pixel Conquest" -DestinationPath "release/PixelConquest-$v-windows.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PixelConquest-windows
+          path: |
+            release/*.exe
+            release/*.zip
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.ver.outputs.version) }}
           name: Pixel Conquest ${{ steps.ver.outputs.version }}
           target_commitish: ${{ github.sha }}
-          files: release/*.exe
+          make_latest: true
+          body: |
+            Полная версия Pixel Conquest ${{ steps.ver.outputs.version }} для Windows.
+
+            Как запустить:
+            - PixelConquest-${{ steps.ver.outputs.version }}-windows.zip — распакуйте архив и запустите «Pixel Conquest.exe» в папке «Pixel Conquest».
+            - PixelConquest-${{ steps.ver.outputs.version }}-portable.exe — один файл, запускается без установки.
+
+            Если Windows покажет SmartScreen: «Подробнее» → «Выполнить в любом случае».
+            Для игры через Steam должен быть запущен клиент Steam.
+          files: |
+            release/*.exe
+            release/*.zip

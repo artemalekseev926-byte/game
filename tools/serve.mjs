@@ -1,8 +1,9 @@
 import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
-const root = new URL('../web/', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../web/', import.meta.url));
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.map': 'application/json' };
 const port = Number(process.env.PORT) || 8080;
 

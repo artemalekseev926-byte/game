@@ -1,4 +1,4 @@
-(()=>{var __defProp=Object.defineProperty;var __export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:true})};var VERSION="2.0.0";var TICK_MS=100;var TICKS_PER_SEC=10;var sec=s=>Math.round(s*TICKS_PER_SEC);var LN2=.6931471805599453;function dlog(x){let k=0;while(x>=2){x/=
+(()=>{var __defProp=Object.defineProperty;var __export=(target,all)=>{for(var name in all)__defProp(target,name,{get:all[name],enumerable:true})};var VERSION="1.1.0";var TICK_MS=100;var TICKS_PER_SEC=10;var sec=s=>Math.round(s*TICKS_PER_SEC);var LN2=.6931471805599453;function dlog(x){let k=0;while(x>=2){x/=
 2;k++}while(x<1){x*=2;k--}const z=(x-1)/(x+1),z2=z*z;let term=z,sum=0;for(let n=1;n<44;n+=2){sum+=term/n;term*=z2}return 2*sum+k*LN2}function dexp(y){let k=Math.
 floor(y/LN2);const r=y-k*LN2;let term=1,sum=1;for(let n=1;n<26;n++){term*=r/n;sum+=term}for(;k>0;k--)sum*=2;for(;k<0;k++)sum/=2;return sum}var dpow=(x,e)=>x>0&&
 Number.isFinite(x)?dexp(e*dlog(x)):0;function heading(dx,dy){const ax=Math.abs(dx),ay=Math.abs(dy);if(ax===0&&ay===0)return 0;const a=ax>ay?ay/ax:ax/ay;const q=a*

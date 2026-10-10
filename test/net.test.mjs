@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { HostLobby, ClientLobby, mergeSettings, defaultLobbySettings, LOBBY_BURST, LOBBY_CHAT_BURST } from '../src/client/lobby.js';
 import {
   Session, createMatch, startOffline, loadOffline, cleanCmd, HASH_EVERY, GAP_WAIT, STALL_WAIT, STATE_GAP, PEER_INTENTS, PEER_QUEUE, CHAT_BURST, READY_RETRY,
@@ -935,7 +936,7 @@ test('чанки: лимиты размера, числа сборок и вре
 });
 
 const require = createRequire(import.meta.url);
-const ELECTRON_DIR = new URL('../electron/', import.meta.url).pathname;
+const ELECTRON_DIR = fileURLToPath(new URL('../electron/', import.meta.url));
 
 function loadMain(file, fakes) {
   const stubs = [];
