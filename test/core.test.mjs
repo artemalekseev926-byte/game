@@ -157,13 +157,14 @@ test('союз запрещает атаку, разрыв делает пред
   assert.equal(g.s.attacks.length, 0, 'атаки между союзниками отменены');
   assert.ok(g.s.players[0].troops > before);
   assert.equal(g.isHostile(0, 1), false);
-  const r = g.validate(0, { c: 'attack', x, y, ratio: 0.2 });
+  const [x2, y2] = frontier(g, 0, 1);
+  const r = g.validate(0, { c: 'attack', x: x2, y: y2, ratio: 0.2 });
   assert.equal(r.ok, false);
   assert.match(r.error, /союзник/);
   g.tick(cmd(0, { c: 'break', with: 1 }));
   assert.equal(g.relation(0, 1).type, 'none');
   assert.ok(g.s.players[0].traitorUntil > g.s.tick);
-  assert.ok(g.validate(0, { c: 'attack', x, y, ratio: 0.2 }).ok);
+  assert.ok(g.validate(0, { c: 'attack', x: x2, y: y2, ratio: 0.2 }).ok);
 });
 
 test('пакт, торговый договор, истечение запросов, эмбарго', () => {

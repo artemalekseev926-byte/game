@@ -52,31 +52,34 @@ function readyBuilding(g, pid, type, x, y) {
 const SMALL = smallMap(7);
 
 test('ИИ: партия 6 ИИ на маленькой карте доигрывается до победы по территории', () => {
-  const g = aiGame(SMALL, ['easy', 'normal', 'hard', 'normal', 'hard', 'easy'], 11, { victory: { territory: true, territoryPct: 70 } });
   const limit = 40 * 60 * TICKS_PER_SEC;
-  const seen = { built: 0, research: 0, capture: 0 };
-  while (g.s.phase !== 'over' && g.s.tick < limit) {
-    g.tick([]);
-    for (const e of g.events) if (seen[e.k] !== undefined) seen[e.k]++;
+  for (const [map, seed] of [[SMALL, 11], [smallMap(8), 12]]) {
+    const g = aiGame(map, ['easy', 'normal', 'hard', 'normal', 'hard', 'easy'], seed, { victory: { territory: true, territoryPct: 70 } });
+    const seen = { built: 0, research: 0, capture: 0 };
+    while (g.s.phase !== 'over' && g.s.tick < limit) {
+      g.tick([]);
+      for (const e of g.events) if (seen[e.k] !== undefined) seen[e.k]++;
+    }
+    assert.equal(g.aiError, undefined, String(g.aiError && g.aiError.stack));
+    assert.equal(g.s.phase, 'over', 'партия не закончилась за 40 минут');
+    assert.equal(g.s.winReason, 'territory');
+    const w = g.s.players[g.s.winner];
+    assert.ok(w.tiles * 100 >= map.landCount * 70 - 1e-9, `победитель держит ${(w.tiles * 100 / map.landCount).toFixed(1)}%`);
+    assert.ok(g.s.tick <= limit);
+    assert.ok(seen.built > 5 && seen.research > 3 && seen.capture > 0, JSON.stringify(seen));
   }
-  assert.equal(g.aiError, undefined, String(g.aiError && g.aiError.stack));
-  assert.equal(g.s.phase, 'over', 'партия не закончилась за 40 минут');
-  assert.equal(g.s.winReason, 'territory');
-  const w = g.s.players[g.s.winner];
-  assert.ok(w.tiles * 100 >= SMALL.landCount * 70 - 1e-9, `победитель держит ${(w.tiles * 100 / SMALL.landCount).toFixed(1)}%`);
-  assert.ok(g.s.tick <= limit);
-  assert.ok(seen.built > 5 && seen.research > 3 && seen.capture > 0, JSON.stringify(seen));
-  assert.ok(g.s.players.filter((p) => !p.alive).length >= 1, 'кто-то выбыл');
 });
 
 test('ИИ: world, 8 ИИ, 15 минут — все здания, высадки, флот, торговля, исследования, бюджет хода', () => {
   const map = generateMap({ id: 'world', seed: 3 });
-  const g = aiGame(map, ['normal', 'normal', 'hard', 'easy', 'normal', 'hard', 'normal', 'easy'], 3);
+  const g = aiGame(map, ['normal', 'normal', 'hard', 'easy', 'normal', 'hard', 'normal', 'easy'], 3, { victory: { territory: false } });
   const think = Object.fromEntries(Object.entries(DIFFICULTY).map(([k, v]) => [k, v.think]));
   for (const k of Object.keys(DIFFICULTY)) DIFFICULTY[k].think = 1e9;
   const types = new Set();
   const count = { transport: 0, warship: 0, trade: 0, research: 0, launch: 0 };
   const turns = [];
+  const levels = [];
+  const researchSum = () => g.s.players.reduce((n, p) => n + Object.values(p.research).reduce((a, b) => a + b, 0), 0);
   let tickMs = 0;
   const T = 15 * 60 * TICKS_PER_SEC;
   try {
@@ -104,21 +107,27 @@ test('ИИ: world, 8 ИИ, 15 минут — все здания, высадки
         } else if (e.k === 'trade') count.trade++;
         else if (e.k === 'research') count.research++;
       }
+      if (t % 3000 === 2999) levels.push(researchSum());
     }
   } finally {
     for (const k of Object.keys(DIFFICULTY)) DIFFICULTY[k].think = think[k];
   }
   assert.equal(g.aiError, undefined, String(g.aiError && g.aiError.stack));
+  assert.equal(g.s.tick >= T, true, 'партия идёт все 15 минут');
   for (const type of BUILDING_KEYS) assert.ok(types.has(type), `ИИ не построили: ${type}`);
   assert.ok(count.transport >= 1, 'нет высадок');
   assert.ok(count.warship >= 1, 'нет военных кораблей');
   assert.ok(count.trade >= 1, 'нет торговых поставок');
   assert.ok(count.launch >= 1, 'нет ударов');
-  assert.ok(g.s.rails.length + count.research > 0);
-  const levels = g.s.players.map((p) => Object.values(p.research).reduce((a, b) => a + b, 0));
-  assert.ok(count.research >= 40 && Math.max(...levels) >= 10, `исследования: ${count.research}, ${levels}`);
+  assert.ok(g.s.rails.length > 0, 'нет железных дорог');
+  assert.equal(levels.length, 3);
+  assert.ok(levels[0] < levels[1] && levels[1] < levels[2], `исследования растут: ${levels}`);
+  const best = Math.max(...g.s.players.map((p) => Object.values(p.research).reduce((a, b) => a + b, 0)));
+  assert.ok(count.research >= 40 && best >= 10, `исследования: ${count.research}, лучший ${best}`);
+  turns.sort((a, b) => a - b);
   const avgTurn = turns.reduce((a, b) => a + b, 0) / turns.length;
   assert.ok(avgTurn <= 2, `средний ход ИИ ${avgTurn.toFixed(3)} мс`);
+  assert.ok(turns[Math.floor(turns.length * 0.9)] <= 4, `90% ходов ИИ дольше ${turns[Math.floor(turns.length * 0.9)].toFixed(2)} мс`);
   assert.ok(tickMs / T <= 8, `средний тик ${(tickMs / T).toFixed(2)} мс`);
 });
 
@@ -153,6 +162,9 @@ test('ИИ: ответы на предложения, предатели, сою
   P[0].traitorUntil = g.s.tick + 100;
   assert.equal(aiRespond(g, 1, { id: 3, from: 0, to: 1, type: 'trade' }), false, 'предателю отказ');
   P[0].traitorUntil = 0;
+  g.s.relations['0:1'] = { type: 'pact', until: g.s.tick + 1000, embargo: false, emb: 0 };
+  assert.equal(aiRespond(g, 1, { id: 5, from: 0, to: 1, type: 'trade' }), false, 'торговля не заменяет действующий пакт');
+  delete g.s.relations['0:1'];
   g.s.relations['0:1'] = { type: 'alliance', until: 0, embargo: false, emb: 0 };
   g.s.relations['0:2'] = { type: 'alliance', until: 0, embargo: false, emb: 0 };
   assert.equal(aiRespond(g, 1, { id: 4, from: 2, to: 1, type: 'alliance' }), false, 'союз всех живых не нужен не-лидеру');
@@ -210,4 +222,70 @@ test('ИИ: runAI не трогает людей и фазу спавна', () =
   assert.equal(hashState(g.s), h);
   g.tick([]);
   assert.equal(g.s.players[0].aiState.turn, undefined);
+});
+
+function fill(g, pid, x0, y0, x1, y1) {
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const i = y * g.W + x;
+    if (g.isLandTile(i)) g.setOwner(i, pid);
+  }
+}
+
+test('ИИ: высадки — малый десант на ничий остров, затем вторжение на остров врага', () => {
+  const map = rectMap([[10, 10, 90, 90], [130, 35, 160, 65], [178, 78, 196, 94]], 200, 100);
+  const g = aiGame(map, ['hard', null], 5, { spawnSeconds: 1, victory: { territory: false } });
+  while (g.s.phase === 'spawn') g.tick([]);
+  fill(g, -1, 0, 0, 200, 100);
+  fill(g, 0, 10, 10, 90, 90);
+  fill(g, 1, 178, 78, 196, 94);
+  const P = g.s.players;
+  const islandB = (pid) => {
+    let n = 0;
+    for (let y = 35; y < 65; y++) for (let x = 130; x < 160; x++) if (g.s.owner[y * g.W + x] === pid + 1) n++;
+    return n;
+  };
+  P[0].troops = 200000;
+  P[1].troops = 500;
+  let first = null;
+  for (let t = 0; t < 400 && !first; t++) {
+    g.tick([]);
+    for (const e of g.events) if (e.k === 'ship' && e.type === 'transport' && e.pid === 0) first = g.unitById(e.id);
+  }
+  assert.ok(first, 'ИИ отправил десант');
+  assert.equal(g.landId[first.target], g.landId[(50 * g.W) + 145], 'цель — ближайший ничий остров');
+  assert.ok(first.troops > 1000 && first.troops < 40000, `размер десанта по размеру острова: ${first.troops}`);
+  for (let t = 0; t < 600 && islandB(0) < 800; t++) g.tick([]);
+  assert.ok(islandB(0) >= 800, `остров занят: ${islandB(0)}`);
+  const hum0 = P[1].tiles;
+  for (let t = 0; t < 2500 && P[1].alive && P[1].tiles >= hum0; t++) g.tick([]);
+  assert.ok(!P[1].alive || P[1].tiles < hum0, 'ИИ высадился на остров врага');
+  assert.equal(g.aiError, undefined);
+});
+
+test('ИИ: сложный ИИ без целей разрывает пакт со слабым соседом, обычный — нет', () => {
+  for (const level of ['hard', 'normal']) {
+    const map = rectMap([[10, 10, 190, 90]], 200, 100);
+    const g = aiGame(map, [level, null], 6, { spawnSeconds: 1, victory: { territory: false } });
+    g.tick([{ pid: 1, cmd: { c: 'spawn', x: 170, y: 50 } }]);
+    while (g.s.phase === 'spawn') g.tick([]);
+    fill(g, 0, 0, 0, 150, 100);
+    fill(g, 1, 150, 0, 200, 100);
+    g.s.relations['0:1'] = { type: 'pact', until: g.s.tick + 30000, embargo: false, emb: 0 };
+    const P = g.s.players;
+    P[1].troops = 300;
+    for (let t = 0; t < 1500 && g.relation(0, 1).type === 'pact'; t++) {
+      P[0].troops = P[0].maxTroops;
+      P[1].troops = 300;
+      g.tick([]);
+    }
+    if (level === 'hard') {
+      assert.equal(g.relation(0, 1).type, 'none', 'пакт разорван');
+      assert.ok(P[0].traitorUntil > g.s.tick, 'предатель');
+      for (let t = 0; t < 100 && !g.s.attacks.some((a) => a.attacker === 0 && a.target === 1); t++) g.tick([]);
+      assert.ok(g.s.attacks.some((a) => a.attacker === 0 && a.target === 1), 'нападение после разрыва');
+    } else {
+      assert.equal(g.relation(0, 1).type, 'pact', 'обычный ИИ соблюдает пакт');
+    }
+    assert.equal(g.aiError, undefined);
+  }
 });

@@ -301,7 +301,7 @@ function pushNeighbors(game, a, i) {
   if (i < N - W) add(i + W);
 }
 
-const scratch = { cands: [], b2: [], b1: [] };
+const scratch = { cands: [], b2: [], b1: [], key: [] };
 
 function stepLanding(game, a) {
   const s = game.s, i = a.landing;
@@ -345,33 +345,24 @@ function stepAttack(game, a) {
     if (!cands.length) return END;
   }
   const own = s.owner, W = game.W, N = game.N, me = a.attacker + 1;
-  const b2 = scratch.b2, b1 = scratch.b1;
+  const b2 = scratch.b2, b1 = scratch.b1, key = scratch.key, terrain = game.map.terrain;
   b2.length = 0; b1.length = 0;
   for (let k = 0; k < cands.length; k++) {
     const i = cands[k];
     const c = nbCount(own, W, N, i, me);
-    if (c >= 2) b2.push(c * 16777216 + k);
-    else b1.push(i);
+    if (c >= 3) b2.push(c * 16777216 + k);
+    else {
+      key[k] = (game.rand() * (c === 2 ? 2 : 1)) / TERRAIN_COST[terrain[i]];
+      b1.push(k);
+    }
   }
-  if (b2.length > 1) b2.sort((p, q) => (q >> 0) - (p >> 0) || 0);
+  if (b2.length > 1) b2.sort((p, q) => q - p);
+  if (b1.length > 1) b1.sort((p, q) => key[q] - key[p] || p - q);
   const atkMul = a.target >= 0 ? game.attackMult(a.attacker) : 1;
   const defMul = a.target >= 0 ? game.defenseMult(a.target) : 1;
   let taken = 0;
-  for (let k = 0; k < b2.length && taken < n; k++) {
-    const i = cands[b2[k] % 16777216];
-    if (own[i] !== a.target + 1) continue;
-    const cost = tileCost(game, a.attacker, a.target, i, atkMul, defMul);
-    if (a.troops < cost) return END;
-    capture(game, a, i, cost);
-    pushNeighbors(game, a, i);
-    taken++;
-  }
-  let m = b1.length;
-  while (taken < n && m > 0) {
-    const r = Math.floor(game.rand() * m);
-    const i = b1[r];
-    b1[r] = b1[m - 1];
-    m--;
+  for (let k = 0; k < b2.length + b1.length && taken < n; k++) {
+    const i = cands[k < b2.length ? b2[k] % 16777216 : b1[k - b2.length]];
     if (own[i] !== a.target + 1) continue;
     const cost = tileCost(game, a.attacker, a.target, i, atkMul, defMul);
     if (a.troops < cost) return END;

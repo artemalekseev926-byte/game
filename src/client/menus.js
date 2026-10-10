@@ -341,8 +341,8 @@ class MenuBg {
     this.cv = $('menu-bg');
     this.res = null;
     this.mask = null;
-    this.mw = 300;
-    this.mh = 120;
+    this.mw = 600;
+    this.mh = 240;
     this.owner = null;
     this.front = [];
     this.layer = null;
@@ -356,7 +356,7 @@ class MenuBg {
 
   load() {
     const theme = this.app.settings.theme;
-    this.app.previews.get(BG_DESC, 1200, 480, theme, { mask: this.mask ? null : [this.mw, this.mh] }).then((res) => {
+    this.app.previews.get(BG_DESC, 1800, 720, theme, { mask: this.mask ? null : [this.mw, this.mh] }).then((res) => {
       if (theme !== this.app.settings.theme) return;
       this.res = res;
       if (res.mask && !this.mask) {
@@ -408,7 +408,7 @@ class MenuBg {
     if (!this.owner) return;
     for (let c = 0; c < this.front.length; c++) {
       const f = this.front[c];
-      const n = 3 + ((c * 7) % 5);
+      const n = (3 + ((c * 7) % 5)) * 4;
       for (let k = 0; k < n && f.length; k++) {
         const r = (Math.random() * f.length) | 0;
         const i = f[r];
@@ -850,9 +850,11 @@ class Multiplayer {
       r = { ok: false, error: e.message };
     }
     this.steamOk = !!(r && r.ok);
-    this.setSteam(this.steamOk, this.steamOk ? `Steam: ${r.name || 'подключён'}` : (r && r.error) || 'Steam недоступен');
+    const err = (r && r.error) || 'Steam недоступен';
+    this.setSteam(this.steamOk, this.steamOk ? `Steam: ${r.name || 'подключён'}` : hasNative() ? 'Steam не запущен' : 'Только в версии для ПК');
+    if (!this.steamOk) $('steam-status').title = err;
     if (this.steamOk) this.refreshLobbies();
-    else $('steam-lobbies').innerHTML = `<li class="empty">${hasNative() ? 'Запустите Steam, чтобы увидеть открытые лобби' : 'Steam доступен только в версии для ПК'}</li>`;
+    else $('steam-lobbies').innerHTML = `<li class="empty">${hasNative() ? 'Steam недоступен: запустите Steam и откройте этот экран снова. Игра по локальной сети работает и без Steam.' : 'Steam доступен только в версии для ПК. В браузере работает одиночная игра.'}</li>`;
   }
 
   async refreshLobbies() {

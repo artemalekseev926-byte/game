@@ -1,7 +1,7 @@
 export const THEMES = {
   dark: {
     name: 'dark',
-    bg: '#060a11',
+    bg: '#08121f',
     edge: 'rgba(0,0,0,0.55)',
     deep: [11, 27, 47], mid: [17, 45, 73], shallow: [32, 78, 108], foam: [118, 170, 196], lake: [30, 72, 102],
     land: [
@@ -39,7 +39,7 @@ export const THEMES = {
   },
   light: {
     name: 'light',
-    bg: '#cfdde6',
+    bg: '#a7c2d8',
     edge: 'rgba(40,60,80,0.25)',
     deep: [74, 132, 182], mid: [100, 158, 204], shallow: [136, 188, 224], foam: [214, 236, 248], lake: [128, 182, 220],
     land: [

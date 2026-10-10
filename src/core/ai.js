@@ -4,7 +4,7 @@ import {
 import {
   buildError, buildCost, upgradeCost, upgradeError, railError, railRoute, railCost, nearestPort,
 } from './buildings.js';
-import { proposeError } from './diplomacy.js';
+import { proposeError, embargoBy } from './diplomacy.js';
 import { shipCost, portShips, portShipCap, canEngage, sharedSea } from './units.js';
 import { coastBodies } from './nav.js';
 import { strikeError } from './strikes.js';
@@ -21,20 +21,20 @@ export const AI_PROFILES = {
   easy: {
     expand: 0.2, expandMin: 0.4, attack: 0.25, warAt: 0.8, edge: 2.0, capPush: 0.97, reserve: 0.45, warGap: 300,
     builds: 1, houseEvery: 1400, maxHouses: 8, maxFactories: 3, maxPorts: 2, airbases: 1, silos: 1,
-    ships: 0.5, maxShips: 3, nukes: 0, nukeEvery: 0, maxNuclear: 0, allies: 0,
-    boat: 0.15, boatRange: 150, boatEvery: 600, dipEvery: 900, strikeEvery: 3,
+    ships: 0.5, maxShips: 3, nukes: 0, nukeEvery: 0, maxNuclear: 0, allies: 0, betray: 0,
+    boatSend: 0.15, boatLocked: 0.4, boatRange: 150, boatEvery: 600, dipEvery: 900, strikeEvery: 3,
   },
   normal: {
     expand: 0.28, expandMin: 0.3, attack: 0.3, warAt: 0.6, edge: 1.6, capPush: 0.95, reserve: 0.35, warGap: 150,
     builds: 2, houseEvery: 900, maxHouses: 16, maxFactories: 6, maxPorts: 4, airbases: 1, silos: 2,
-    ships: 1, maxShips: 6, nukes: 2, nukeEvery: 900, maxNuclear: 2, allies: 1,
-    boat: 0.2, boatRange: 220, boatEvery: 400, dipEvery: 600, strikeEvery: 1,
+    ships: 1, maxShips: 6, nukes: 2, nukeEvery: 900, maxNuclear: 2, allies: 1, betray: 0,
+    boatSend: 0.2, boatLocked: 0.5, boatRange: 220, boatEvery: 400, dipEvery: 600, strikeEvery: 1,
   },
   hard: {
     expand: 0.33, expandMin: 0.25, attack: 0.45, warAt: 0.55, edge: 1.15, capPush: 0.9, reserve: 0.25, warGap: 40,
     builds: 3, houseEvery: 650, maxHouses: 24, maxFactories: 8, maxPorts: 5, airbases: 2, silos: 2,
-    ships: 1.5, maxShips: 10, nukes: 3, nukeEvery: 450, maxNuclear: 3, allies: 1,
-    boat: 0.25, boatRange: 300, boatEvery: 250, dipEvery: 400, strikeEvery: 1,
+    ships: 1.5, maxShips: 10, nukes: 3, nukeEvery: 450, maxNuclear: 3, allies: 1, betray: 1,
+    boatSend: 0.25, boatLocked: 0.6, boatRange: 300, boatEvery: 250, dipEvery: 400, strikeEvery: 1,
   },
 };
 
@@ -58,6 +58,8 @@ function brain(game, p) {
       v: 1, rng: (Math.imul(p.id + 1, 0x9e3779b1) ^ game.s.rngState ^ 0x5bd1e995) >>> 0,
       turn: 0, war: -1, warAt: 0, bad: [], prop: [], dipAt: 0, boatAt: 0, nukeAt: 0, boats: 0, ships: 0,
     };
+    st.agg = Math.round((0.85 + rnd(st) * 0.35) * 100) / 100;
+    st.sea = Math.round((0.7 + rnd(st) * 0.7) * 100) / 100;
     p.aiState = st;
   }
   return st;
@@ -163,6 +165,7 @@ function survey(game, p, st) {
   for (const u of s.units) {
     if (u.type === 'transport' && u.tp === p.id && u.owner !== p.id) { inc[u.owner] += u.troops || 0; incoming += u.troops || 0; }
   }
+  const lead = leaderOf(s);
   let landBorder = 0, hostileLand = 0;
   for (let q = 0; q <= P; q++) {
     landBorder += cnt[q];
@@ -172,7 +175,7 @@ function survey(game, p, st) {
     cnt, tile, coast, coastN, minX, minY, maxX, maxY,
     cx: n ? sx / n : (p.capital >= 0 ? p.capital % W : W / 2),
     cy: n ? sy / n : (p.capital >= 0 ? Math.floor(p.capital / W) : game.H / 2),
-    inc, out, incoming, landBorder, hostileLand, lead: leaderOf(s),
+    inc, out, incoming, landBorder, hostileLand, lead, dom: dominant(game, lead) && lead.id !== p.id,
   };
 }
 
@@ -210,14 +213,15 @@ function military(game, p, st, v, prof) {
   const pick = pickWar(game, p, st, v, prof);
   if (!pick) return;
   const q = pick.q;
+  const agg = st.agg || 1;
   const scarce = neutral === 0 || neutral * 12 < v.landBorder;
   const capped = p.troops / M >= prof.capPush;
   const counter = v.inc[q] > 0 && pick.pow >= 0.9;
-  const strong = pick.pow >= prof.edge * (scarce ? 1 : 2.5);
+  const strong = pick.pow * agg >= prof.edge * (scarce ? 1 : 2.5);
   if (!(capped || counter || (strong && p.troops / M >= prof.warAt))) return;
-  if (!capped && !counter && s.tick - (st.atkAt || 0) < prof.warGap) return;
+  if (!capped && !counter && s.tick - (st.atkAt || 0) < prof.warGap / agg) return;
   if (v.out[q + 1] > p.troops * (capped ? 0.6 : 0.35)) return;
-  let r = prof.attack * (pick.pow >= 3 ? 1.2 : 1) + (capped ? 0.1 : 0);
+  let r = prof.attack * agg * (pick.pow >= 3 ? 1.2 : 1) + (capped ? 0.1 : 0);
   if (danger && v.inc[q] === 0) r *= 0.7;
   if (!capped) r = Math.min(r, (p.troops - M * prof.reserve * (danger ? 1.4 : 1)) / Math.max(1, p.troops));
   if (r < 0.05) return;
@@ -246,7 +250,7 @@ function pickWar(game, p, st, v, prof) {
     if (st.war === q) sc *= 1.5;
     if (v.inc[q] > 0) sc *= 1.4;
     if (Q.traitorUntil > s.tick) sc *= 1.2;
-    if (lead.id === q && lead.tiles > p.tiles * 1.3 && prof.allies > 0) sc *= 1.3;
+    if (lead.id === q && lead.tiles > p.tiles * 1.3 && prof.allies > 0) sc *= v.dom ? 1.7 : 1.3;
     if (Q.tiles < p.tiles * 0.3) sc *= 1.2;
     if (sc > bs) { bs = sc; best = { q, pow, gain }; }
   }
@@ -409,24 +413,41 @@ function hostileThreats(game, p, v) {
 }
 
 function strikeThreat(game, pid) {
+  let t = 0;
   for (const b of game.s.buildings) {
-    if ((b.type === 'silo' || b.type === 'airbase') && b.owner !== pid && game.isHostile(pid, b.owner)) return true;
+    if ((b.type === 'silo' || b.type === 'airbase') && b.owner !== pid && game.isHostile(pid, b.owner)) {
+      if (b.type === 'silo') return 2;
+      t = 1;
+    }
   }
-  return false;
+  return t;
 }
 
-function nextResearch(game, p, prof, mine) {
-  if (p.researching) return null;
+const NUKE_PLAN = [['missile', 1], ['nuclear', 1], ['nuclear', 2], ['nuclear', 3]];
+
+
+function researchOk(p, prof, mine, key, lvl) {
   const R = p.research;
+  if (R[key] >= lvl) return false;
+  if (key === 'nuclear' && lvl > prof.maxNuclear) return false;
+  if (key === 'naval' && !mine.port.length) return false;
+  if ((key === 'armor' || key === 'art') && !mine.factory.length) return false;
+  const req = RESEARCH[key].req;
+  return !req || R[req[0]] >= req[1];
+}
+
+function nextResearch(game, p, prof, mine, threat) {
+  if (p.researching) return null;
+  if (threat && researchOk(p, prof, mine, 'aa', threat)) return { key: 'aa', pri: 72 };
+  if (prof.maxNuclear && p.gold >= 60000) {
+    for (const [key, lvl] of NUKE_PLAN) {
+      if (lvl >= 3 && p.gold < 150000) break;
+      if (researchOk(p, prof, mine, key, lvl)) return { key, pri: 75 };
+    }
+  }
   for (let k = 0; k < PLAN.length; k++) {
     const [key, lvl] = PLAN[k];
-    if (R[key] >= lvl) continue;
-    if (key === 'nuclear' && lvl > prof.maxNuclear) continue;
-    if (key === 'naval' && !mine.port.length) continue;
-    if ((key === 'armor' || key === 'art') && !mine.factory.length) continue;
-    const req = RESEARCH[key].req;
-    if (req && R[req[0]] < req[1]) continue;
-    return { key, pri: 76 - k * 0.7 };
+    if (researchOk(p, prof, mine, key, lvl)) return { key, pri: 76 - k * 0.7 };
   }
   return null;
 }
@@ -464,7 +485,8 @@ function economy(game, p, st, v, prof, withRails) {
   const rich = Math.min(3, Math.floor(p.gold / 40000));
   const wishes = [];
   const wish = (pri, cost, run, save = false) => { wishes.push({ pri, cost, run, save }); };
-  const nr = nextResearch(game, p, prof, mine);
+  const threat = strikeThreat(game, pid);
+  const nr = nextResearch(game, p, prof, mine, threat);
   if (nr) wish(nr.pri, researchCost(nr.key, R[nr.key]), () => OK(game.apply(pid, { c: 'research', key: nr.key })), nr.pri >= 66);
   const upgrade = (b) => !upgradeError(game, pid, b) && OK(game.apply(pid, { c: 'upgrade', id: b.id }));
   const wantH = Math.min(prof.maxHouses + rich * 4, 1 + Math.floor(t / prof.houseEvery));
@@ -499,7 +521,6 @@ function economy(game, p, st, v, prof, withRails) {
     const fo = cheapestUpgrade(game, pid, mine.fort, BUILDINGS.fort.max);
     if (fo && v.incoming > 0) wish(46, upgradeCost(game, fo), () => upgrade(fo));
   }
-  const threat = strikeThreat(game, pid);
   const wantS = (threat ? Math.min(6, 1 + Math.floor(t / 7000)) : (mine.silo.length || mine.factory.length > 2 ? 1 : 0)) + rich;
   if (mine.sam.length < wantS) wish(threat ? 66 : 42, buildCost(game, pid, 'sam'), () => placeSam(game, p, st, v, mine));
   if (threat || rich) {
@@ -553,9 +574,15 @@ function coastSamples(game) {
     const q = Math.floor(y / cell) * cw + Math.floor(x / cell);
     if (pick[q] < 0 || i < pick[q]) pick[q] = i;
   }
-  const out = [];
-  for (const i of pick) if (i >= 0) out.push(i);
-  c = Int32Array.from(out);
+  const out = [], body = [];
+  for (const i of pick) {
+    if (i < 0) continue;
+    const bs = coastBodies(map, i);
+    if (!bs.length) continue;
+    out.push(i);
+    body.push(Math.min(...bs));
+  }
+  c = { tiles: Int32Array.from(out), body: Int32Array.from(body) };
   coastCache.set(map, c);
   return c;
 }
@@ -581,31 +608,67 @@ function countOwn(game, pid, type) {
   return n;
 }
 
+function freeLand(game, lm) {
+  let n = game.landSizes[lm];
+  for (const c of game.lmCount) n -= c[lm];
+  return n;
+}
+
+const NEUTRAL_TILE = ECON.neutralCost * 1.35;
+
+function tileCostOf(game, p, q) {
+  const dens = q.troops / Math.max(1, q.tiles);
+  return ((ECON.tileCost + dens * ECON.densityCost) * 1.35 * game.defenseMult(q.id)) / game.attackMult(p.id);
+}
+
 function pickLanding(game, p, st, v, prof, locked, noNeutral) {
   const s = game.s, own = s.owner, fo = s.fallout, W = game.W, P = s.players;
-  const samples = coastSamples(game);
+  const cs = coastSamples(game);
   const range = prof.boatRange * (locked ? 4 : 1) * (W >= 1000 ? 1 : 0.6);
   const R2 = range * range;
+  const send = Math.max(1, p.troops) * (locked ? prof.boatLocked : prof.boatSend);
   const myPow = atkPower(game, p);
-  const cx = v.coast.map((i) => i % W), cy = v.coast.map((i) => Math.floor(i / W));
-  let best = -1, bs = Infinity, bt = -2;
-  for (let k = 0; k < samples.length; k++) {
-    const t = samples[k];
+  const bodies = [];
+  const cx = [], cy = [];
+  for (const i of v.coast) {
+    cx.push(i % W);
+    cy.push(Math.floor(i / W));
+    for (const b of coastBodies(game.map, i)) if (!bodies.includes(b)) bodies.push(b);
+  }
+  const per = new Float64Array(P.length).fill(-1);
+  for (const q of P) {
+    if (q.id === p.id || !q.alive || !q.tiles || !game.isHostile(p.id, q.id)) continue;
+    if (myPow / Math.max(1, defPower(game, q)) < (locked ? 0.5 : 1.8)) continue;
+    per[q.id] = tileCostOf(game, p, q);
+  }
+  const free = new Map();
+  let best = null, bs = 0;
+  for (let k = 0; k < cs.tiles.length; k++) {
+    if (!bodies.includes(cs.body[k])) continue;
+    const t = cs.tiles[k];
     const o = own[t] - 1;
     if (o === p.id) continue;
     const lm = game.landId[t];
-    let w = 1;
+    let gain, need, mul = 1;
     if (o < 0) {
-      if (fo[t]) continue;
-      if (!noNeutral && game.ownsOnLandmass(p.id, lm)) continue;
-      w /= 1 + Math.min(game.landSizes[lm], 4000) / 400;
+      if (fo[t] || (!noNeutral && game.ownsOnLandmass(p.id, lm))) continue;
+      let f = free.get(lm);
+      if (f === undefined) { f = freeLand(game, lm); free.set(lm, f); }
+      if (f <= 0) continue;
+      gain = Math.min(f, send / NEUTRAL_TILE);
+      need = f * NEUTRAL_TILE * 1.4 + 600;
     } else {
-      if (!P[o].alive || !game.isHostile(p.id, o)) continue;
-      const ratio = myPow / Math.max(1, defPower(game, P[o]));
-      if (ratio < (locked ? 0.6 : 2.5)) continue;
-      w = 1.5 / Math.min(2, ratio / 2);
-      w /= 1 + Math.min(game.lmCount[o][lm], 40000) / 2000;
+      const c = per[o];
+      if (c < 0) continue;
+      const have = game.lmCount[o][lm];
+      gain = Math.min(have, send / c);
+      need = have * c * 1.3 + 1500;
+      if (o === st.war) mul *= 1.5;
+      if (P[o].traitorUntil > s.tick) mul *= 1.2;
+      if (o === v.lead.id && v.lead.tiles > p.tiles) mul *= 1.3;
+      if (!locked) mul *= 0.6;
     }
+    if (gain < 3) continue;
     const x = t % W, y = (t - x) / W;
     let d = Infinity;
     for (let j = 0; j < cx.length; j++) {
@@ -613,10 +676,10 @@ function pickLanding(game, p, st, v, prof, locked, noNeutral) {
       if (dd < d) d = dd;
     }
     if (d > R2) continue;
-    const sc = (d + 400) * w;
-    if (sc < bs && !isBad(st, t, s.tick)) { bs = sc; best = t; bt = o; }
+    const sc = (gain * mul) / (Math.sqrt(d) + 120);
+    if (sc > bs && !isBad(st, t, s.tick)) { bs = sc; best = { tile: t, target: o, troops: Math.min(send, need) }; }
   }
-  return best >= 0 ? { tile: best, target: bt } : null;
+  return best;
 }
 
 function boats(game, p, st, v, prof) {
@@ -629,10 +692,10 @@ function boats(game, p, st, v, prof) {
   if (fill < (locked ? 0.4 : 0.55)) return false;
   if (s.tick < st.boatAt) return false;
   const pick = pickLanding(game, p, st, v, prof, locked, noNeutral);
-  st.boatAt = s.tick + (locked ? 30 : prof.boatEvery);
+  st.boatAt = s.tick + (locked ? 40 : Math.round(prof.boatEvery / (st.sea || 1)));
   if (!pick) return false;
   const W = game.W, t = pick.tile;
-  const ratio = pick.target < 0 ? prof.boat : Math.min(0.6, prof.attack + 0.1);
+  const ratio = Math.min(1, Math.max(0.01, pick.troops / Math.max(1, p.troops)));
   if (OK(game.apply(pid, { c: 'boat', x: t % W, y: Math.floor(t / W), ratio }))) {
     st.boats++;
     if (pick.target >= 0 && st.war < 0) { st.war = pick.target; st.warAt = s.tick; }
@@ -667,7 +730,7 @@ function navy(game, p, st, v, prof) {
   }
   let want = 0;
   if (enemyPorts.length || prey.length) {
-    want = Math.min(prof.maxShips, Math.max(1, Math.round((1 + p.tiles / 9000) * prof.ships)));
+    want = Math.min(Math.round(prof.maxShips * (st.sea || 1)), Math.max(1, Math.round((1 + p.tiles / 9000) * prof.ships * (st.sea || 1))));
     if (prey.some((u) => u.type === 'transport' && u.tp === pid)) want++;
   }
   if (ships.length < want) {
@@ -805,23 +868,44 @@ function strike(game, pid, kind, from, x, y) {
   return OK(game.apply(pid, { c: 'strike', kind, from: from.id, x, y }));
 }
 
+const MEGA_GAP = 3000;
+
+function rivalOf(game, p) {
+  let best = null;
+  for (const q of game.s.players) {
+    if (q.id === p.id || !q.alive || !q.tiles || !game.isHostile(p.id, q.id)) continue;
+    if (!best || q.tiles > best.tiles) best = q;
+  }
+  return best;
+}
+
 function launchNuke(game, p, st, v, prof, sl, war) {
   const s = game.s, R = p.research, W = game.W, gold = p.gold;
   if (s.tick < st.nukeAt || prof.nukes < 1) return false;
-  if (prof.nukes >= 3 && R.nuclear >= 3 && gold >= STRIKES.mega.cost + 20000) {
-    const lead = v.lead.id !== p.id && v.lead.id >= 0 ? s.players[v.lead.id] : null;
-    const tgt = lead && game.isHostile(p.id, lead.id) && lead.capital >= 0 ? lead.capital : -1;
-    const x = tgt >= 0 ? tgt % W : undefined, y = tgt >= 0 ? Math.floor(tgt / W) : undefined;
-    if (strike(game, p.id, 'mega', sl, x, y)) { st.nukeAt = s.tick + 1800; return true; }
+  if (prof.nukes >= 3 && R.nuclear >= 3 && gold >= STRIKES.mega.cost + 20000 && s.tick >= (st.megaAt || 0)) {
+    const rival = rivalOf(game, p);
+    const stuck = v.cnt[0] === 0 && v.hostileLand === 0 && p.troops >= p.maxTroops * prof.capPush;
+    if (rival && (rival.tiles * 5 >= p.tiles * 3 || stuck)) {
+      const tgt = rival.capital >= 0 && s.owner[rival.capital] === rival.id + 1 ? rival.capital : -1;
+      const x = tgt >= 0 ? tgt % W : undefined, y = tgt >= 0 ? Math.floor(tgt / W) : undefined;
+      if (strike(game, p.id, 'mega', sl, x, y)) {
+        st.nukeAt = s.tick + 600;
+        st.megaAt = s.tick + MEGA_GAP;
+        return true;
+      }
+    }
   }
   if (war < 0) return false;
-  const kind = prof.nukes >= 2 && R.nuclear >= 2 && gold >= STRIKES.hbomb.cost * 1.5 + 10000 ? 'hbomb'
-    : R.nuclear >= 1 && gold >= STRIKES.atom.cost * 1.6 + 5000 ? 'atom' : null;
-  if (!kind) return false;
-  const spot = nukeSpot(game, p, STRIKES[kind].r, war, sl);
-  if (spot < 0 || !strike(game, p.id, kind, sl, spot % W, Math.floor(spot / W))) return false;
-  st.nukeAt = s.tick + (gold > 400000 ? 200 : prof.nukeEvery);
-  return true;
+  const kinds = [];
+  if (prof.nukes >= 2 && R.nuclear >= 2 && gold >= STRIKES.hbomb.cost * 1.5 + 10000) kinds.push('hbomb');
+  if (R.nuclear >= 1 && gold >= STRIKES.atom.cost * 1.6 + 5000) kinds.push('atom');
+  for (const kind of kinds) {
+    const spot = nukeSpot(game, p, STRIKES[kind].r, war, sl);
+    if (spot < 0 || !strike(game, p.id, kind, sl, spot % W, Math.floor(spot / W))) continue;
+    st.nukeAt = s.tick + (gold > 400000 ? 200 : prof.nukeEvery);
+    return true;
+  }
+  return false;
 }
 
 function strikes(game, p, st, v, prof) {
@@ -896,6 +980,38 @@ function propose(game, p, st, q, type) {
   return true;
 }
 
+function betray(game, p, st, v, prof) {
+  const s = game.s, P = s.players;
+  if (v.cnt[0] > 0 || v.hostileLand > 0 || p.troops < p.maxTroops * prof.capPush) return false;
+  if (p.traitorUntil > s.tick) return false;
+  const me = atkPower(game, p);
+  let best = -1, bs = 0;
+  for (const q of P) {
+    if (q.id === p.id || !q.alive || !v.cnt[q.id + 1] || game.isHostile(p.id, q.id)) continue;
+    const pow = me / Math.max(1, defPower(game, q));
+    if (pow < 2.5) continue;
+    const sc = pow * v.cnt[q.id + 1];
+    if (sc > bs) { bs = sc; best = q.id; }
+  }
+  if (best < 0 || !OK(game.apply(p.id, { c: 'break', with: best }))) return false;
+  st.war = best;
+  st.warAt = s.tick;
+  return true;
+}
+
+function embargoes(game, p, st) {
+  const s = game.s;
+  for (const q of s.players) {
+    if (q.id === p.id || !q.alive) continue;
+    const on = embargoBy(game, p.id, q.id);
+    const hot = st.war === q.id && s.tick - st.warAt > 600 && q.tiles > p.tiles * 0.8 && game.relation(p.id, q.id).type === 'none';
+    if (hot === on) continue;
+    if (!hot && st.war === q.id) continue;
+    return OK(game.apply(p.id, { c: 'embargo', with: q.id, on: hot }));
+  }
+  return false;
+}
+
 function diplomacy(game, p, st, v, prof) {
   const s = game.s, P = s.players, pid = p.id;
   if (s.tick < st.dipAt) return;
@@ -909,23 +1025,27 @@ function diplomacy(game, p, st, v, prof) {
       return;
     }
   }
+  if (prof.betray && betray(game, p, st, v, prof)) return;
+  if (prof.allies && embargoes(game, p, st)) return;
   const myPorts = [];
   for (const b of s.buildings) if (b.owner === pid && b.type === 'port' && game.buildingActive(b)) myPorts.push(b);
   if (myPorts.length) {
     for (const b of s.buildings) {
       if (b.type !== 'port' || b.owner === pid || !game.buildingActive(b)) continue;
       const q = P[b.owner];
-      if (!q.alive || q.traitorUntil > s.tick || game.relation(pid, q.id).type !== 'none') continue;
+      if (!q.alive || q.traitorUntil > s.tick || game.relation(pid, q.id).type !== 'none' || embargoBy(game, pid, q.id)) continue;
       if (st.war === q.id || v.inc[q.id] > 0) continue;
       if (!myPorts.some((m) => sharedSea(game, m, b) >= 0)) continue;
       if (propose(game, p, st, q.id, 'trade')) return;
     }
   }
+  const front = v.dom && v.cnt[lead.id + 1] > 0;
   for (const q of P) {
     if (q.id === pid || !q.alive || q.traitorUntil > s.tick || !v.cnt[q.id + 1]) continue;
     if (game.relation(pid, q.id).type !== 'none' && game.relation(pid, q.id).type !== 'trade') continue;
     const ratio = atkPower(game, q) / Math.max(1, me);
-    if ((ratio >= 1.6 || (v.inc[q.id] > 0 && ratio >= 1)) && st.war !== q.id) {
+    const calm = front && q.id !== lead.id && ratio >= 0.25;
+    if ((ratio >= 1.6 || calm || (v.inc[q.id] > 0 && ratio >= 1)) && st.war !== q.id) {
       if (propose(game, p, st, q.id, 'pact')) return;
     }
   }
@@ -951,7 +1071,9 @@ export function aiRespond(game, pid, req) {
   const mine = atkPower(game, me), theirs = atkPower(game, from);
   const ratio = theirs / Math.max(1, mine);
   const war = attacksBetween(game, pid, req.from);
+  const cur = game.relation(pid, req.from).type;
   if (req.type === 'trade') {
+    if (cur === 'pact' || cur === 'alliance') return false;
     if (war.ba > 0 && ratio < 1) return false;
     return st.war !== req.from || ratio >= 1.2;
   }
@@ -960,6 +1082,7 @@ export function aiRespond(game, pid, req) {
     if (lead.id === pid && dominant(game, lead) && ratio < 1.2) return false;
     if (war.ab > 0 && ratio < 0.8) return false;
     if (ratio >= 0.7) return true;
+    if (dominant(game, lead) && lead.id !== pid && lead.id !== req.from) return true;
     return st.war >= 0 && st.war !== req.from;
   }
   if (req.type === 'alliance') {

@@ -24,6 +24,8 @@ export function fmtInt(n) {
 
 export const fmtPct = (v, d = 1) => (Number(v) || 0).toFixed(d).replace('.', ',') + '%';
 
+export const fmtShare = (v) => fmtPct(v, v > 0 && v < 1 ? 2 : 1);
+
 export function fmtClock(sec) {
   const t = Math.max(0, Math.floor(Number(sec) || 0));
   const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
@@ -533,7 +535,7 @@ export class Hud {
     setText($('r-comp-art-v'), ai);
     const land = g.map.landCount || 1;
     const pct = (me.tiles * 100) / land;
-    setText($('r-terr'), fmtPct(pct, pct < 1 ? 2 : 1));
+    setText($('r-terr'), fmtShare(pct));
     const alive = s.players.filter((p) => p.alive);
     const rank = me.alive ? alive.filter((p) => p.tiles > me.tiles).length + 1 : 0;
     setText($('r-rank'), me.alive && s.phase !== 'spawn' ? `#${rank} из ${alive.length}` : '');
@@ -581,7 +583,7 @@ export class Hud {
       const bar = $('g-econ-bar');
       bar.style.width = clamp((t / need) * 100, 0, 100).toFixed(1) + '%';
       bar.style.background = lp ? safeColor(lp.color) : '';
-      setText($('g-econ-v'), `${who} · ${fmtSec(t / TICKS_PER_SEC)} / ${fmtSec(need / TICKS_PER_SEC)}`);
+      setText($('g-econ-v'), lp ? `${who} · ${fmtSec(t / TICKS_PER_SEC)} / ${fmtSec(need / TICKS_PER_SEC)}` : `${who} · цель ${fmtSec(need / TICKS_PER_SEC)}`);
       toggle($('g-econ'), 'done', L === me.id);
     }
     show($('g-surv'), !v.territory && !v.economy);
@@ -605,7 +607,7 @@ export class Hud {
       setText(li.querySelector('.rank'), rank || '—');
       li.querySelector('.dot').style.background = safeColor(p.color);
       setText(li.querySelector('.nm'), p.name);
-      setText(li.querySelector('.pct'), fmtPct((p.tiles * 100) / land));
+      setText(li.querySelector('.pct'), fmtShare((p.tiles * 100) / land));
       li.title = `${p.name}: ${fmtNum(p.troops)} войск`;
     });
   }
@@ -739,7 +741,7 @@ export class Hud {
   }
 
   updateDock() {
-    const g = this.game, s = g.s, me = this.me, pid = this.pid;
+    const g = this.game, me = this.me, pid = this.pid;
     if (!me) return;
     setText($('atk-troops'), fmtNum(Math.floor(me.troops * this.ratio)));
     for (const type of BUILDING_KEYS) {
@@ -784,7 +786,6 @@ export class Hud {
     setText($('cost-warship'), fmtInt(sc));
     toggle($('btn-warship'), 'locked', !ports.length);
     toggle($('btn-warship'), 'poor', ports.length > 0 && me.gold < sc);
-    void s;
   }
 
   setRatio(v, silent = false) {
@@ -1192,7 +1193,6 @@ export class Hud {
   }
 
   onModeClick(mode, sx, sy, i, x, y, shift) {
-    const g = this.game;
     switch (mode.kind) {
       case 'build':
         if (this.send({ c: 'build', type: mode.type, x, y })) {
@@ -1231,7 +1231,6 @@ export class Hud {
       default:
         break;
     }
-    void g;
   }
 
   onRailClick(mode, sx, sy, i, shift) {
@@ -1597,7 +1596,7 @@ export class Hud {
       return b ? this.tipAct('ok', b.type, 'ЛКМ — выбрать здание') : '';
     }
     const va = val({ c: 'attack', x, y, ratio: this.ratio });
-    if (va.ok) return this.tipAct('attack', 'sword', `ЛКМ — атака · ${troops} войск`);
+    if (va.ok) return this.tipAct('attack', 'sword', o < 0 ? `ЛКМ — захват ничьей земли · ${troops} войск` : `ЛКМ — атака · ${troops} войск`);
     if (!g.bordersByLand(me, i)) {
       const vb = this.boatValid(x, y);
       return vb.ok ? this.tipAct('boat', 'boat', `ЛКМ — высадка · ${troops} войск`) : this.tipAct('bad', 'alert', vb.error);
@@ -2037,7 +2036,7 @@ export class Hud {
     if (self) { tt = 'Вы'; tc = 'you'; } else if (!st.alive) { tt = 'Выбыл'; tc = 'dead'; } else if (st.traitor) { tt = 'Предатель'; tc = 'traitor'; } else if (st.ai) { tt = 'Бот'; tc = 'bot'; }
     setText(tag, tt);
     tag.className = 'tag' + (tc ? ' ' + tc : '');
-    setText(tr.querySelector('.c-terr'), fmtPct(st.pct, st.pct < 1 && st.pct > 0 ? 2 : 1));
+    setText(tr.querySelector('.c-terr'), fmtShare(st.pct));
     setText(tr.querySelector('.c-troops'), fmtNum(st.troops));
     setText(tr.querySelector('.c-gold'), fmtNum(st.gold));
     const net = st.income - st.upkeep;
@@ -2149,12 +2148,16 @@ export class Hud {
       if (!a.alive) return (b.eliminatedAt || 0) - (a.eliminatedAt || 0);
       return b.tiles - a.tiles;
     });
-    const head = '<thead><tr><th>Страна</th><th class="num">Территория</th><th class="num">Пик</th><th class="num">Захвачено клеток</th><th class="num">Уничтожено войск</th><th class="num">Потоплено судов</th><th class="num">Ядерные удары</th><th class="num">Заработано золота</th></tr></thead>';
+    const cols = [
+      ['Земля', 'Доля суши сейчас'], ['Пик', 'Наибольшая доля суши за партию'], ['Клетки', 'Захвачено клеток'],
+      ['Убито', 'Уничтожено вражеских войск'], ['Суда', 'Потоплено судов'], ['Ядерн.', 'Ядерные удары'], ['Золото', 'Заработано золота'],
+    ];
+    const head = `<thead><tr><th>Страна</th>${cols.map(([t, h]) => `<th class="num" title="${h}">${t}</th>`).join('')}</tr></thead>`;
     const rows = order.map((p) => {
       const st = p.stats || {};
       const cls = [p.id === me ? 'me' : '', p.alive ? '' : 'dead'].filter(Boolean).join(' ');
       return `<tr${cls ? ` class="${cls}"` : ''}><td class="cname"><span class="dot" style="background:${safeColor(p.color)}"></span>${esc(p.name)}</td>`
-        + `<td class="num">${fmtPct((p.tiles * 100) / land)}</td><td class="num">${fmtPct(((st.peakTiles || p.tiles) * 100) / land)}</td>`
+        + `<td class="num">${fmtShare((p.tiles * 100) / land)}</td><td class="num">${fmtShare(((st.peakTiles || p.tiles) * 100) / land)}</td>`
         + `<td class="num">${fmtInt(st.tilesCaptured || 0)}</td><td class="num">${fmtNum(st.kills || 0)}</td><td class="num">${fmtInt(st.shipsSunk || 0)}</td>`
         + `<td class="num">${fmtInt(st.nukes || 0)}</td><td class="num">${fmtNum(st.goldEarned || 0)}</td></tr>`;
     }).join('');
