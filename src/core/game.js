@@ -99,7 +99,7 @@ export function mapExtras(map) {
   return ex;
 }
 
-const NO_REL = Object.freeze({ type: 'none', until: 0, embargo: false, emb: 0 });
+const NO_REL = Object.freeze({ type: 'none', until: 0, trade: false, embargo: false, emb: 0 });
 const OK = Object.freeze({ ok: true });
 const fail = (error) => ({ ok: false, error });
 

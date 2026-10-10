@@ -754,7 +754,7 @@ output {
 .chips .badge { font-size: 0.82rem; padding: 0.2rem 0.65rem; }
 .map-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
   gap: 0.75rem;
   margin-top: 1rem;
 }
@@ -795,8 +795,8 @@ output {
   color: var(--accent-ink);
 }
 .map-badge:empty { display: none; }
-.map-card-name { padding: 0 0.2rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.map-card-meta { padding: 0 0.2rem; font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-card-name { display: -webkit-box; padding: 0 0.2rem; font-weight: 600; line-height: 1.25; overflow: hidden; overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.map-card-meta { padding: 0 0.2rem; font-size: 0.8rem; line-height: 1.3; color: var(--muted); overflow-wrap: anywhere; }
 .setup-pane { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .setup-scroll { flex: 1; min-height: 0; overflow: auto; padding: 1.25rem; }
 .setup-foot { flex: none; padding: 1rem 1.25rem; border-top: 1px solid var(--border); background: var(--surface); }
@@ -985,11 +985,15 @@ output {
 .mini-bar > span { display: block; height: 100%; background: var(--c-art); border-radius: 2px; transition: width 0.3s; }
 .stat.goals { gap: 0.1rem; }
 .goal { display: grid; grid-template-columns: 4.9rem 4.2rem auto; align-items: center; gap: 0.5rem; font-size: 0.76rem; line-height: 1.15; }
+.goal-dot { display: inline-block; flex: none; width: 0.55rem; height: 0.55rem; margin-right: 0.3rem; border-radius: 50%; box-shadow: 0 0 0 1px var(--border-2); }
+.goal-dot[hidden] { display: none; }
+#g-econ-v { display: inline-flex; align-items: center; }
+.goal.rival .goal-v { color: var(--warn); }
 .goal-name { color: var(--text-2); font-weight: 600; white-space: nowrap; }
 .goal-bar { position: relative; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .goal-bar > span { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 3px; background: var(--accent); transition: width 0.4s; }
 .goal-lead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--danger); }
-.goal-v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 8.5rem; }
+.goal-v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9rem; }
 .goal-v.wide { grid-column: 2 / -1; max-width: none; }
 .goal.done .goal-v { color: var(--good); }
 
@@ -1099,7 +1103,8 @@ output {
   pointer-events: none;
 }
 .right-col > * { pointer-events: auto; }
-.diplo-stack { flex: 0 1 auto; display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; max-height: 50%; overflow: auto; }
+.diplo-stack { flex: 0 1 auto; display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; max-height: 50%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: auto; scrollbar-color: var(--muted) transparent; }
+.right-col:has(> .sel-panel[hidden]) .diplo-stack { max-height: 100%; }
 .diplo-stack:empty { display: none; }
 .dcard {
   position: relative;
@@ -1158,7 +1163,10 @@ output {
 .sec-title { margin: 1rem 0 0.55rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .sec-title:first-child { margin-top: 0; }
 .panel-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-.panel-actions .btn { width: 100%; min-width: 0; padding: 0 0.6rem; }
+.panel-actions .btn { width: 100%; min-width: 0; padding: 0 0.6rem; overflow: hidden; }
+.panel-actions .btn .ic { flex: none; }
+.panel-actions .btn .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.panel-actions .btn .cost { flex: none; padding-left: 0.4rem; }
 .panel-actions .btn.full { grid-column: 1 / -1; }
 .panel-actions .btn .cost { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
 .note { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--muted); }
@@ -1236,13 +1244,17 @@ output {
   left: 0.6rem;
   bottom: calc(var(--dock-h) + 1.3rem);
   width: min(26rem, 32vw);
+  max-height: calc(100vh - var(--top-h) - var(--dock-h) - 2rem);
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 0.4rem;
+  overflow: hidden;
   pointer-events: none;
 }
 .feed > form { pointer-events: auto; }
-.event-log { display: flex; flex-direction: column; gap: 0.3rem; }
+.event-log { flex: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.event-log:empty { display: none; }
 .log-item {
   display: flex;
   align-items: baseline;
@@ -1796,9 +1808,8 @@ output {
 }
 @media (max-width: 1439px) {
   .comp-legend { display: none; }
-  .stat.goals .goal-bar { display: none; }
-  .goal { grid-template-columns: auto auto; gap: 0.5rem; }
-  .goal-v { max-width: 7rem; }
+  .goal { grid-template-columns: 4.3rem 2.4rem auto; gap: 0.4rem; }
+  .goal-v { max-width: 7.5rem; }
   .stat-val.sm { max-width: 7rem; }
   .tool { width: 4.1rem; }
   .tool.wide { width: 6rem; }

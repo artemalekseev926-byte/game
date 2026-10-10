@@ -238,7 +238,7 @@
         <h3><svg class="ic"><use href="#i-gamepad"/></svg>Steam</h3>
         <span id="steam-status" class="status" data-state="wait">Проверка Steam…</span>
       </div>
-      <p class="hint-text">Создайте лобби и пригласите друзей через оверлей Steam (Shift+Tab), передайте им ID лобби или выберите открытое лобби из списка.</p>
+      <p class="hint-text">Создайте лобби и пригласите друзей через оверлей Steam (Shift+Tab) или передайте им ID лобби. Список открытых лобби полезен только со своим AppID: на тестовом AppID 480 он часто пуст — входите по приглашению или по ID.</p>
       <button class="btn primary block" id="steam-host"><svg class="ic"><use href="#i-plus"/></svg>Создать лобби</button>
       <div class="field top-gap">
         <label class="field-label" for="steam-lobby-id">ID лобби</label>
@@ -336,7 +336,7 @@
         <button class="btn" id="lobby-copy"><svg class="ic"><use href="#i-copy"/></svg>Копировать ID</button>
         <button class="btn" id="lobby-invite"><svg class="ic"><use href="#i-invite"/></svg>Пригласить друзей</button>
       </div>
-      <p class="hint-text" id="lobby-hint">Друзья могут войти по приглашению Steam, по ID лобби или найти его в списке открытых лобби.</p>
+      <p class="hint-text" id="lobby-hint">Друзья могут войти по приглашению Steam или по ID лобби. На тестовом AppID 480 лобби может не появиться в списке открытых — тогда пригласите друзей или отправьте им ID.</p>
     </section>
   </div>
   <footer class="screen-foot">
@@ -367,7 +367,7 @@
       <div class="stat goals" id="st-goals" title="Прогресс целей победы">
         <span class="stat-label"><svg class="ic"><use href="#i-trophy"/></svg>Цели победы</span>
         <span class="goal" id="g-terr"><span class="goal-name">Территория</span><span class="goal-bar"><span id="g-terr-bar" style="width:0%"></span><i class="goal-lead" id="g-terr-lead" hidden></i></span><span class="goal-v" id="g-terr-v">0 / 70%</span></span>
-        <span class="goal" id="g-econ" hidden><span class="goal-name">Экономика</span><span class="goal-bar"><span id="g-econ-bar" style="width:0%"></span></span><span class="goal-v" id="g-econ-v">0:00 / 20:00</span></span>
+        <span class="goal" id="g-econ" hidden><span class="goal-name">Экономика</span><span class="goal-bar"><span id="g-econ-bar" style="width:0%"></span></span><span class="goal-v" id="g-econ-v"><i class="goal-dot" id="g-econ-dot" hidden></i><span id="g-econ-t">цель 20:00</span></span></span>
         <span class="goal" id="g-surv" hidden><span class="goal-name">Выживание</span><span class="goal-v wide" id="g-surv-v">Осталось стран: 0</span></span>
       </div>
       <button class="stat stat-btn research" id="r-research" title="Исследования (R)">
@@ -453,32 +453,32 @@
       <div class="tool-group" id="build-bar">
         <span class="group-cap">Строительство</span>
         <div class="tools">
-          <button class="tool" data-build="house" id="tool-house" title="Жилой квартал: +25 000 к максимуму войск и +6 золота/с за уровень (1)"><kbd>1</kbd><svg class="ic"><use href="#i-house"/></svg><span class="tool-name">Дома</span><span class="tool-cost" id="cost-house">1 000</span></button>
-          <button class="tool" data-build="factory" id="tool-factory" title="Фабрика: отправляет товары в порт, увеличивает долю танков (2)"><kbd>2</kbd><svg class="ic"><use href="#i-factory"/></svg><span class="tool-name">Фабрика</span><span class="tool-cost" id="cost-factory">2 500</span></button>
-          <button class="tool" data-build="port" id="tool-port" title="Порт: верфь, торговля, приём товаров. Только на побережье (3)"><kbd>3</kbd><svg class="ic"><use href="#i-port"/></svg><span class="tool-name">Порт</span><span class="tool-cost" id="cost-port">3 000</span></button>
-          <button class="tool" data-build="fort" id="tool-fort" title="Укрепление: бонус обороны в радиусе (4)"><kbd>4</kbd><svg class="ic"><use href="#i-fort"/></svg><span class="tool-name">Укрепление</span><span class="tool-cost" id="cost-fort">1 500</span></button>
-          <button class="tool" data-build="sam" id="tool-sam" title="ПВО: перехват дронов, ракет и бомб в радиусе (5)"><kbd>5</kbd><svg class="ic"><use href="#i-sam"/></svg><span class="tool-name">ПВО</span><span class="tool-cost" id="cost-sam">4 000</span></button>
-          <button class="tool" data-build="airbase" id="tool-airbase" title="Аэродром БПЛА: запуск дронов. Нужно исследование «БПЛА» (6)"><kbd>6</kbd><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-airbase"/></svg><span class="tool-name">Аэродром</span><span class="tool-cost" id="cost-airbase">3 500</span></button>
-          <button class="tool" data-build="silo" id="tool-silo" title="Ракетная шахта: запуск ракет и бомб. Нужно исследование «Ракеты» (7)"><kbd>7</kbd><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-silo"/></svg><span class="tool-name">Шахта</span><span class="tool-cost" id="cost-silo">8 000</span></button>
-          <button class="tool" data-build="rail" id="tool-rail" title="Железная дорога между фабрикой, портом или домом: поезда возят товары в 2 раза быстрее грузовиков (8)"><kbd>8</kbd><svg class="ic"><use href="#i-rail"/></svg><span class="tool-name">Ж/д</span><span class="tool-cost" id="cost-rail">40/клетка</span></button>
+          <button class="tool" data-build="house" id="tool-house" title="Жилой квартал (1)"><kbd>1</kbd><svg class="ic"><use href="#i-house"/></svg><span class="tool-name">Дома</span><span class="tool-cost" id="cost-house">1 000</span></button>
+          <button class="tool" data-build="factory" id="tool-factory" title="Фабрика (2)"><kbd>2</kbd><svg class="ic"><use href="#i-factory"/></svg><span class="tool-name">Фабрика</span><span class="tool-cost" id="cost-factory">2 500</span></button>
+          <button class="tool" data-build="port" id="tool-port" title="Порт (3)"><kbd>3</kbd><svg class="ic"><use href="#i-port"/></svg><span class="tool-name">Порт</span><span class="tool-cost" id="cost-port">3 000</span></button>
+          <button class="tool" data-build="fort" id="tool-fort" title="Укрепление (4)"><kbd>4</kbd><svg class="ic"><use href="#i-fort"/></svg><span class="tool-name">Укрепление</span><span class="tool-cost" id="cost-fort">1 500</span></button>
+          <button class="tool" data-build="sam" id="tool-sam" title="ПВО (5)"><kbd>5</kbd><svg class="ic"><use href="#i-sam"/></svg><span class="tool-name">ПВО</span><span class="tool-cost" id="cost-sam">4 000</span></button>
+          <button class="tool" data-build="airbase" id="tool-airbase" title="Аэродром БПЛА (6)"><kbd>6</kbd><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-airbase"/></svg><span class="tool-name">Аэродром</span><span class="tool-cost" id="cost-airbase">3 500</span></button>
+          <button class="tool" data-build="silo" id="tool-silo" title="Ракетная шахта (7)"><kbd>7</kbd><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-silo"/></svg><span class="tool-name">Шахта</span><span class="tool-cost" id="cost-silo">8 000</span></button>
+          <button class="tool" data-build="rail" id="tool-rail" title="Железная дорога (8)"><kbd>8</kbd><svg class="ic"><use href="#i-rail"/></svg><span class="tool-name">Ж/д</span><span class="tool-cost" id="cost-rail">40/клетка</span></button>
         </div>
       </div>
       <div class="tool-group" id="strike-bar">
         <span class="group-cap">Удары</span>
         <div class="tools">
-          <button class="tool" data-strike="drone" id="tool-drone" title="Дрон: уничтожает войска в небольшом радиусе. Нужен аэродром"><span class="tool-badge" id="cnt-drone" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-drone"/></svg><span class="tool-name">Дрон</span><span class="tool-cost" id="cost-drone">300</span></button>
-          <button class="tool" data-strike="kamikaze" id="tool-kamikaze" title="Дрон-камикадзе: точечно уничтожает здание. Нужен аэродром и БПЛА II"><span class="tool-badge" id="cnt-kamikaze" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-kamikaze"/></svg><span class="tool-name">Камикадзе</span><span class="tool-cost" id="cost-kamikaze">600</span></button>
-          <button class="tool" data-strike="cruise" id="tool-cruise" title="Крылатая ракета: точечно уничтожает здание на большой дистанции. Нужна шахта"><span class="tool-badge" id="cnt-cruise" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-cruise"/></svg><span class="tool-name">Крылатая</span><span class="tool-cost" id="cost-cruise">2 000</span></button>
-          <button class="tool nuke" data-strike="atom" id="tool-atom" title="Атомная бомба: выжигает область, земля становится ничьей и заражённой. Нужна шахта и ядерная программа I"><span class="tool-badge" id="cnt-atom" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-atom"/></svg><span class="tool-name">Атомная</span><span class="tool-cost" id="cost-atom">15 000</span></button>
-          <button class="tool nuke" data-strike="hbomb" id="tool-hbomb" title="Водородная бомба: огромный радиус поражения. Нужна шахта и ядерная программа II"><span class="tool-badge" id="cnt-hbomb" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-hbomb"/></svg><span class="tool-name">Водородная</span><span class="tool-cost" id="cost-hbomb">50 000</span></button>
-          <button class="tool mega" data-strike="mega" id="tool-mega" title="Мегабомба «Судный день»: боеголовки по всем вражеским странам. Нужна шахта и ядерная программа III"><span class="tool-badge" id="cnt-mega" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-mega"/></svg><span class="tool-name">Мегабомба</span><span class="tool-cost" id="cost-mega">250 000</span></button>
+          <button class="tool" data-strike="drone" id="tool-drone" title="Ударный БПЛА"><span class="tool-badge" id="cnt-drone" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-drone"/></svg><span class="tool-name">Дрон</span><span class="tool-cost" id="cost-drone">300</span></button>
+          <button class="tool" data-strike="kamikaze" id="tool-kamikaze" title="Дрон-камикадзе"><span class="tool-badge" id="cnt-kamikaze" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-kamikaze"/></svg><span class="tool-name">Камикадзе</span><span class="tool-cost" id="cost-kamikaze">600</span></button>
+          <button class="tool" data-strike="cruise" id="tool-cruise" title="Крылатая ракета"><span class="tool-badge" id="cnt-cruise" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-cruise"/></svg><span class="tool-name">Крылатая</span><span class="tool-cost" id="cost-cruise">2 000</span></button>
+          <button class="tool nuke" data-strike="atom" id="tool-atom" title="Атомная бомба"><span class="tool-badge" id="cnt-atom" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-atom"/></svg><span class="tool-name">Атомная</span><span class="tool-cost" id="cost-atom">15 000</span></button>
+          <button class="tool nuke" data-strike="hbomb" id="tool-hbomb" title="Водородная бомба"><span class="tool-badge" id="cnt-hbomb" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-hbomb"/></svg><span class="tool-name">Водородная</span><span class="tool-cost" id="cost-hbomb">50 000</span></button>
+          <button class="tool mega" data-strike="mega" id="tool-mega" title="Мегабомба «Судный день»"><span class="tool-badge" id="cnt-mega" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-mega"/></svg><span class="tool-name">Мегабомба</span><span class="tool-cost" id="cost-mega">250 000</span></button>
         </div>
       </div>
       <div class="tool-group" id="fleet-bar">
         <span class="group-cap">Флот</span>
         <div class="tools">
           <button class="tool" data-tool="boat" id="btn-boat" title="Высадка десанта: кликните по земле за морем (B)"><kbd>B</kbd><svg class="ic"><use href="#i-boat"/></svg><span class="tool-name">Высадка</span><span class="tool-cost muted-cost" id="cnt-boats">0 / 3</span></button>
-          <button class="tool wide" data-tool="warship" id="btn-warship" title="Военный корабль: строится в выбранном или ближайшем порту"><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-ship"/></svg><span class="tool-name">Военный корабль</span><span class="tool-cost" id="cost-warship">2 500</span></button>
+          <button class="tool wide" data-tool="warship" id="btn-warship" title="Военный корабль: строится в выбранном или ближайшем порту. F — выбрать весь флот"><span class="tool-badge" id="cnt-warships" title="Ваши военные корабли (F — выбрать все)" hidden>0</span><svg class="ic tool-lock"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-ship"/></svg><span class="tool-name">Военный корабль</span><span class="tool-cost" id="cost-warship">2 500</span></button>
         </div>
       </div>
     </div>
@@ -498,9 +498,9 @@
       <button data-act="cruise" id="ctx-cruise" hidden><svg class="ic"><use href="#i-cruise"/></svg>Крылатая ракета<span class="ctx-hint" id="ctx-cruise-hint"></span></button>
     </div>
     <div class="ctx-group">
-      <button data-act="alliance" id="ctx-alliance"><svg class="ic"><use href="#i-ally"/></svg>Предложить союз</button>
-      <button data-act="pact" id="ctx-pact"><svg class="ic"><use href="#i-pact"/></svg>Пакт о ненападении</button>
-      <button data-act="trade" id="ctx-trade"><svg class="ic"><use href="#i-swap"/></svg>Торговый договор</button>
+      <button data-act="alliance" id="ctx-alliance"><svg class="ic"><use href="#i-ally"/></svg>Предложить союз<span class="ctx-hint" id="ctx-alliance-hint"></span></button>
+      <button data-act="pact" id="ctx-pact"><svg class="ic"><use href="#i-pact"/></svg>Пакт о ненападении<span class="ctx-hint" id="ctx-pact-hint"></span></button>
+      <button data-act="trade" id="ctx-trade"><svg class="ic"><use href="#i-swap"/></svg>Торговый договор<span class="ctx-hint" id="ctx-trade-hint"></span></button>
       <button data-act="break" id="ctx-break" class="danger"><svg class="ic"><use href="#i-break"/></svg>Разорвать договор</button>
       <button data-act="embargo" id="ctx-embargo"><svg class="ic"><use href="#i-ban"/></svg><span id="ctx-embargo-text">Объявить эмбарго</span></button>
     </div>
@@ -665,7 +665,7 @@
             <li><b>Экономическое лидерство</b> — держите самый высокий доход с отрывом не меньше 15% от второго места непрерывно заданное число минут (от 5 до 60).</li>
             <li><b>Последний выживший</b> — действует всегда: останьтесь единственной страной или коалицией союзников.</li>
           </ul>
-          <p>Прогресс целей виден в верхней панели.</p>
+          <p>Прогресс целей виден в верхней панели. Когда соперник приближается к экономической победе, в журнале событий появляется предупреждение.</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-pin"/></svg>Начало партии</h3>
@@ -684,8 +684,9 @@
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-ship"/></svg>Флот и порты</h3>
-          <p>Порт строится только на побережье. В порту можно построить <b>военный корабль</b> — кнопкой «Военный корабль» внизу или в панели выбранного порта.</p>
+          <p>Порт строится только на побережье. В порту можно построить <b>военный корабль</b> — кнопкой «Военный корабль» внизу или в панели выбранного порта. Новые корабли встают у порта рядом друг с другом.</p>
           <p>Выберите корабль <b>ЛКМ</b> и укажите курс <b>ПКМ</b> по воде. Корабли сами атакуют вражеские военные корабли, транспорты и торговые суда поблизости. Потопленный торговец отдаёт половину груза.</p>
+          <p><b>Флотом можно управлять группой:</b> Shift + перетаскивание — выбор рамкой, Ctrl + клик — добавить или убрать корабль, двойной клик по кораблю — все ваши корабли на экране, клавиша <b>F</b> — весь флот (повторное нажатие покажет его на карте). ПКМ по воде отправит выбранные корабли строем: каждый получит свою точку рядом с целью. Число выбранных кораблей видно в подсказке сверху и в панели «Флот».</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-gold"/></svg>Экономика</h3>
@@ -695,68 +696,59 @@
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-tank"/></svg>Армия формируется сама</h3>
           <p>Отряды не нужно нанимать вручную. Состав армии — <b>пехота</b>, <b>танки</b> и <b>артиллерия</b> — рассчитывается автоматически по исследованиям и фабрикам.</p>
-          <p>Изучили «Бронетехнику» — танки сами появятся в армии и распределятся по всем фронтам; каждая фабрика немного увеличивает их долю. Танки усиливают атаку, артиллерия — и атаку, и оборону. Состав показан цветной полоской в верхней панели.</p>
+          <p>Изучили «Бронетехнику» — танки сами появятся в армии и распределятся по всем фронтам, «Артиллерию» — появится артиллерия. Фабрики вдвое увеличивают долю танков и артиллерии, и каждая следующая фабрика добавляет ещё. Танки усиливают атаку, артиллерия — и атаку, и оборону. Состав показан цветной полоской в верхней панели.</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-house"/></svg>Постройки</h3>
           <p>Здания ставятся в <b>любой клетке</b> своей территории, не ближе 5 клеток к другому зданию. Выберите инструмент (клавиши 1–7) и кликните по карте. Повторная постройка на месте здания — улучшение, снос возвращает 25% цены. Каждое следующее здание того же типа дороже.</p>
-          <ul>
-            <li><b>Дома</b> — +25 000 к максимуму войск и +6 золота/с за уровень.</li>
-            <li><b>Фабрика</b> — производит товары для портов, увеличивает долю танков.</li>
-            <li><b>Порт</b> — верфь, торговля и приём товаров.</li>
-            <li><b>Укрепление</b> — бонус обороны в радиусе.</li>
-            <li><b>ПВО</b> — сбивает дроны, ракеты и бомбы.</li>
-            <li><b>Аэродром</b> и <b>Шахта</b> — запуск дронов и ракет, нужны исследования.</li>
-          </ul>
+          <ul id="help-buildings"></ul>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-rail"/></svg>Железные дороги</h3>
-          <p>Фабрики регулярно отправляют товары в ближайший порт. Без дороги их везут грузовики, а по железной дороге — поезда, которые идут <b>в 2 раза быстрее</b>. Товары в порту увеличивают доход торговых судов.</p>
-          <p>Инструмент «Ж/д» (клавиша <b>8</b>): кликните по первому зданию (фабрика, порт или дом), затем по второму. Цена зависит от длины, путь должен проходить по вашей земле. Дорога исчезает, если потерян любой её конец.</p>
+          <p>Фабрика возит груз в свой порт только по своей или союзной суше и отправляет новый груз, когда предыдущий доставлен. Грузовик ездит не дальше 100 клеток. <b>Поезд по железной дороге идёт вдвое быстрее, поэтому ж/д удваивает поток товаров с фабрики в порт.</b> Без доступного порта фабрика даёт золото напрямую. Товары на складе порта увеличивают доход торговых судов.</p>
+          <p>Инструмент «Ж/д» (клавиша <b>8</b>): кликните по первому зданию (фабрика, порт или дом), затем по второму. Дорога идёт по прямой только по вашей или союзной земле и не через воду, длина — до 300 клеток, цена зависит от длины. Если дорога до порта выгодна, в панели фабрики появится кнопка «Ж/д до порта». Дорога исчезает, если потерян любой её конец.</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-trade"/></svg>Торговля</h3>
           <p>Каждый порт сам отправляет торговые суда в порты других стран. Доход получают обе стороны; дальние рейсы и полный склад товаров выгоднее.</p>
-          <p>Торговые маршруты всех стран видны на карте пунктиром. Торговый договор даёт <b>+50%</b> к доходу, эмбарго полностью запрещает торговлю со страной.</p>
+          <p>Торговые маршруты всех стран видны на карте пунктиром. Торговый договор даёт <b>+50%</b> к доходу и заключается отдельно: он <b>не отменяет пакт о ненападении</b>, оба договора действуют вместе. Эмбарго полностью запрещает торговлю со страной.</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-target"/></svg>Удары и ПВО</h3>
-          <ul>
-            <li><b>Дрон</b> — уничтожает войска в небольшом радиусе.</li>
-            <li><b>Камикадзе</b> — точечно уничтожает выбранное здание.</li>
-            <li><b>Крылатая ракета</b> — точечно уничтожает здание на большой дистанции.</li>
-            <li><b>Атомная бомба</b> — выжигает область: земля становится ничьей и заражённой.</li>
-            <li><b>Водородная бомба</b> — то же, но намного мощнее.</li>
-          </ul>
-          <p>Выберите удар внизу экрана и цель на карте или нажмите <b>ПКМ</b> по вражескому зданию. Запуск идёт с готового аэродрома или шахты, после выстрела — перезарядка. ПВО перехватывает снаряды в своём радиусе; клавиша <b>V</b> показывает зоны ПВО.</p>
+          <ul id="help-strikes"></ul>
+          <p>Выберите удар внизу экрана и цель на карте или нажмите <b>ПКМ</b> по вражескому зданию. Запуск идёт с готового аэродрома или шахты, после выстрела — перезарядка. ПВО перехватывает снаряды в своём радиусе; клавиша <b>V</b> показывает зоны ПВО. Ядерный удар по союзнику или партнёру по пакту разрывает договор, и вы становитесь предателем.</p>
         </article>
         <article class="help-card danger-card">
           <h3><svg class="ic"><use href="#i-mega"/></svg>Мегабомба «Судный день»</h3>
-          <p>Самое дорогое оружие в игре — <b>250 000 золота</b>, требуется «Ядерная программа» III и готовая ракетная шахта, поэтому она доступна только в поздней игре.</p>
-          <p>Ракета распадается на боеголовки и поражает крупнейшие скопления и здания каждой вражеской страны, кроме ваших союзников, — уничтожает почти всю карту. Любой ядерный удар разрывает договоры с пострадавшими и делает вас предателем.</p>
+          <p>Самое мощное оружие в игре, <b>одно на партию</b>. Нужны исследование «Ядерное оружие» III и готовая ракетная шахта. Цена — не меньше <b>250 000 золота</b> и не меньше двух минут вашего дохода.</p>
+          <p>Через несколько секунд после пуска ракета распадается на сотни ядерных боеголовок и <b>опустошает всю карту врагов</b>: почти вся территория всех враждебных стран становится ничьей и заражённой, войска гибнут, здания рушатся. Ваша земля, союзники и партнёры по пакту не страдают. Носитель не сбивается, а боеголовки ПВО перехватывает редко.</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-ally"/></svg>Дипломатия</h3>
           <p><b>ПКМ</b> по стране или окно «Страны» (<b>Tab</b>):</p>
           <ul>
-            <li><b>Союз</b> — бессрочно, нельзя атаковать друг друга.</li>
+            <li><b>Союз</b> — бессрочно, нельзя атаковать друг друга, торговля с бонусом.</li>
             <li><b>Пакт о ненападении</b> — то же, но на 10 минут.</li>
-            <li><b>Торговый договор</b> — +50% к торговле.</li>
+            <li><b>Торговый договор</b> — +50% к торговле; действует вместе с пактом и не отменяет его.</li>
             <li><b>Эмбарго</b> — запрет торговли.</li>
           </ul>
-          <p>Входящие предложения появляются справа карточками «Принять / Отклонить» и действуют 30 секунд. Разрыв союза делает вас предателем — боты долго не будут вам доверять.</p>
+          <p>Входящие предложения появляются справа карточками «Принять / Отклонить» и действуют 30 секунд. Разрыв союза или действующего пакта делает вас предателем — боты 5 минут не будут с вами договариваться.</p>
         </article>
         <article class="help-card">
           <h3><svg class="ic"><use href="#i-chart"/></svg>Сводка по странам</h3>
           <p>Окно «Страны» (<b>Tab</b>) показывает по каждой стране территорию, войска, золото, доход, число фабрик, домов, портов, ПВО, шахт и кораблей, а также ваши отношения и кнопки дипломатии. Щёлкните по заголовку столбца, чтобы отсортировать.</p>
           <h3 class="sub"><svg class="ic"><use href="#i-flask"/></svg>Исследования</h3>
-          <p>Окно исследований (<b>R</b>): экономика, логистика, пехота, бронетехника, артиллерия, укрепления, флот, БПЛА, ракеты, ПВО и ядерная программа. Одновременно изучается одна технология, каждый следующий уровень дороже и дольше.</p>
+          <p>Окно исследований (<b>R</b>): <span id="help-research">экономика, логистика, пехота, бронетехника, артиллерия, фортификация, флот, БПЛА, ракеты, системы ПВО, ядерное оружие</span>. Одновременно изучается одна технология, каждый следующий уровень дороже и дольше.</p>
         </article>
         <article class="help-card wide">
           <h3><svg class="ic"><use href="#i-keyboard"/></svg>Управление</h3>
           <div class="keys">
             <div><span>Атака, высадка, выбор здания или корабля</span><kbd>ЛКМ</kbd></div>
-            <div><span>Меню страны, курс выбранного корабля</span><kbd>ПКМ</kbd></div>
+            <div><span>Меню страны, курс выбранных кораблей</span><kbd>ПКМ</kbd></div>
+            <div><span>Выбрать корабли рамкой</span><kbd>Shift + перетаскивание</kbd></div>
+            <div><span>Добавить или убрать корабль</span><kbd>Ctrl + клик</kbd></div>
+            <div><span>Все корабли на экране</span><kbd>Двойной клик</kbd></div>
+            <div><span>Весь флот</span><kbd>F</kbd></div>
             <div><span>Масштаб карты</span><kbd>Колесо</kbd></div>
             <div><span>Перемещение карты</span><span class="kgroup"><kbd>WASD</kbd><kbd>Стрелки</kbd></span></div>
             <div><span>Сила атаки меньше / больше</span><span class="kgroup"><kbd>Q</kbd><kbd>E</kbd></span></div>
@@ -882,7 +874,7 @@
     <td class="ic-col c-sam"></td>
     <td class="ic-col c-silo"></td>
     <td class="ic-col c-ships"></td>
-    <td class="c-rel"><span class="rel none">Нейтралитет</span></td>
+    <td class="c-rel"><span class="rel none">Нет договора</span></td>
     <td class="c-act"><span class="dip-actions">
       <button class="dip" data-dip="alliance" title="Предложить союз" aria-label="Предложить союз"><svg class="ic"><use href="#i-ally"/></svg></button>
       <button class="dip" data-dip="pact" title="Предложить пакт о ненападении на 10 минут" aria-label="Пакт о ненападении"><svg class="ic"><use href="#i-pact"/></svg></button>

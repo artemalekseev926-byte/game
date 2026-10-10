@@ -5,7 +5,28 @@ export const TRAITOR_TICKS = DIPLO.traitorTicks;
 
 export const relKey = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
 
+const has = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
+
 const TYPE_ACC = { alliance: 'союз', pact: 'пакт о ненападении', trade: 'торговый договор' };
+const MILITARY = { none: true, pact: true, alliance: true };
+
+export const isProposal = (type) => has(PROPOSALS, type);
+
+export function makeRelation(src) {
+  const r = src && typeof src === 'object' ? src : {};
+  const legacyTrade = r.type === 'trade';
+  const type = !legacyTrade && has(MILITARY, r.type) ? r.type : 'none';
+  const emb = (r.emb | 0) & 3;
+  return {
+    type,
+    until: type === 'pact' && Number.isFinite(r.until) ? r.until : 0,
+    trade: legacyTrade || r.trade === true,
+    embargo: emb !== 0,
+    emb,
+  };
+}
+
+const idle = (r) => r.type === 'none' && !r.trade && !r.embargo;
 
 export const INTENTS = {
   propose: { phase: 'any', check: checkPropose, run: runPropose },
@@ -22,12 +43,25 @@ function otherPlayer(game, pid, v) {
 
 export function hasTradeTreaty(game, a, b) {
   const r = game.relation(a, b);
-  return r.type === 'trade' || r.type === 'alliance' || !!r.trade;
+  return r.type === 'alliance' || r.trade === true;
 }
 
 export function treaties(game, a, b) {
   const r = game.relation(a, b);
-  return { type: r.type, trade: r.type === 'trade' || !!r.trade };
+  return { type: r.type, until: r.until, trade: r.trade === true, embargo: !!r.embargo };
+}
+
+export function hasTreaty(game, a, b) {
+  const r = game.relation(a, b);
+  return r.type !== 'none' || r.trade === true;
+}
+
+function coveredBy(game, a, b, type) {
+  const rel = game.relation(a, b);
+  if (rel.type === 'alliance') return type === 'alliance' ? 'Союз уже заключён' : 'Союз уже включает пакт и торговлю';
+  if (type === 'pact' && rel.type === 'pact') return 'Пакт о ненападении уже действует';
+  if (type === 'trade' && rel.trade) return 'Торговый договор уже действует';
+  return null;
 }
 
 function pendingRequest(game, a, b, type) {
@@ -41,11 +75,9 @@ export function proposeError(game, pid, to, type) {
   const q = otherPlayer(game, pid, to);
   if (q < 0) return 'Неизвестный игрок';
   if (!game.s.players[q].alive) return 'Этот игрок выбыл';
-  if (typeof type !== 'string' || !PROPOSALS[type]) return 'Неизвестный тип договора';
-  const rel = treaties(game, pid, q);
-  const cur = rel.type;
-  if (cur === type || (type === 'trade' && rel.trade)) return 'Такой договор уже действует';
-  if (cur === 'alliance') return 'Союз уже включает пакт и торговлю';
+  if (!isProposal(type)) return 'Неизвестный тип договора';
+  const dup = coveredBy(game, pid, q, type);
+  if (dup) return dup;
   const r = pendingRequest(game, pid, q, type);
   if (r && r.from === pid) return 'Предложение уже отправлено';
   return null;
@@ -58,23 +90,24 @@ function checkPropose(game, pid, cmd) {
 function runPropose(game, pid, cmd) {
   const s = game.s;
   const to = Number(cmd.to);
-  const back = pendingRequest(game, pid, to, cmd.type);
+  const type = String(cmd.type);
+  const back = pendingRequest(game, pid, to, type);
   if (back) {
     s.requests = s.requests.filter((r) => r !== back);
-    establish(game, pid, to, cmd.type);
+    establish(game, pid, to, type);
     return;
   }
-  const req = { id: game.nextId(), from: pid, to, type: cmd.type, expires: s.tick + DIPLO.requestTicks, at: s.tick };
+  const req = { id: game.nextId(), from: pid, to, type, expires: s.tick + DIPLO.requestTicks, at: s.tick };
   s.requests.push(req);
   game.emit({ k: 'request', req: { ...req } });
-  game.msg(to, `${s.players[pid].name} предлагает ${TYPE_ACC[req.type]}`, 'info');
+  game.msg(to, `${s.players[pid].name} предлагает ${TYPE_ACC[type]}`, 'info');
   game.msg(pid, `Предложение отправлено: ${s.players[to].name}`, 'info');
 }
 
 function checkRespond(game, pid, cmd) {
   const id = Number(cmd.id);
   const r = game.s.requests.find((q) => q.id === id);
-  if (!r || r.to !== pid) return 'Предложение не найдено';
+  if (!r || r.to !== pid || !isProposal(r.type)) return 'Предложение не найдено';
   return null;
 }
 
@@ -88,30 +121,29 @@ export function answer(game, r, accept) {
   const s = game.s;
   s.requests = s.requests.filter((q) => q !== r);
   const from = s.players[r.from], to = s.players[r.to];
-  if (!from || !to || !from.alive || !to.alive) return;
+  if (!from || !to || !from.alive || !to.alive || !isProposal(r.type)) return;
   if (accept) {
-    establish(game, r.from, r.to, r.type);
+    if (!coveredBy(game, r.from, r.to, r.type)) establish(game, r.from, r.to, r.type);
   } else {
     game.msg(r.from, `${to.name} отклонил ${TYPE_ACC[r.type]}`, 'info');
   }
 }
 
 export function establish(game, a, b, type) {
+  if (!isProposal(type)) return;
   const s = game.s;
   const key = relKey(a, b);
-  const prev = s.relations[key];
-  const emb = prev ? prev.emb | 0 : 0;
-  const had = !!prev && (prev.type === 'trade' || !!prev.trade);
-  if (type === 'trade' && prev && prev.type === 'pact') {
-    prev.trade = true;
-  } else {
-    const trade = type === 'pact' && had;
-    s.relations[key] = { type, until: type === 'pact' ? s.tick + DIPLO.pactTicks : 0, embargo: emb !== 0, emb, trade };
+  const r = makeRelation(s.relations[key]);
+  if (type === 'trade') r.trade = true;
+  else {
+    r.type = type;
+    r.until = type === 'pact' ? s.tick + DIPLO.pactTicks : 0;
   }
+  s.relations[key] = r;
   if (type === 'alliance' || type === 'pact') {
     cancelAttacks(game, (x) => (x.attacker === a && x.target === b) || (x.attacker === b && x.target === a));
   }
-  game.emit({ k: 'relation', a, b, type });
+  game.emit({ k: 'relation', a, b, type: r.type, trade: r.trade });
   const A = s.players[a], B = s.players[b];
   const text = RELATIONS[type];
   game.msg(a, `${text}: ${B.name}`, 'good');
@@ -127,35 +159,40 @@ export function markTraitor(game, pid) {
 export function breakRelation(game, a, b, traitor = false) {
   const s = game.s;
   const key = relKey(a, b);
-  const r = s.relations[key];
-  if (!r || r.type === 'none') return false;
-  const was = r.type;
+  const cur = s.relations[key];
+  if (!cur || (cur.type === 'none' && !cur.trade)) return false;
+  const r = makeRelation(cur);
+  const was = r.type !== 'none' ? r.type : 'trade';
   r.type = 'none';
   r.until = 0;
   r.trade = false;
-  if (!r.embargo) delete s.relations[key];
+  if (r.embargo) s.relations[key] = r;
+  else delete s.relations[key];
   if (traitor) {
     markTraitor(game, a);
     game.msg(-1, `${s.players[a].name} нарушил договор и считается предателем`, 'danger');
   }
-  game.emit({ k: 'relation', a, b, type: 'none' });
+  game.emit({ k: 'relation', a, b, type: 'none', trade: false });
   game.msg(b, `${s.players[a].name} разорвал договор (${RELATIONS[was]})`, 'danger');
   game.msg(a, `Договор разорван: ${s.players[b].name}`, 'info');
   return true;
 }
 
+export const breakMakesTraitor = (game, a, b) => {
+  const r = game.relation(a, b);
+  return r.type === 'alliance' || (r.type === 'pact' && r.until > game.s.tick);
+};
+
 function checkBreak(game, pid, cmd) {
   const q = otherPlayer(game, pid, cmd.with);
   if (q < 0) return 'Неизвестный игрок';
-  if (game.relation(pid, q).type === 'none') return 'Нет действующего договора';
+  if (!hasTreaty(game, pid, q)) return 'Нет действующего договора';
   return null;
 }
 
 function runBreak(game, pid, cmd) {
   const q = Number(cmd.with);
-  const r = game.relation(pid, q);
-  const traitor = r.type === 'alliance' || (r.type === 'pact' && r.until > game.s.tick);
-  breakRelation(game, pid, q, traitor);
+  breakRelation(game, pid, q, breakMakesTraitor(game, pid, q));
 }
 
 function checkEmbargo(game, pid, cmd) {
@@ -173,13 +210,13 @@ function runEmbargo(game, pid, cmd) {
   const q = Number(cmd.with);
   const key = relKey(pid, q);
   const on = cmd.on === undefined ? !embargoBy(game, pid, q) : !!cmd.on;
-  let r = s.relations[key];
-  if (!r) r = s.relations[key] = { type: 'none', until: 0, embargo: false, emb: 0, trade: false };
+  const r = makeRelation(s.relations[key]);
   const bit = pid < q ? 1 : 2;
-  r.emb = on ? (r.emb | 0) | bit : (r.emb | 0) & ~bit;
+  r.emb = on ? r.emb | bit : r.emb & ~bit;
   r.embargo = r.emb !== 0;
-  if (r.type === 'none' && !r.embargo) delete s.relations[key];
-  game.emit({ k: 'relation', a: pid, b: q, type: r.type, embargo: r.embargo });
+  if (idle(r)) delete s.relations[key];
+  else s.relations[key] = r;
+  game.emit({ k: 'relation', a: pid, b: q, type: r.type, trade: r.trade, embargo: r.embargo });
   const P = s.players;
   if (on) {
     game.msg(q, `${P[pid].name} ввёл против вас эмбарго`, 'danger');
@@ -196,7 +233,7 @@ function tickRequests(game) {
   for (const r of list) {
     if (!s.requests.includes(r)) continue;
     const from = s.players[r.from], to = s.players[r.to];
-    if (!from || !to || !from.alive || !to.alive) {
+    if (!from || !to || !from.alive || !to.alive || !isProposal(r.type)) {
       s.requests = s.requests.filter((q) => q !== r);
       continue;
     }
@@ -219,11 +256,10 @@ function tickPacts(game) {
     const r = s.relations[key];
     if (r.type !== 'pact' || !r.until || r.until > s.tick) continue;
     const [a, b] = key.split(':').map(Number);
-    r.type = r.trade ? 'trade' : 'none';
+    r.type = 'none';
     r.until = 0;
-    r.trade = false;
-    if (r.type === 'none' && !r.embargo) delete s.relations[key];
-    game.emit({ k: 'relation', a, b, type: r.type });
+    if (idle(r)) delete s.relations[key];
+    game.emit({ k: 'relation', a, b, type: 'none', trade: r.trade === true });
     if (s.players[a]) game.msg(a, `Пакт о ненападении с ${s.players[b].name} истёк`, 'info');
     if (s.players[b]) game.msg(b, `Пакт о ненападении с ${s.players[a].name} истёк`, 'info');
   }

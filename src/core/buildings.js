@@ -27,7 +27,11 @@ export function upgradeCost(game, b) {
 
 export const buildTicks = (type) => sec(BUILDINGS[type].time);
 
-export const factoryInterval = (level) => Math.max(1, Math.round((ECON.factoryInterval * TICKS_PER_SEC) / Math.max(1, level)));
+export const factoryInterval = () => Math.max(1, Math.round(ECON.factoryInterval * TICKS_PER_SEC));
+
+export const factoryLoad = () => Math.max(1, Math.round(ECON.factoryLoad * TICKS_PER_SEC));
+
+export const factoryCargo = (level) => ECON.cargoPerLevel * Math.max(1, level);
 
 export const railCost = (len) => Math.round(ECON.railCostPerTile * len);
 
@@ -138,17 +142,38 @@ export function railBetween(game, a, b) {
   return null;
 }
 
-export function railOwnShare(game, pid, A, B) {
-  const own = game.s.owner, W = game.W, me = pid + 1;
-  const ax = A.x + 0.5, ay = A.y + 0.5, bx = B.x + 0.5, by = B.y + 0.5;
-  const steps = Math.max(1, Math.ceil(dist(A, B)));
-  let mine = 0;
-  for (let k = 0; k <= steps; k++) {
-    const x = Math.floor(ax + ((bx - ax) * k) / steps), y = Math.floor(ay + ((by - ay) * k) / steps);
-    if (own[y * W + x] === me) mine++;
-  }
-  return mine / (steps + 1);
+const LINE_OK = 0, LINE_WATER = 1, LINE_FOREIGN = 2;
+
+function landCode(game, pid, x, y) {
+  const i = y * game.W + x;
+  if (!game.isLandTile(i)) return LINE_WATER;
+  const o = game.s.owner[i] - 1;
+  return o === pid || (o >= 0 && game.isAllied(pid, o)) ? LINE_OK : LINE_FOREIGN;
 }
+
+export function landLine(game, pid, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const sx = Math.sign(dx), sy = Math.sign(dy);
+  const nx = Math.abs(dx), ny = Math.abs(dy);
+  let x = ax, y = ay, worst = landCode(game, pid, x, y);
+  const see = (c) => { if (c === LINE_WATER || (c === LINE_FOREIGN && worst === LINE_OK)) worst = c; };
+  for (let ix = 0, iy = 0; ix < nx || iy < ny;) {
+    const d = (1 + 2 * ix) * ny - (1 + 2 * iy) * nx;
+    if (d === 0) {
+      const a = landCode(game, pid, x + sx, y), b = landCode(game, pid, x, y + sy);
+      if (a !== LINE_OK && b !== LINE_OK) see(Math.min(a, b));
+      x += sx; y += sy; ix++; iy++;
+    } else if (d < 0) { x += sx; ix++; } else { y += sy; iy++; }
+    see(landCode(game, pid, x, y));
+    if (worst === LINE_WATER) return worst;
+  }
+  return worst;
+}
+
+const LINE_ERROR = {
+  [LINE_WATER]: 'Ж/д не может идти через воду',
+  [LINE_FOREIGN]: 'Ж/д строится только по вашей или союзной территории',
+};
 
 export function railError(game, pid, aId, bId) {
   const A = game.buildingById(aId), B = game.buildingById(bId);
@@ -159,7 +184,8 @@ export function railError(game, pid, aId, bId) {
   if (railBetween(game, A.id, B.id)) return 'Эти здания уже соединены';
   const len = dist(A, B);
   if (len > ECON.railMaxLen) return `Слишком длинная дорога (не больше ${ECON.railMaxLen} клеток)`;
-  if (railOwnShare(game, pid, A, B) < ECON.railOwnShare) return 'Дорога должна идти по вашей территории (не менее 80%)';
+  const line = landLine(game, pid, A.x, A.y, B.x, B.y);
+  if (line !== LINE_OK) return LINE_ERROR[line];
   const cost = railCost(len);
   if (game.s.players[pid].gold < cost) return `Нужно ${cost} золота`;
   return null;
@@ -256,7 +282,7 @@ function complete(game, b) {
   } else {
     game.msg(b.owner, `Построено: ${name}`, 'good');
   }
-  if (b.type === 'factory') b.cd = Math.min(b.cd > 0 ? b.cd : Infinity, factoryInterval(b.level));
+  if (b.type === 'factory') b.cd = Math.min(b.cd > 0 ? b.cd : Infinity, factoryLoad());
   game.emit({ k: 'built', pid: b.owner, id: b.id });
 }
 
@@ -279,34 +305,67 @@ export function railLength(game, route) {
   return L;
 }
 
+export const tripTicks = (len, type) => Math.max(1, Math.ceil(len / LAND_UNITS[type].speed));
+
+export function railClear(game, pid, route) {
+  for (let k = 1; k < route.length; k++) {
+    const a = game.buildingById(route[k - 1]), b = game.buildingById(route[k]);
+    if (!a || !b || landLine(game, pid, a.x, a.y, b.x, b.y) !== LINE_OK) return false;
+  }
+  return true;
+}
+
+export function truckError(game, f, port) {
+  const W = game.W;
+  if (game.landId[f.y * W + f.x] !== game.landId[port.y * W + port.x]) return 'Порт на другом берегу моря';
+  if (dist(f, port) > ECON.truckMaxLen) return `Грузовик возит не дальше ${ECON.truckMaxLen} клеток`;
+  const line = landLine(game, f.owner, f.x, f.y, port.x, port.y);
+  if (line === LINE_WATER) return 'Путь грузовика пересекает воду';
+  if (line === LINE_FOREIGN) return 'Путь грузовика идёт по чужой земле';
+  return null;
+}
+
+export function trainRoute(game, f, port) {
+  const route = railRoute(game, f.owner, f.id, port.id);
+  if (!route || route.length < 2) return null;
+  const len = railLength(game, route);
+  const straight = dist(f, port);
+  if (len > straight * (LAND_UNITS.train.speed / (2 * LAND_UNITS.truck.speed)) + 1e-9) return null;
+  if (!railClear(game, f.owner, route)) return null;
+  return { route, len };
+}
+
 export function factoryRoute(game, f) {
   let best = null;
+  const take = (plan) => {
+    if (!best || plan.trip < best.trip || (plan.trip === best.trip && plan.port.id < best.port.id)) best = plan;
+  };
   for (const b of game.s.buildings) {
     if (b.owner !== f.owner || b.type !== 'port' || !game.buildingActive(b)) continue;
-    const route = railRoute(game, f.owner, f.id, b.id);
-    if (!route) continue;
-    const len = railLength(game, route);
-    if (!best || len < best.len || (len === best.len && b.id < best.port.id)) best = { port: b, route, type: 'train', len };
+    const straight = dist(f, b);
+    const tr = trainRoute(game, f, b);
+    if (tr) take({ type: 'train', port: b, route: tr.route, len: tr.len, straight, trip: tripTicks(tr.len, 'train') });
+    if (!truckError(game, f, b)) take({ type: 'truck', port: b, route: null, len: straight, straight, trip: tripTicks(straight, 'truck') });
   }
-  if (best) return best;
-  const port = nearestPort(game, f.owner, f.x, f.y);
-  if (!port) return null;
-  return { port, route: null, type: 'truck', len: dist(f, port) };
+  return best;
 }
 
-export function factoryCycle(level, len, type) {
-  const trip = Math.ceil((2 * len) / LAND_UNITS[type].speed);
-  return Math.max(factoryInterval(level), trip);
-}
+export const factoryCycle = (trip) => Math.max(factoryInterval(), trip + factoryLoad());
 
 export function factoryOutlook(game, f) {
+  const cargo = factoryCargo(f.level);
+  const rate = (cycle) => (cargo * TICKS_PER_SEC) / cycle;
   const plan = factoryRoute(game, f);
-  if (!plan) return null;
-  const cargo = ECON.cargoPerLevel * f.level;
-  const perMin = (ticks) => (cargo * 60 * TICKS_PER_SEC) / ticks;
-  const cycle = factoryCycle(f.level, plan.len, plan.type);
-  const out = { ...plan, cargo, cycle, perMin: perMin(cycle), railPerMin: 0 };
-  if (plan.type === 'truck') out.railPerMin = perMin(factoryCycle(f.level, plan.len, 'train')) - out.perMin;
+  if (!plan) {
+    const direct = ECON.factoryDirect * f.level;
+    return { type: 'direct', port: null, route: null, len: 0, trip: 0, cycle: 0, cargo: 0, perSec: direct, perMin: direct * 60, railPerSec: 0, railPerMin: 0 };
+  }
+  const cycle = factoryCycle(plan.trip);
+  const out = { ...plan, cargo, cycle, perSec: rate(cycle), perMin: rate(cycle) * 60, railPerSec: 0, railPerMin: 0 };
+  if (plan.type === 'truck') {
+    out.railPerSec = rate(factoryCycle(tripTicks(plan.straight, 'train'))) - out.perSec;
+    out.railPerMin = out.railPerSec * 60;
+  }
   return out;
 }
 
@@ -317,7 +376,7 @@ export function shipCargo(game, f) {
   const path = stops.map((b) => [b.x + 0.5, b.y + 0.5]);
   const u = {
     owner: f.owner, type: plan.type, x: path[0][0], y: path[0][1], path, pi: 1, hp: 1, maxHp: 1,
-    cargo: ECON.cargoPerLevel * f.level, from: f.id, to: plan.port.id, back: 0,
+    cargo: factoryCargo(f.level), from: f.id, to: plan.port.id,
     heading: heading(path[1][0] - path[0][0], path[1][1] - path[0][1]),
   };
   game.spawnUnit(u);
@@ -325,10 +384,20 @@ export function shipCargo(game, f) {
   return u;
 }
 
+function liveVehicles(game) {
+  let set = game.tickCache.get('veh');
+  if (!set) {
+    set = new Map();
+    for (const u of game.s.units) if (u.type === 'train' || u.type === 'truck') set.set(u.id, u);
+    game.tickCache.set('veh', set);
+  }
+  return set;
+}
+
 function vehicleOut(game, b) {
   if (!b.veh) return false;
-  const u = game.unitById(b.veh);
-  if (u && u.from === b.id && (u.type === 'train' || u.type === 'truck')) return true;
+  const u = liveVehicles(game).get(b.veh);
+  if (u && u.from === b.id && u.owner === b.owner) return true;
   b.veh = 0;
   return false;
 }
@@ -336,8 +405,10 @@ function vehicleOut(game, b) {
 function tickFactory(game, b) {
   if (b.cd > 0) b.cd--;
   if (b.cd > 0 || vehicleOut(game, b)) return;
-  b.cd = factoryInterval(b.level);
-  shipCargo(game, b);
+  b.cd = factoryInterval();
+  const u = shipCargo(game, b);
+  b.direct = u ? 0 : 1;
+  if (u) liveVehicles(game).set(u.id, u);
 }
 
 export function deliverCargo(game, u) {
@@ -348,7 +419,7 @@ export function deliverCargo(game, u) {
   const gold = Math.round(u.cargo * game.incomeMult(u.owner));
   game.addGold(u.owner, gold);
   port.stock = Math.min(TRADE.maxStock, (port.stock || 0) + 1);
-  game.emit({ k: 'cargo', pid: u.owner, id: port.id, x: port.x, y: port.y, gold, by: u.type });
+  game.emit({ k: 'cargo', pid: u.owner, id: port.id, from: u.from, x: port.x, y: port.y, gold, by: u.type });
   return true;
 }
 
@@ -373,28 +444,18 @@ export function stepLandUnit(u) {
   return u.pi >= u.path.length;
 }
 
-function turnBack(u) {
-  u.back = 1;
-  u.cargo = 0;
-  u.path = u.path.slice().reverse();
-  u.pi = 1;
-}
-
 function tickLandUnits(game) {
   const s = game.s;
   let done = null;
   for (const u of s.units) {
     if (u.type !== 'train' && u.type !== 'truck') continue;
     if (!stepLandUnit(u)) continue;
-    if (!u.back) {
-      deliverCargo(game, u);
-      if (u.path.length > 1) {
-        turnBack(u);
-        continue;
-      }
-    }
+    if (!u.back) deliverCargo(game, u);
     const f = game.buildingById(u.from);
-    if (f && f.veh === u.id) f.veh = 0;
+    if (f && f.veh === u.id) {
+      f.veh = 0;
+      f.cd = Math.max(f.cd | 0, factoryLoad());
+    }
     (done || (done = new Set())).add(u);
   }
   if (done) s.units = s.units.filter((u) => !done.has(u));

@@ -850,6 +850,7 @@ class Multiplayer {
       r = { ok: false, error: e.message };
     }
     this.steamOk = !!(r && r.ok);
+    this.steamShared = !!(r && r.shared);
     const err = (r && r.error) || 'Steam недоступен';
     this.setSteam(this.steamOk, this.steamOk ? `Steam: ${r.name || 'подключён'}` : hasNative() ? 'Steam не запущен' : 'Только в версии для ПК');
     if (!this.steamOk) $('steam-status').title = err;
@@ -862,10 +863,14 @@ class Multiplayer {
     if (!this.steamOk) return;
     ul.innerHTML = '<li class="empty">Поиск лобби…</li>';
     try {
-      const list = await SteamTransport.list();
+      const res = typeof SteamTransport.scan === 'function' ? await SteamTransport.scan() : { list: await SteamTransport.list(), shared: this.steamShared };
+      const list = res.list || [];
+      const shared = !!res.shared || this.steamShared;
       ul.innerHTML = '';
       if (!list.length) {
-        ul.innerHTML = '<li class="empty">Открытых лобби нет</li>';
+        ul.innerHTML = shared
+          ? '<li class="empty">Открытых лобби не найдено. На тестовом AppID 480 Steam показывает только часть лобби, поэтому список часто пуст: попросите друга пригласить вас через Steam (Shift+Tab) или введите ID лобби выше.</li>'
+          : '<li class="empty">Открытых лобби нет. Создайте своё лобби или войдите по приглашению либо по ID.</li>';
         return;
       }
       for (const l of list) {
@@ -877,6 +882,7 @@ class Multiplayer {
         b.disabled = l.members >= l.max;
         ul.appendChild(li);
       }
+      if (shared) ul.insertAdjacentHTML('beforeend', '<li class="empty">Нет лобби друга? На тестовом AppID 480 список неполный — войдите по приглашению или по ID.</li>');
     } catch (e) {
       ul.innerHTML = `<li class="empty">${esc(e.message)}</li>`;
     }
@@ -1027,7 +1033,9 @@ class LobbyView {
     else info = `Подключено к хосту <b>${esc(this.app.multiplayer.lanAddr || '')}</b>`;
     $('lobby-connect').innerHTML = info;
     $('lobby-hint').textContent = t.kind === 'steam'
-      ? 'Друзья могут войти по приглашению Steam, по ID лобби или найти его в списке открытых лобби.'
+      ? (this.app.multiplayer.steamShared
+        ? 'Пригласите друзей кнопкой «Пригласить друзей» или отправьте им ID лобби. На тестовом AppID 480 лобби может не появиться в списке открытых лобби.'
+        : 'Друзья могут войти по приглашению Steam, по ID лобби или найти его в списке открытых лобби.')
       : isHost ? 'Игроки в той же сети (или через Radmin VPN, Hamachi, проброс порта) подключаются по этому адресу.' : 'Ожидайте, пока хост настроит партию и начнёт игру.';
     $('lobby-slots').innerHTML = '';
     $('lobby-info').innerHTML = isHost ? '' : 'Подключение к хосту…';

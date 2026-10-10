@@ -2,9 +2,12 @@ import { MAPS, parseCustomMap } from '../core/map.js';
 import { PLAYER_COLORS, DEFAULT_SETTINGS, DIFFICULTY } from '../core/config.js';
 import { normalizeSettings } from '../core/state.js';
 import { Session, createMatch } from './session.js';
-import { NET_VERSION, Reassembler, sendLarge } from './net.js';
+import { NET_VERSION, Reassembler, RateLimit, sendLarge } from './net.js';
 
 export const MAX_SLOTS = 12;
+export const LOBBY_BURST = 20;
+export const LOBBY_WINDOW = 5;
+export const LOBBY_CHAT_BURST = 5;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const CHAT_MAX = 200;
 
@@ -86,7 +89,9 @@ export class HostLobby {
     this.closed = false;
     this.onChange = () => {};
     this.onChat = () => {};
-    this.chunks = new Reassembler();
+    this.chunks = new Reassembler({ chunks: false });
+    this.limit = new RateLimit(LOBBY_BURST, LOBBY_WINDOW, opts.now);
+    this.chatLimit = new RateLimit(LOBBY_CHAT_BURST, LOBBY_WINDOW, opts.now);
     transport.onMessage = (peer, msg) => this.onMsg(peer, msg);
     transport.onPeerLeave = (peer) => this.onLeave(peer);
     transport.onPeerJoin = () => {};
@@ -162,18 +167,21 @@ export class HostLobby {
     if (this.closed || this.started) return;
     const msg = this.chunks.accept(peer, raw);
     if (!msg || typeof msg.t !== 'string') return;
+    if (msg.t === 'bye') { this.onLeave(peer); return; }
+    if (!this.limit.take(peer)) return;
     if (msg.t === 'hello') { this.onHello(peer, msg); return; }
     const i = this.slotOf(peer);
     if (i < 0) return;
     if (msg.t === 'color') {
       if (!this.setColor(i, msg.color)) this.transport.send(peer, { t: 'err', error: 'Этот цвет уже занят' });
     } else if (msg.t === 'name') {
-      this.slots[i].name = cleanName(msg.name, this.slots[i].name);
+      const name = cleanName(msg.name, this.slots[i].name);
+      if (name === this.slots[i].name) return;
+      this.slots[i].name = name;
       this.sync();
     } else if (msg.t === 'chat') {
-      this.postChat(i, msg.text);
-    } else if (msg.t === 'bye') {
-      this.onLeave(peer);
+      if (this.chatLimit.take(peer)) this.postChat(i, msg.text);
+      else if (this.chatLimit.firstMiss(peer)) this.transport.send(peer, { t: 'err', error: 'Слишком много сообщений в чате — подождите несколько секунд' });
     }
   }
 
@@ -196,6 +204,8 @@ export class HostLobby {
     if (this.started) return;
     const i = this.slotOf(peer);
     this.chunks.drop(peer);
+    this.limit.drop(peer);
+    this.chatLimit.drop(peer);
     if (i > 0) {
       this.slots.splice(i, 1);
       this.sync();

@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('native', {
     send: (peer, data) => ipcRenderer.send('steam:send', peer, data),
     onPacket: (cb) => listen('steam:packet', cb),
     onMemberLeft: (cb) => listen('steam:memberLeft', cb),
+    onLinkFail: (cb) => listen('steam:linkFail', cb),
     onJoinRequested: (cb) => listen('steam:joinRequested', cb),
   },
   lan: {

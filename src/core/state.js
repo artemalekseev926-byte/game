@@ -1,6 +1,7 @@
 import {
-  VERSION, PLAYER_COLORS, ECON, RESEARCH_KEYS, DEFAULT_SETTINGS, VICTORY, DIFFICULTY, BUILDING_KEYS,
+  VERSION, PLAYER_COLORS, ECON, RESEARCH_KEYS, DEFAULT_SETTINGS, VICTORY, DIFFICULTY, BUILDING_KEYS, STRIKE_KEYS,
 } from './config.js';
+import { makeRelation, isProposal } from './diplomacy.js';
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const clampNum = (v, lo, hi, def) => {
@@ -226,42 +227,107 @@ export function deserializeState(obj, map) {
     if (!(s.fallout instanceof Uint16Array) || s.fallout.length !== N) s.fallout = new Uint16Array(N);
   }
   for (const key of ['buildings', 'rails', 'attacks', 'units', 'projectiles', 'requests', 'players']) if (!Array.isArray(s[key])) s[key] = [];
-  if (!s.relations || typeof s.relations !== 'object') s.relations = {};
+  s.relations = normalizeRelations(s.relations, s.players.length);
+  s.requests = s.requests.filter((r) => r && typeof r === 'object' && isProposal(r.type));
   s.settings = normalizeSettings(s.settings);
   return s;
+}
+
+const REL_KEY = /^(\d+):(\d+)$/;
+
+export function normalizeRelations(src, n) {
+  const out = {};
+  if (!src || typeof src !== 'object') return out;
+  for (const key of Object.keys(src)) {
+    const m = REL_KEY.exec(key);
+    if (!m) continue;
+    const a = Number(m[1]), b = Number(m[2]);
+    if (a >= b || b >= n) continue;
+    const r = makeRelation(src[key]);
+    if (r.type !== 'none' || r.trade || r.embargo) out[key] = r;
+  }
+  return out;
 }
 
 const FNV = 16777619;
 const BTYPE = Object.fromEntries(BUILDING_KEYS.map((k, i) => [k, i + 1]));
 const UTYPE = { warship: 1, transport: 2, trade: 3, train: 4, truck: 5 };
 const PHASE = { spawn: 1, play: 2, over: 3 };
+const RTYPE = { none: 1, pact: 2, alliance: 3 };
+const PTYPE = { alliance: 1, pact: 2, trade: 3 };
+const RKEY = Object.fromEntries(RESEARCH_KEYS.map((k, i) => [k, i + 1]));
+const SKIND = Object.fromEntries([...STRIKE_KEYS, 'warhead'].map((k, i) => [k, i + 1]));
+const AILVL = { easy: 1, normal: 2, hard: 3 };
 
 export function hashState(s) {
   let h = 0x811c9dc5;
   const mix = (v) => { h = Math.imul(h ^ (v | 0), FNV); };
   const num = (v, m = 1) => mix(Number.isFinite(v) ? Math.floor(v * m) : -7);
+  const int = (v) => mix(Number.isFinite(v) ? v : -7);
   mix(s.tick);
   mix(s.rngState);
   mix(PHASE[s.phase] || 0);
   mix(s.winner);
   mix(s.nextId);
+  int(s.econLeader);
+  int(s.econLeadTicks);
   const own = s.owner, fo = s.fallout;
   for (let i = 0; i < own.length; i++) h = Math.imul(h ^ (own[i] | (fo[i] << 16)), FNV);
   for (const p of s.players) {
     mix(p.alive ? 1 : 0);
+    mix(p.spawned ? 1 : 0);
+    mix(AILVL[p.ai] || 0);
     num(p.troops);
-    mix(Math.round(p.gold));
+    num(p.gold, 16);
     mix(p.tiles);
     num(p.maxTroops);
+    num(p.income, 64);
+    num(p.upkeep, 64);
+    num(p.eventIncome, 64);
+    int(p.traitorUntil);
+    int(p.capital);
+    int(p.eliminatedAt);
     for (const k of RESEARCH_KEYS) mix(p.research[k]);
+    const r = p.researching;
+    if (r) { mix(RKEY[r.key] || -1); int(r.progress); int(r.total); } else mix(-2);
+    const c = p.composition;
+    if (c) { num(c.tank, 1e6); num(c.art, 1e6); }
+    const a = p.aiState;
+    if (a && typeof a === 'object' && a.v) {
+      mix(a.rng); int(a.turn); int(a.war); int(a.warAt); int(a.nukeAt); int(a.boatAt); int(a.dipAt); int(a.atkAt);
+    }
   }
+  const keys = Object.keys(s.relations).sort();
+  mix(keys.length);
+  for (const key of keys) {
+    const r = s.relations[key];
+    const k = key.indexOf(':');
+    mix(Number(key.slice(0, k)));
+    mix(Number(key.slice(k + 1)));
+    mix(RTYPE[r.type] || 9);
+    int(r.until);
+    mix(r.trade ? 1 : 0);
+    mix(r.emb);
+  }
+  mix(s.requests.length);
+  for (const r of s.requests) { mix(r.id); mix(r.from); mix(r.to); mix(PTYPE[r.type] || 9); int(r.expires); int(r.at); }
   for (const b of s.buildings) {
     mix(b.id); mix(b.owner); mix(BTYPE[b.type] || 0); mix(b.x); mix(b.y); mix(b.level); mix(b.build); mix(b.cd | 0);
+    mix(b.up | 0); mix(b.stock | 0); mix(b.veh | 0); mix(b.direct | 0);
   }
-  for (const r of s.rails) { mix(r.id); mix(r.a); mix(r.b); }
-  for (const a of s.attacks) { mix(a.id); mix(a.attacker); mix(a.target); num(a.troops); mix(a.landing); }
-  for (const u of s.units) { mix(u.id); mix(u.owner); mix(UTYPE[u.type] || 0); num(u.x, 8); num(u.y, 8); num(u.hp); }
-  for (const p of s.projectiles) { mix(p.id); mix(p.owner); num(p.x, 8); num(p.y, 8); mix(p.t); }
-  mix(s.requests.length);
+  for (const r of s.rails) { mix(r.id); mix(r.owner); mix(r.a); mix(r.b); }
+  for (const a of s.attacks) {
+    mix(a.id); mix(a.attacker); mix(a.target); num(a.troops); mix(a.landing); mix(a.local ? 1 : 0); int(a.scan);
+    const F = a.front;
+    mix(F.length);
+    for (let k = 0; k < F.length; k++) mix(F[k]);
+  }
+  for (const u of s.units) {
+    mix(u.id); mix(u.owner); mix(UTYPE[u.type] || 0); num(u.x, 8); num(u.y, 8); num(u.hp); int(u.pi);
+    num(u.cargo); num(u.troops); int(u.chase); mix(u.order | 0); mix(u.path ? u.path.length : -1);
+  }
+  for (const p of s.projectiles) {
+    mix(p.id); mix(p.owner); mix(SKIND[p.type] || 0); num(p.x, 8); num(p.y, 8); num(p.tx, 8); num(p.ty, 8); mix(p.t); mix(p.dur);
+  }
   return h >>> 0;
 }

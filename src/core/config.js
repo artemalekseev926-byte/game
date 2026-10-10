@@ -62,11 +62,13 @@ export const TERRAIN_DEF = Float64Array.from(TERRAIN, (t) => t.def);
 export const BUILDINGS = {
   house: {
     name: 'Жилой квартал', short: 'Дома', max: 5, cost: 1000, time: 6, upkeep: 0, hotkey: '1',
-    desc: '+25 000 к максимуму войск и +6 золота/с за уровень',
+    desc: '+3 000 к максимуму войск и +6 золота/с за уровень (каждая клетка территории даёт +6)',
   },
   factory: {
     name: 'Фабрика', short: 'Фабрика', max: 3, cost: 2500, time: 10, upkeep: 0, hotkey: '2',
-    desc: 'Возит грузы в ближайший порт (по ж/д — вдвое быстрее). Без порта даёт 4 золота/с за уровень. Открывает танки и артиллерию',
+    desc: 'Возит груз (75 золота за уровень) в свой порт только по своей или союзной суше: следующий рейс — после прибытия предыдущего. '
+      + 'Грузовик ездит до 100 клеток, поезд по прямой ж/д — вдвое быстрее и потому привозит вдвое больше. '
+      + 'Без доступного порта даёт 4 золота/с за уровень. Удваивает долю танков и артиллерии в армии, каждая фабрика добавляет ещё',
   },
   port: {
     name: 'Порт', short: 'Порт', max: 3, cost: 3000, time: 10, upkeep: 0, coast: true, hotkey: '3',
@@ -97,32 +99,51 @@ export const RESEARCH = {
   econ: { name: 'Экономика', max: 5, base: 1200, desc: '+10% к доходу и +5% к приросту войск за уровень' },
   logistics: { name: 'Логистика', max: 3, base: 1500, desc: '+10% к скорости наступления за уровень' },
   inf: { name: 'Пехота', max: 5, base: 1000, desc: '+8% к атаке и обороне за уровень' },
-  armor: { name: 'Бронетехника', max: 5, base: 2000, desc: 'Танки сами появляются в армии (нужна фабрика): мощная атака' },
-  art: { name: 'Артиллерия', max: 5, base: 1800, desc: 'Артиллерия сама появляется в армии (нужна фабрика): атака и оборона' },
+  armor: { name: 'Бронетехника', max: 5, base: 2000, desc: 'Танки сами появляются в армии: мощная атака. С фабриками их доля вдвое больше и растёт с каждой фабрикой' },
+  art: { name: 'Артиллерия', max: 5, base: 1800, desc: 'Артиллерия сама появляется в армии: атака и оборона. С фабриками её доля вдвое больше и растёт с каждой фабрикой' },
   fort: { name: 'Фортификация', max: 3, base: 1500, desc: '+12% к обороне всей территории за уровень' },
   naval: { name: 'Флот', max: 3, base: 2000, desc: '+20% к прочности и урону военных кораблей за уровень' },
   drone: { name: 'БПЛА', max: 3, base: 3000, desc: '1: аэродромы и ударные дроны, 2: дроны-камикадзе, 3: усиленные дроны' },
   missile: { name: 'Ракеты', max: 3, base: 5000, desc: '1: шахты и крылатые ракеты, 2: дальность 500, 3: без ограничения дальности' },
   aa: { name: 'Системы ПВО', max: 3, base: 3000, desc: '+10% к шансу перехвата за уровень' },
-  nuclear: { name: 'Ядерное оружие', max: 3, base: 12000, req: ['missile', 1], desc: '1: атомная бомба, 2: водородная бомба, 3: мегабомба «Судный день»' },
+  nuclear: { name: 'Ядерное оружие', max: 3, base: 12000, req: ['missile', 1], desc: '1: атомная бомба, 2: водородная бомба, 3: мегабомба «Судный день» — опустошает все враждебные страны' },
 };
 export const RESEARCH_KEYS = Object.keys(RESEARCH);
 export const researchCost = (key, lvl) => Math.round(RESEARCH[key].base * dpow(lvl + 1, 1.6));
 export const researchTicks = (lvl) => (20 + 15 * lvl) * TICKS_PER_SEC;
 
 export const STRIKES = {
-  drone: { name: 'Ударный БПЛА', src: 'airbase', req: ['drone', 1], cost: 300, r: 3, speed: 1.5, killPerLevel: 1500 },
-  kamikaze: { name: 'Дрон-камикадзе', src: 'airbase', req: ['drone', 2], cost: 600, r: 0, speed: 1.5, point: true, pick: 2 },
-  cruise: { name: 'Крылатая ракета', src: 'silo', req: ['missile', 1], cost: 2000, r: 0, speed: 2.5, point: true, pick: 2 },
-  atom: { name: 'Атомная бомба', src: 'silo', req: ['nuclear', 1], cost: 15000, r: 14, speed: 2.0, nuke: true },
-  hbomb: { name: 'Водородная бомба', src: 'silo', req: ['nuclear', 2], cost: 50000, r: 40, speed: 2.0, nuke: true },
+  drone: {
+    name: 'Ударный БПЛА', src: 'airbase', req: ['drone', 1], cost: 300, r: 3, speed: 1.5, killPerLevel: 1500,
+    desc: 'Уничтожает войска владельца клетки в точке удара',
+  },
+  kamikaze: {
+    name: 'Дрон-камикадзе', src: 'airbase', req: ['drone', 2], cost: 600, r: 0, speed: 1.5, point: true, pick: 2,
+    desc: 'Уничтожает выбранное вражеское здание',
+  },
+  cruise: {
+    name: 'Крылатая ракета', src: 'silo', req: ['missile', 1], cost: 2000, r: 0, speed: 2.5, point: true, pick: 2,
+    desc: 'Уничтожает выбранное вражеское здание; дальность растёт с исследованием «Ракеты»',
+  },
+  atom: {
+    name: 'Атомная бомба', src: 'silo', req: ['nuclear', 1], cost: 15000, r: 14, speed: 2.0, nuke: true,
+    desc: 'Выжигает клетки в радиусе 14: земля становится ничьей, здания рушатся, остаётся заражение',
+  },
+  hbomb: {
+    name: 'Водородная бомба', src: 'silo', req: ['nuclear', 2], cost: 50000, r: 40, speed: 2.0, nuke: true,
+    desc: 'То же, что атомная бомба, в радиусе 40',
+  },
   mega: {
-    name: 'Мегабомба «Судный день»', src: 'silo', req: ['nuclear', 3], cost: 250000, r: 24, speed: 2.0, nuke: true,
+    name: 'Мегабомба «Судный день»', src: 'silo', req: ['nuclear', 3], cost: 250000, r: 40, speed: 2.0, nuke: true,
     boost: 30, incomeSec: 120, perGame: 1,
+    desc: 'Одна на партию. Цена — не меньше 250 000 золота и не меньше 2 минут вашего дохода. Через несколько секунд после пуска '
+      + 'распадается на сотни ядерных боеголовок (одна на каждые ~1200 клеток врага, не меньше 8 на страну, радиус 40), '
+      + 'которые выжигают почти всю территорию всех враждебных стран: земля становится ничьей и заражённой, войска гибнут, '
+      + 'здания рушатся. Носитель не сбивается, боеголовки ПВО сбивает редко. Ваша земля, союзники и партнёры по пакту не страдают',
   },
 };
 export const STRIKE_KEYS = Object.keys(STRIKES);
-export const WARHEAD = { r: 24, speed: 3.0, minFlight: 25, maxFlight: 160, stagger: 61, terminal: 30 };
+export const WARHEAD = { r: 40, speed: 3.0, perTiles: 1200, min: 8, minFlight: 25, maxFlight: 160, stagger: 61, terminal: 30 };
 export const FALLOUT_TICKS = 600;
 export const NUKE_TROOP_LOSS = 1.5;
 export const TRAITOR_TICKS = 3000;
@@ -135,7 +156,7 @@ export const SAM = {
   radius: (lvl) => 40 + 10 * (lvl - 1),
   reload: (lvl) => Math.round(30 / Math.max(1, lvl)),
 };
-export const INTERCEPT = { drone: 0.6, kamikaze: 0.6, cruise: 0.5, atom: 0.45, warhead: 0.2, mega: 0, hbomb: 0.35 };
+export const INTERCEPT = { drone: 0.6, kamikaze: 0.6, cruise: 0.5, atom: 0.45, warhead: 0.15, mega: 0, hbomb: 0.35 };
 export const interceptChance = (kind, aaLvl) => (INTERCEPT[kind] === 0 ? 0 : Math.min(0.95, (INTERCEPT[kind] ?? 0.45) + 0.1 * aaLvl));
 
 export const SHIPS = {
@@ -160,8 +181,8 @@ export const ECON = {
   startTroops: 3000,
   maxGold: 1e9,
   troopsBase: 5000,
-  troopsPerTile: 2.2,
-  houseTroops: 25000,
+  troopsPerTile: 6,
+  houseTroops: 3000,
   growthBase: 60,
   growthExp: 0.73,
   growthDiv: 8,
@@ -194,16 +215,17 @@ export const ECON = {
   buildCostStep: 0.25,
   upgradeStep: 0.5,
   demolishRefund: 0.25,
-  factoryInterval: 20,
-  cargoPerLevel: 150,
+  factoryInterval: 6,
+  factoryLoad: 1,
+  cargoPerLevel: 75,
+  truckMaxLen: 100,
   railCostPerTile: 40,
-  railOwnShare: 0.8,
   railMaxLen: 300,
 };
 
 export const ARMY = {
   tankPerArmor: 0.07, tankPerFactory: 0.01, tankMax: 0.45,
-  artPerLevel: 0.06, artMax: 0.3,
+  artPerLevel: 0.06, artPerFactory: 0.005, artMax: 0.3, noFactory: 0.5,
   infBonus: 0.08, tankAtk: 1.3, artAtk: 0.9, artDef: 0.5, fortDef: 0.12,
   armorBonus: 0.1, artBonus: 0.1, shiftPerSec: 0.02,
 };

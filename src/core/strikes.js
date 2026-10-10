@@ -269,7 +269,9 @@ export function nukeArea(game, pr, r, selective) {
   return lost;
 }
 
-export const megaCell = () => Math.max(1, Math.floor(WARHEAD.r * Math.SQRT2));
+export const megaCell = () => Math.max(1, Math.floor(Math.sqrt(WARHEAD.perTiles)));
+
+const SPREAD = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
 
 export function megaTargets(game, pid) {
   const s = game.s, W = game.W, H = game.H, own = s.owner, P = s.players;
@@ -290,7 +292,17 @@ export function megaTargets(game, pid) {
     const x = i % W, y = (i - x) / W;
     per[v * C + Math.floor(y / G) * gw + Math.floor(x / G)]++;
   }
+  const center = (c, k) => {
+    const gx = c % gw, gy = (c - gx) / gw;
+    const x0 = gx * G, y0 = gy * G, x1 = Math.min(W, x0 + G), y1 = Math.min(H, y0 + G);
+    const [ox, oy] = SPREAD[k % SPREAD.length];
+    const d = Math.floor(G / 3);
+    const x = Math.min(W - 1, Math.max(0, Math.floor((x0 + x1 - 1) / 2) + ox * d));
+    const y = Math.min(H - 1, Math.max(0, Math.floor((y0 + y1 - 1) / 2) + oy * d));
+    return { x: x + 0.5, y: y + 0.5 };
+  };
   const out = [];
+  const count = new Int32Array(vic.length);
   for (let c = 0; c < C; c++) {
     let best = -1, bn = 0;
     for (let v = 0; v < vic.length; v++) {
@@ -298,9 +310,19 @@ export function megaTargets(game, pid) {
       if (n > bn) { bn = n; best = v; }
     }
     if (best < 0) continue;
-    const gx = c % gw, gy = (c - gx) / gw;
-    const x0 = gx * G, y0 = gy * G, x1 = Math.min(W, x0 + G), y1 = Math.min(H, y0 + G);
-    out.push({ pid: vic[best], x: Math.floor((x0 + x1 - 1) / 2) + 0.5, y: Math.floor((y0 + y1 - 1) / 2) + 0.5 });
+    out.push({ pid: vic[best], ...center(c, 0) });
+    count[best]++;
+  }
+  for (let v = 0; v < vic.length; v++) {
+    if (count[v] >= WARHEAD.min) continue;
+    const cells = [];
+    for (let c = 0; c < C; c++) if (per[v * C + c] > 0) cells.push(c);
+    cells.sort((a, b) => per[v * C + b] - per[v * C + a] || a - b);
+    for (let k = 0; count[v] < WARHEAD.min; k++) {
+      const c = cells[k % cells.length];
+      out.push({ pid: vic[v], ...center(c, 1 + Math.floor(k / cells.length)) });
+      count[v]++;
+    }
   }
   return out;
 }

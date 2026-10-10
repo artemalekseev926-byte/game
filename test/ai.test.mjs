@@ -162,17 +162,20 @@ test('ИИ: ответы на предложения, предатели, сою
   P[0].traitorUntil = g.s.tick + 100;
   assert.equal(aiRespond(g, 1, { id: 3, from: 0, to: 1, type: 'trade' }), false, 'предателю отказ');
   P[0].traitorUntil = 0;
-  g.s.relations['0:1'] = { type: 'pact', until: g.s.tick + 1000, embargo: false, emb: 0 };
-  assert.equal(aiRespond(g, 1, { id: 5, from: 0, to: 1, type: 'trade' }), false, 'торговля не заменяет действующий пакт');
+  g.s.relations['0:1'] = { type: 'pact', until: g.s.tick + 1000, trade: false, embargo: false, emb: 0 };
+  assert.equal(aiRespond(g, 1, { id: 5, from: 0, to: 1, type: 'trade' }), true, 'торговля поверх пакта не отменяет пакт');
+  g.s.relations['0:1'].trade = true;
+  assert.equal(aiRespond(g, 1, { id: 6, from: 0, to: 1, type: 'trade' }), false, 'договор уже есть');
   delete g.s.relations['0:1'];
-  g.s.relations['0:1'] = { type: 'alliance', until: 0, embargo: false, emb: 0 };
-  g.s.relations['0:2'] = { type: 'alliance', until: 0, embargo: false, emb: 0 };
+  g.s.relations['0:1'] = { type: 'alliance', until: 0, trade: false, embargo: false, emb: 0 };
+  g.s.relations['0:2'] = { type: 'alliance', until: 0, trade: false, embargo: false, emb: 0 };
   assert.equal(aiRespond(g, 1, { id: 4, from: 2, to: 1, type: 'alliance' }), false, 'союз всех живых не нужен не-лидеру');
   delete g.s.relations['0:1'];
   delete g.s.relations['0:2'];
   g.tick([{ pid: 0, cmd: { c: 'propose', to: 1, type: 'trade' } }]);
   for (let t = 0; t < 30 && g.s.requests.length; t++) g.tick([]);
-  assert.equal(g.relation(0, 1).type, 'trade', 'ИИ принял торговый договор');
+  assert.equal(g.relation(0, 1).trade, true, 'ИИ принял торговый договор');
+  assert.equal(g.relation(0, 1).type, 'none', 'торговля не военный договор');
   const before = P[0].tiles;
   g.tick([{ pid: 0, cmd: { c: '_ai', pid: 0, level: 'hard' } }]);
   for (let t = 0; t < 400; t++) g.tick([]);
@@ -180,6 +183,35 @@ test('ИИ: ответы на предложения, предатели, сою
   assert.ok(P[0].aiState.turn > 10, 'ИИ ходит за отключившегося');
   assert.ok(P[0].tiles > before, 'ИИ расширяет территорию');
   assert.equal(g.aiError, undefined);
+});
+
+test('ИИ: союз, объединяющий всех живых, не принимается и не даёт мгновенной победы', () => {
+  const map = rectMap([[10, 10, 190, 90]], 200, 100);
+  const g = aiGame(map, [null, 'normal'], 4, { spawnSeconds: 1 });
+  g.tick([{ pid: 0, cmd: { c: 'spawn', x: 30, y: 50 } }]);
+  while (g.s.phase === 'spawn') g.tick([]);
+  for (let t = 0; t < 600; t++) g.tick([]);
+  const P = g.s.players;
+  assert.ok(P[1].tiles > P[0].tiles * 5, 'ИИ — лидер');
+  P[0].troops = P[1].troops;
+  g.tick([{ pid: 0, cmd: { c: 'propose', to: 1, type: 'alliance' } }]);
+  for (let t = 0; t < 40; t++) g.tick([]);
+  assert.equal(g.s.phase, 'play', 'партия продолжается');
+  assert.equal(g.relation(0, 1).type, 'none', 'лидер отказал в союзе');
+  g.s.relations['0:1'] = { type: 'alliance', until: 0, trade: false, embargo: false, emb: 0 };
+  g.tick([]);
+  assert.equal(g.s.phase, 'play', 'союз двух стартовых игроков без побеждённых — не победа');
+
+  const h = aiGame(map, [null, 'normal', 'normal'], 4, { spawnSeconds: 1 });
+  h.tick([{ pid: 0, cmd: { c: 'spawn', x: 30, y: 50 } }]);
+  while (h.s.phase === 'spawn') h.tick([]);
+  h.tick([{ pid: 2, cmd: { c: 'surrender' } }]);
+  assert.equal(h.s.players[2].alive, false);
+  assert.equal(aiRespond(h, 1, { id: 1, from: 0, to: 1, type: 'alliance' }), false, 'ИИ не отдаёт победу коалиции');
+  h.s.relations['0:1'] = { type: 'alliance', until: 0, trade: false, embargo: false, emb: 0 };
+  h.tick([]);
+  assert.equal(h.s.phase, 'over', 'коалиция выживших после выбывания врага побеждает');
+  assert.equal(h.s.winReason, 'survivor');
 });
 
 test('ИИ: удары по ценным зданиям, атомная бомба и мегабомба у сложного ИИ', () => {
@@ -212,6 +244,63 @@ test('ИИ: удары по ценным зданиям, атомная бомб
   assert.ok(air.id > 0);
   assert.ok(AI_PROFILES.normal.nukes < 3 && AI_PROFILES.easy.nukes === 0, 'мегабомба только у сложного');
   assert.ok(STRIKES.mega.cost > 0);
+  assert.equal(g.aiError, undefined);
+});
+
+test('ИИ: ядерные удары никогда не задевают свою и союзную территорию', () => {
+  const map = rectMap([[10, 10, 290, 110]], 300, 120);
+  const g = aiGame(map, ['normal', null, null, null], 9, { spawnSeconds: 1, victory: { territory: false } });
+  g.tick([{ pid: 1, cmd: { c: 'spawn', x: 220, y: 60 } }, { pid: 2, cmd: { c: 'spawn', x: 120, y: 30 } }, { pid: 3, cmd: { c: 'spawn', x: 120, y: 90 } }]);
+  while (g.s.phase === 'spawn') g.tick([]);
+  claim(g, 0, 10, 10, 100, 110);
+  claim(g, 2, 100, 10, 140, 60);
+  claim(g, 3, 100, 60, 140, 85);
+  claim(g, 1, 140, 10, 290, 110);
+  claim(g, 1, 100, 85, 140, 110);
+  claim(g, 2, 200, 10, 201, 110);
+  const P = g.s.players;
+  g.s.relations['0:2'] = { type: 'alliance', until: 0, trade: false, embargo: false, emb: 0 };
+  g.s.relations['0:3'] = { type: 'pact', until: 1e9, trade: false, embargo: false, emb: 0 };
+  Object.assign(P[0].research, { missile: 3, nuclear: 2 });
+  readyBuilding(g, 0, 'silo', 50, 60);
+  readyBuilding(g, 0, 'silo', 50, 30);
+  for (const [x, y] of [[150, 30], [160, 80], [195, 40], [206, 70], [190, 100], [212, 20], [260, 60], [275, 30], [270, 95]]) readyBuilding(g, 1, 'factory', x, y);
+  const friendly = (pr, mine = true) => {
+    const r = STRIKES[pr.type].r, cx = Math.floor(pr.tx), cy = Math.floor(pr.ty);
+    let n = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= g.W || y >= g.H) continue;
+      const o = g.s.owner[y * g.W + x] - 1;
+      if ((mine && o === 0) || o === 2 || o === 3) n++;
+    }
+    return n;
+  };
+  let launched = 0, landed = 0;
+  const lost0 = [0, 2, 3].map((q) => P[q].stats.tilesLost);
+  for (let t = 0; t < 4000; t++) {
+    P[0].gold = Math.max(P[0].gold, 4e5);
+    P[1].troops = Math.max(P[1].troops, 3e5);
+    for (const pr of g.s.projectiles) {
+      if ((pr.type === 'atom' || pr.type === 'hbomb') && pr.t + 1 >= pr.dur) {
+        assert.equal(friendly(pr, false), 0, `удар по союзнику в момент взрыва, тик ${g.s.tick}`);
+        landed++;
+      }
+    }
+    g.tick([]);
+    for (const e of g.events) {
+      if (e.k !== 'launch' || (e.kind !== 'atom' && e.kind !== 'hbomb')) continue;
+      launched++;
+      const pr = g.s.projectiles.find((q) => q.id === e.id);
+      assert.equal(friendly(pr), 0, 'при пуске в радиусе нет своих, союзных и пактовых клеток');
+    }
+  }
+  assert.ok(launched >= 2 && landed >= 1, `пусков ${launched}, взрывов ${landed}`);
+  assert.deepEqual([0, 2, 3].map((q) => P[q].stats.tilesLost), lost0, 'свои и союзники не потеряли ни клетки');
+  assert.equal(g.relation(0, 2).type, 'alliance');
+  assert.equal(g.relation(0, 3).type, 'pact');
+  assert.equal(P[0].traitorUntil, 0);
   assert.equal(g.aiError, undefined);
 });
 
@@ -270,7 +359,7 @@ test('ИИ: сложный ИИ без целей разрывает пакт с
     while (g.s.phase === 'spawn') g.tick([]);
     fill(g, 0, 0, 0, 150, 100);
     fill(g, 1, 150, 0, 200, 100);
-    g.s.relations['0:1'] = { type: 'pact', until: g.s.tick + 30000, embargo: false, emb: 0 };
+    g.s.relations['0:1'] = { type: 'pact', until: g.s.tick + 30000, trade: false, embargo: false, emb: 0 };
     const P = g.s.players;
     P[1].troops = 300;
     for (let t = 0; t < 1500 && g.relation(0, 1).type === 'pact'; t++) {

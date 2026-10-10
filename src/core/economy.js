@@ -33,7 +33,7 @@ function runResearch(game, pid, cmd) {
 }
 
 const emptyAssets = () => ({
-  houseLv: 0, factoryLv: 0, factories: 0, ports: 0, forts: 0, samLv: 0, airbases: 0, silos: 0,
+  houseLv: 0, factoryLv: 0, directLv: 0, factories: 0, ports: 0, forts: 0, samLv: 0, airbases: 0, silos: 0,
   warships: 0, transports: 0, trade: 0,
 });
 
@@ -45,7 +45,11 @@ export function playerAssets(game) {
     if (!a || !game.buildingActive(b)) continue;
     switch (b.type) {
       case 'house': a.houseLv += b.level; break;
-      case 'factory': a.factoryLv += b.level; a.factories++; break;
+      case 'factory':
+        a.factoryLv += b.level;
+        a.factories++;
+        if (b.direct) a.directLv += b.level;
+        break;
       case 'port': a.ports++; break;
       case 'fort': a.forts++; break;
       case 'sam': a.samLv += b.level; break;
@@ -83,7 +87,7 @@ function updateIncome(p, a) {
   const base = p.tiles * ECON.incomePerTile
     + Math.sqrt(Math.max(0, p.troops)) * ECON.incomeTroops
     + a.houseLv * ECON.houseIncome
-    + (a.ports ? 0 : a.factoryLv * ECON.factoryDirect);
+    + a.directLv * ECON.factoryDirect;
   p.incBase = base * incomeMult(p);
   p.eventIncome = p.eventIncome * (1 - ECON.eventIncomeAlpha) + p.eventAcc * ECON.eventIncomeAlpha;
   p.eventAcc = 0;
@@ -99,8 +103,9 @@ const approach = (v, target, step) => (v < target ? Math.min(target, v + step) :
 export function targetComposition(p, a) {
   const r = p.research;
   const fac = a.factories;
-  const tank = r.armor >= 1 && fac > 0 ? Math.min(ARMY.tankMax, ARMY.tankPerArmor * r.armor + ARMY.tankPerFactory * fac) : 0;
-  const art = r.art >= 1 && fac > 0 ? Math.min(ARMY.artMax, ARMY.artPerLevel * r.art) : 0;
+  const mul = fac > 0 ? 1 : ARMY.noFactory;
+  const tank = r.armor >= 1 ? Math.min(ARMY.tankMax, ARMY.tankPerArmor * r.armor * mul + ARMY.tankPerFactory * fac) : 0;
+  const art = r.art >= 1 ? Math.min(ARMY.artMax, ARMY.artPerLevel * r.art * mul + ARMY.artPerFactory * fac) : 0;
   return { tank, art };
 }
 

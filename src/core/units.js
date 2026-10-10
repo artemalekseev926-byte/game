@@ -45,8 +45,64 @@ export function shipCost(game, pid) {
 export const warshipHp = (naval) => Math.round(WS.hp * (1 + WS.navalBonus * naval));
 export const warshipDamage = (naval) => Math.round(WS.dmg * (1 + WS.navalBonus * naval));
 
+const BERTH_R = 5;
+
+function berthTaken(game, pid, i, skip) {
+  const W = game.W;
+  for (const u of game.s.units) {
+    if (u === skip || u.type !== 'warship' || u.owner !== pid || u.hp <= 0) continue;
+    if (Math.floor(u.y) * W + Math.floor(u.x) === i) return true;
+    if (u.dest && Math.floor(u.dest[1]) * W + Math.floor(u.dest[0]) === i) return true;
+  }
+  return false;
+}
+
+export function freeBerth(game, pid, i0, skip = null) {
+  const map = game.map, W = game.W, H = game.H, ocean = map.nav.ocean;
+  if (i0 < 0 || !ocean[i0]) return -1;
+  if (!berthTaken(game, pid, i0, skip)) return i0;
+  const body = map.waterBody[i0];
+  const x0 = i0 % W, y0 = (i0 - x0) / W;
+  const cands = [];
+  for (let dy = -BERTH_R; dy <= BERTH_R; dy++) {
+    const y = y0 + dy;
+    if (y < 0 || y >= H) continue;
+    for (let dx = -BERTH_R; dx <= BERTH_R; dx++) {
+      const x = x0 + dx;
+      if (x < 0 || x >= W || dx * dx + dy * dy > BERTH_R * BERTH_R) continue;
+      const i = y * W + x;
+      if (ocean[i] && map.waterBody[i] === body && clearWater(map, x0 + 0.5, y0 + 0.5, x + 0.5, y + 0.5)) cands.push(dx * dx + dy * dy, i);
+    }
+  }
+  let best = -1, bd = Infinity;
+  for (let k = 0; k < cands.length; k += 2) {
+    const d = cands[k], i = cands[k + 1];
+    if (d < bd || (d === bd && i < best)) {
+      if (berthTaken(game, pid, i, skip)) continue;
+      bd = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
 export function shipSpawnTile(game, port) {
-  return nearestOceanTile(game.map, port.x + 0.5, port.y + 0.5, 3);
+  const base = nearestOceanTile(game.map, port.x + 0.5, port.y + 0.5, 3);
+  if (base < 0) return -1;
+  const free = freeBerth(game, port.owner, base);
+  return free >= 0 ? free : base;
+}
+
+function spreadOut(game, u) {
+  const here = cellOf(game, u.x, u.y);
+  if (here < 0 || !berthTaken(game, u.owner, here, u)) return;
+  const t = freeBerth(game, u.owner, here, u);
+  if (t < 0 || t === here) return;
+  const c = center(game, t);
+  u.path = [c];
+  u.pi = 0;
+  u.order = 1;
+  u.dest = [c[0], c[1]];
 }
 
 export function buildShipError(game, pid, portId) {
@@ -442,10 +498,9 @@ function moveShips(game) {
     if (u.type === 'warship') {
       u.path = [];
       u.pi = 0;
-      if (u.order) {
-        u.order = 0;
-        u.dest = null;
-      }
+      u.dest = null;
+      if (u.order) u.order = 0;
+      spreadOut(game, u);
       continue;
     }
     if (u.type === 'transport') arriveTransport(game, u);

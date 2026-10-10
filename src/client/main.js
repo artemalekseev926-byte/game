@@ -1,4 +1,6 @@
-import { VERSION, PLAYER_COLORS, DEFAULT_SETTINGS } from '../core/config.js';
+import {
+  VERSION, PLAYER_COLORS, DEFAULT_SETTINGS, BUILDINGS, BUILDING_KEYS, STRIKES, STRIKE_KEYS, RESEARCH, RESEARCH_KEYS,
+} from '../core/config.js';
 import { generateMap, parseCustomMap } from '../core/map.js';
 import { Renderer } from './render.js';
 import { Hud, $, esc, tpl, setRangeFill, fmtClock, fmtPct } from './hud.js';
@@ -17,6 +19,7 @@ const META_KEY = 'pc2_save_meta_';
 const SLOTS = ['auto', '1', '2', '3'];
 const AUTOSAVE_SEC = 60;
 const NO_BACKDROP_CLOSE = { end: true, msg: true, confirm: true };
+const UI_MIN = 0.6;
 
 const store = {
   get(k, d) {
@@ -112,6 +115,7 @@ class App {
     this.multiplayer = this.menus.mp;
     $('ver').textContent = VERSION;
     document.querySelectorAll('.native-only').forEach((el) => { el.hidden = !hasNative(); });
+    this.fillHelp();
     this.bindGlobal();
     this.bindSettings();
     this.bindPause();
@@ -154,11 +158,64 @@ class App {
 
   applyUi() {
     const want = Number(this.settings.ui) || 1;
-    const w = window.innerWidth;
+    const root = document.documentElement;
+    const set = (v) => root.style.setProperty('--ui', String(Math.round(v * 1000) / 1000));
     let ui = want;
-    if (w < 1400) ui = Math.min(ui, 1.15);
-    if (w < 1300) ui = Math.min(ui, 1);
-    document.documentElement.style.setProperty('--ui', String(ui));
+    set(ui);
+    if (this.screen === 'game') {
+      for (let k = 0; k < 5; k++) {
+        const over = this.hudOverflow();
+        if (over <= 1.002 || ui <= UI_MIN) break;
+        ui = Math.max(UI_MIN, ui / Math.min(over, 1.5) - 0.005);
+        set(ui);
+      }
+    }
+    this.uiScale = ui;
+    if (this.hud) this.hud.updateDockHeight();
+  }
+
+  checkUi() {
+    if (this.screen === 'game' && this.hudOverflow() > 1.002) this.applyUi();
+  }
+
+  hudOverflow() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 15;
+    let over = 1;
+    const dock = $('hud-bottom');
+    const row = dock && !dock.hidden ? dock.querySelector('.tools-row') : null;
+    if (row && row.scrollWidth > 0) {
+      const cs = getComputedStyle(dock);
+      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2;
+      over = Math.max(over, (row.scrollWidth + pad) / Math.max(1, W - rem));
+    }
+    const stats = document.querySelector('#hud-top .hud-stats'), right = document.querySelector('#hud-top .hud-right');
+    if (stats && right) {
+      const gap = parseFloat(getComputedStyle(stats).columnGap) || 0;
+      let sum = 0, n = 0;
+      for (const c of stats.children) {
+        if (c.hidden || c.offsetParent === null) continue;
+        sum += c.scrollWidth;
+        n++;
+      }
+      const top = $('hud-top');
+      const ts = getComputedStyle(top);
+      const need = sum + gap * Math.max(0, n - 1) + right.offsetWidth + parseFloat(ts.paddingLeft) + parseFloat(ts.paddingRight) + (parseFloat(ts.columnGap) || 0);
+      over = Math.max(over, need / Math.max(1, W));
+    }
+    const topH = $('hud-top').offsetHeight, dockH = dock && !dock.hidden ? dock.offsetHeight : 0;
+    over = Math.max(over, (topH + dockH) / Math.max(1, H * 0.46));
+    return over;
+  }
+
+  fillHelp() {
+    const li = (name, text) => `<li><b>${esc(name)}</b> — ${esc(text)}</li>`;
+    const b = $('help-buildings');
+    if (b) b.innerHTML = BUILDING_KEYS.map((k) => li(`${BUILDINGS[k].short} (${BUILDINGS[k].hotkey})`, BUILDINGS[k].desc)).join('');
+    const st = $('help-strikes');
+    if (st) st.innerHTML = STRIKE_KEYS.map((k) => li(STRIKES[k].name, STRIKES[k].desc || '')).join('');
+    const r = $('help-research');
+    if (r) r.textContent = RESEARCH_KEYS.map((k, i) => (i ? RESEARCH[k].name.toLowerCase() : RESEARCH[k].name)).join(', ');
   }
 
   setTheme(name) {
@@ -325,7 +382,7 @@ class App {
       this.settings.ui = Number(e.target.value);
       this.saveSettings();
       this.applyUi();
-      if (this.hud) setTimeout(() => this.hud && this.hud.updateDockHeight(), 50);
+      if (this.hud) setTimeout(() => this.applyUi(), 60);
     };
     $('set-edge').onchange = (e) => {
       this.settings.edgeScroll = e.target.checked;
@@ -515,8 +572,9 @@ class App {
     const r = this.renderer;
     r.setTheme(this.settings.theme);
     r.setMap(session.map);
-    r.fit();
     this.hud = new Hud(this, session, r);
+    this.applyUi();
+    r.fit(this.hud.safeInsets());
     this.hideLoading();
     if (session.s.phase !== 'spawn') {
       const me = session.s.players[session.localPid];

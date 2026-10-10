@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HostLobby, ClientLobby, mergeSettings, defaultLobbySettings } from '../src/client/lobby.js';
-import { Session, startOffline, loadOffline, cleanCmd, HASH_EVERY } from '../src/client/session.js';
-import { packMessage, Reassembler, NET_VERSION } from '../src/client/net.js';
+import { createRequire } from 'node:module';
+import { HostLobby, ClientLobby, mergeSettings, defaultLobbySettings, LOBBY_BURST, LOBBY_CHAT_BURST } from '../src/client/lobby.js';
+import {
+  Session, createMatch, startOffline, loadOffline, cleanCmd, HASH_EVERY, GAP_WAIT, STALL_WAIT, STATE_GAP, PEER_INTENTS, PEER_QUEUE, CHAT_BURST, READY_RETRY,
+} from '../src/client/session.js';
+import { packMessage, Reassembler, RateLimit, NET_VERSION, MAX_ASSEMBLY, SteamTransport } from '../src/client/net.js';
 import { parseCustomMap, generateMap } from '../src/core/map.js';
 import { hashState, serializeState } from '../src/core/state.js';
 
@@ -10,16 +13,19 @@ function makeHub() {
   const queue = [];
   const nodes = new Map();
   const stats = { msgs: 0, bytes: 0, types: {} };
+  let dropRule = null;
   const mk = (selfId, isHost, hostId) => {
     const t = {
       kind: 'test', isHost, selfId, hostId, lobbyId: 'L1', peers: new Set(), closed: false,
-      onMessage() {}, onPeerJoin() {}, onPeerLeave() {},
+      onMessage() {}, onPeerJoin() {}, onPeerLeave() {}, onTrouble() {},
       send(peer, obj) {
         if (this.closed) return;
+        if (dropRule && dropRule(selfId, peer, obj)) return;
         const data = JSON.stringify(obj);
+        const type = obj && typeof obj === 'object' ? obj.t : typeof obj;
         stats.msgs++;
         stats.bytes += data.length;
-        stats.types[obj.t] = (stats.types[obj.t] || 0) + 1;
+        stats.types[type] = (stats.types[type] || 0) + 1;
         queue.push(() => {
           const dst = nodes.get(peer);
           if (dst && !dst.closed) dst.deliver(selfId, data);
@@ -47,7 +53,7 @@ function makeHub() {
     t.closed = true;
     if (host.peers.delete(id)) host.onPeerLeave(id);
   };
-  return { host, client, flush, drop, stats, queue };
+  return { host, client, flush, drop, stats, queue, nodes, setDrop: (f) => { dropRule = f; } };
 }
 
 function testRows() {
@@ -484,7 +490,11 @@ test('чат в игре и отклонение служебных команд
   assert.deepEqual(cleanCmd({ c: 'attack', x: 1, y: 2, ratio: 0.5 }), { c: 'attack', x: 1, y: 2, ratio: 0.5 });
   for (let k = 0; k < 40; k++) a.transport.send('H', { t: 'intent', cmd: { c: 'research', key: 'econ' } });
   ctx.hub.flush();
-  assert.ok(ctx.host.queue.length <= 32, 'ограничение команд за ход');
+  assert.equal(ctx.host.backlog, 40, 'команды клиента ждут своего хода, а не теряются');
+  ctx.host.step();
+  assert.equal(ctx.host.backlog, 40 - PEER_INTENTS, 'не больше PEER_INTENTS команд клиента за ход');
+  ctx.host.step();
+  assert.equal(ctx.host.backlog, 0);
   assertInSync(ctx, 'после мусора');
 });
 
@@ -647,4 +657,529 @@ test('старт на процедурной карте: состояние у �
   assertInSync(ctx, 'twin');
   assert.ok(host.s.players[2].spawned);
   assert.ok(serializeState(host.s).owner.rle.length > 0);
+});
+
+test('потерянный ход: клиент замечает разрыв в номерах и загружает состояние с хоста', () => {
+  const ctx = setup();
+  const [a, b] = ctx.clients;
+  allSessions(ctx).forEach((s, k) => s.send(findSpawn(s, [40, 130, 210][k], 60)));
+  for (let k = 0; k < 30; k++) frame(ctx);
+  assertInSync(ctx, 'до потери');
+  const seen = [];
+  a.on((e) => { if (e.type === 'desync' || e.type === 'resync') seen.push(e.type + ':' + (e.reason || '')); });
+  const lostTurn = ctx.host.n + 1;
+  ctx.hub.setDrop((from, to, obj) => obj.t === 'turn' && obj.n === lostTurn && to === 'C1');
+  let frames = 0;
+  while (!a.lost && frames < 50) { frame(ctx); frames++; }
+  ctx.hub.setDrop(null);
+  assert.equal(a.lost, 1, 'разрыв обнаружен');
+  assert.ok(frames * 0.1 <= GAP_WAIT + 0.5, `состояние запрошено через ${(frames * 0.1).toFixed(1)} с`);
+  assert.deepEqual(seen, ['desync:lost', 'resync:'], 'клиент запросил и сразу получил состояние');
+  assert.equal(a.awaitingState, false);
+  assert.equal(b.lost, 0, 'второй клиент не затронут');
+  assert.equal(ctx.host.desyncs, 1, 'хост отправил одно состояние');
+  assertInSync(ctx, 'после потерянного хода');
+  for (let k = 0; k < 60; k++) frame(ctx);
+  assertInSync(ctx, 'через 60 ходов');
+  assert.equal(a.lost, 1, 'повторных запросов нет');
+  assert.equal(a.desyncs, 0, 'хэши не расходились');
+});
+
+test('таймаут ожидания: без ходов дольше STALL_WAIT клиент запрашивает состояние, на паузе ждёт', () => {
+  const ctx = setup({ clients: 1, bots: 1 });
+  const [a] = ctx.clients;
+  allSessions(ctx).forEach((s, k) => s.send(findSpawn(s, [40, 130][k], 60)));
+  for (let k = 0; k < 20; k++) frame(ctx);
+  ctx.host.setPaused(true);
+  ctx.hub.flush();
+  for (let k = 0; k < STALL_WAIT * 25; k++) frame(ctx);
+  assert.equal(a.lost, 0, 'на паузе тишина — это норма');
+  ctx.host.setPaused(false);
+  ctx.hub.flush();
+  ctx.hub.setDrop((from, to, obj) => from === 'H' && obj.t === 'turn');
+  let frames = 0;
+  while (!a.lost && frames < 100) { frame(ctx); frames++; }
+  ctx.hub.setDrop(null);
+  assert.equal(a.lost, 1, 'клиент не завис навсегда');
+  assert.ok(Math.abs(frames * 0.1 - STALL_WAIT) < 0.5, `запрос через ${(frames * 0.1).toFixed(1)} с`);
+  assert.equal(a.resyncs, 1);
+  for (let k = 0; k < 30; k++) frame(ctx);
+  assertInSync(ctx, 'после таймаута');
+  const n = a.n;
+  ctx.hub.setDrop((from, to, obj) => obj.t === 'pause');
+  ctx.host.setPaused(true);
+  for (let k = 0; k < (STALL_WAIT + 1) * 10; k++) frame(ctx);
+  ctx.hub.setDrop(null);
+  assert.equal(a.lost, 2, 'потерянное сообщение о паузе — клиент спросил состояние');
+  assert.equal(a.paused, true, 'из состояния клиент узнал о паузе');
+  for (let k = 0; k < STALL_WAIT * 20; k++) frame(ctx);
+  assert.equal(a.lost, 2, 'дальше ждёт молча');
+  assert.equal(a.n, n);
+  assertInSync(ctx, 'на паузе');
+});
+
+test('потерянное сообщение ready: клиент повторяет его и игра стартует сразу', () => {
+  const hub = makeHub();
+  const hl = new HostLobby(hub.host, 'Хост');
+  const cl = new ClientLobby(hub.client('C1'), 'Друг');
+  hub.flush();
+  hl.set({ custom: CUSTOM, seed: 9 });
+  let client = null;
+  cl.onStart = (s) => { client = s; };
+  hub.setDrop((from, to, obj) => obj.t === 'ready');
+  const host = hl.start();
+  hub.flush();
+  hub.setDrop(null);
+  assert.ok(client);
+  host.update(1);
+  assert.equal(host.waiting, 1, 'первый ready потерян');
+  assert.equal(host.n, 0);
+  client.update(READY_RETRY + 0.1);
+  hub.flush();
+  assert.equal(host.waiting, 0, 'повторный ready дошёл');
+  host.update(0.1);
+  assert.equal(host.n, 1);
+  hub.flush();
+  client.update(0.1);
+  assert.equal(client.n, 1);
+  assert.equal(client.lost, 0);
+});
+
+test('пауза: все команды клиента выполняются после паузы, переполнение очереди — ошибка в интерфейсе', () => {
+  const ctx = setup({ clients: 1, bots: 1 });
+  const [a] = ctx.clients;
+  allSessions(ctx).forEach((s, k) => s.send(findSpawn(s, [40, 130][k], 60)));
+  while (ctx.host.s.phase === 'spawn') frame(ctx);
+  ctx.host.setPaused(true);
+  ctx.hub.flush();
+  let ok = 0;
+  for (let k = 0; k < 40; k++) if (a.send({ c: 'embargo', with: 0, on: k % 2 === 0 }).ok) ok++;
+  for (let k = 0; k < 10; k++) frame(ctx);
+  assert.equal(ok, 40);
+  assert.equal(ctx.host.backlog, 40, 'на паузе команды ждут');
+  let applied = 0;
+  ctx.host.on((ev) => { if (ev.type === 'events') for (const e of ev.events) if (e.k === 'relation' && e.a === 1 && e.b === 0) applied++; });
+  ctx.host.setPaused(false);
+  ctx.hub.flush();
+  frame(ctx);
+  assert.equal(ctx.host.backlog, 40 - PEER_INTENTS);
+  frame(ctx);
+  assert.equal(ctx.host.backlog, 0);
+  assert.equal(applied, 40, 'применены все команды, на которые send() ответил ok');
+  assertInSync(ctx, 'после паузы');
+
+  const errs = [];
+  a.on((e) => { if (e.type === 'error') errs.push(e.error); });
+  ctx.host.setPaused(true);
+  ctx.hub.flush();
+  for (let k = 0; k < PEER_QUEUE + 50; k++) a.transport.send('H', { t: 'intent', cmd: { c: 'embargo', with: 0, on: k % 2 === 0 } });
+  ctx.hub.flush();
+  assert.equal(ctx.host.backlog, PEER_QUEUE, 'очередь одного клиента ограничена');
+  assert.equal(errs.length, 1, 'клиент получил одно сообщение об ошибке');
+  assert.match(errs[0], /Слишком много команд/);
+  ctx.host.setPaused(false);
+  ctx.hub.flush();
+  for (let k = 0; k < Math.ceil(PEER_QUEUE / PEER_INTENTS); k++) frame(ctx);
+  assert.equal(ctx.host.backlog, 0);
+  assertInSync(ctx, 'после переполнения');
+});
+
+test('спам desync и чата от клиента ограничен по частоте', () => {
+  const ctx = setup();
+  const [a, b] = ctx.clients;
+  allSessions(ctx).forEach((s, k) => s.send(findSpawn(s, [40, 130, 210][k], 60)));
+  for (let k = 0; k < 30; k++) frame(ctx);
+  const c1 = ctx.hub.nodes.get('C1');
+  const before = ctx.hub.stats.types.state || 0;
+  for (let k = 0; k < 100; k++) c1.send('H', { t: 'desync', n: 0 });
+  ctx.hub.flush();
+  assert.equal(ctx.host.desyncs, 1, 'на 100 запросов — одно состояние сразу');
+  for (let k = 0; k < STATE_GAP * 10 + 2; k++) frame(ctx);
+  assert.equal(ctx.host.desyncs, 2, 'отложенный запрос обслужен один раз');
+  for (let k = 0; k < 50; k++) frame(ctx);
+  assert.equal(ctx.host.desyncs, 2, 'новых состояний нет');
+  assert.equal((ctx.hub.stats.types.state || 0) - before, 2);
+  assert.equal(b.resyncs, 0);
+  assertInSync(ctx, 'после спама desync');
+
+  const got = [];
+  b.on((e) => { if (e.type === 'chat') got.push(e.chat.text); });
+  const errs = [];
+  a.on((e) => { if (e.type === 'error') errs.push(e.error); });
+  for (let k = 0; k < 20; k++) a.sendChat('спам ' + k);
+  ctx.hub.flush();
+  assert.equal(got.length, CHAT_BURST, 'в чат прошло не больше CHAT_BURST сообщений');
+  assert.equal(errs.length, 1);
+  for (let k = 0; k < 60; k++) frame(ctx);
+  assert.ok(a.sendChat('снова можно'));
+  ctx.hub.flush();
+  assert.equal(got[got.length - 1], 'снова можно');
+  assert.ok(ctx.host.sendChat('хост не ограничен'));
+});
+
+test('мусор и чанки от клиента не роняют хост и не копятся в памяти', () => {
+  const ctx = setup({ clients: 1, bots: 1 });
+  const [a] = ctx.clients;
+  allSessions(ctx).forEach((s, k) => s.send(findSpawn(s, [40, 130][k], 60)));
+  for (let k = 0; k < 20; k++) frame(ctx);
+  const c1 = ctx.hub.nodes.get('C1');
+  const part = 'x'.repeat(64 * 1024);
+  for (let i = 0; i < 200; i++) c1.send('H', { t: 'chunk', id: 'a' + (i % 7), i, of: 4096, data: part });
+  const junk = [
+    null, 0, 7, 'строка', [], [1, 2], true, {}, { t: 5 }, { t: 'нет такого' }, { t: 'intent' }, { t: 'intent', cmd: null },
+    { t: 'intent', cmd: [1] }, { t: 'intent', cmd: { c: '__proto__' } }, { t: 'intent', cmd: { c: 'build', type: '__proto__', x: 'a', y: {} } },
+    { t: 'intent', cmd: { c: 'attack', x: 1e308, y: -1e308, ratio: 'много' } }, { t: 'intent', cmd: { c: 'propose', to: 0, type: 'constructor' } },
+    { t: 'chat', text: { a: 1 } }, { t: 'chat' }, { t: 'desync', n: 'x' }, { t: 'ready' }, { t: 'hello', v: NET_VERSION },
+    { t: 'state', n: 0, state: {} }, { t: 'turn', n: 999, intents: 5 }, { t: 'chunk' }, { t: 'chunk', id: 'b', i: 0, of: 1, data: '{"t":"desync"}' },
+  ];
+  for (const m of junk) c1.send('H', m);
+  ctx.hub.flush();
+  for (const m of [undefined, null, 'x', 42, [], new Uint8Array(4)]) ctx.host.onNet('C1', m);
+  assert.equal(ctx.host.chunks.held(), 0, 'хост не хранит чанки от клиентов');
+  assert.equal(ctx.host.chunks.pending.size, 0);
+  assert.ok(ctx.host.chunks.rejected >= 200);
+  for (let k = 0; k < 30; k++) frame(ctx);
+  assert.equal(ctx.host.errors, 0, 'симуляция хоста без исключений');
+  assert.equal(a.ended, false);
+  assert.ok(ctx.host.peers.has('C1'));
+  assertInSync(ctx, 'после мусора');
+});
+
+test('лобби: мусор, чанки и спам от клиента ограничены', () => {
+  let now = 1000;
+  const hub = makeHub();
+  const hl = new HostLobby(hub.host, 'Хост', { now: () => now });
+  hl.set({ custom: CUSTOM });
+  const cl = new ClientLobby(hub.client('C1'), 'Аня');
+  hub.flush();
+  assert.equal(hl.slots.length, 2);
+  const c1 = hub.nodes.get('C1');
+  for (let i = 0; i < 50; i++) c1.send('H', { t: 'chunk', id: 'z', i, of: 4096, data: 'x'.repeat(65536) });
+  for (const m of [null, 3, 'x', [], { t: 1 }, { t: 'color', color: {} }, { t: 'name', name: ['a'] }, { t: 'hello' }]) c1.send('H', m);
+  hub.flush();
+  assert.equal(hl.chunks.held(), 0);
+  assert.equal(hl.slots.length, 2);
+  assert.equal(hl.slots[1].name, 'a');
+  const sentBefore = hub.stats.types.custom || 0;
+  for (let k = 0; k < 100; k++) c1.send('H', { t: 'hello', v: NET_VERSION, name: 'Аня' });
+  hub.flush();
+  const replies = (hub.stats.types.custom || 0) - sentBefore;
+  assert.ok(replies > 0 && replies <= LOBBY_BURST, `ответов с картой на 100 hello: ${replies}`);
+  now += 10;
+  const chats = [];
+  hl.onChat = (c) => chats.push(c);
+  const errs = [];
+  cl.onError = (e) => errs.push(e);
+  for (let k = 0; k < 12; k++) cl.sendChat('привет ' + k);
+  hub.flush();
+  assert.equal(chats.length, LOBBY_CHAT_BURST);
+  assert.equal(errs.length, 1);
+  now += 10;
+  cl.sendChat('ещё');
+  cl.setColor('#123456');
+  hub.flush();
+  assert.equal(chats.length, LOBBY_CHAT_BURST + 1);
+  assert.equal(hl.slots[1].color, '#123456');
+  now += 10;
+  for (let k = 0; k < 200; k++) c1.send('H', { t: 'name', name: 'Имя' + (k % 2) });
+  c1.send('H', { t: 'bye' });
+  hub.flush();
+  assert.equal(hl.slots.length, 1, 'bye обрабатывается даже сверх лимита');
+});
+
+test('чанки: лимиты размера, числа сборок и времени жизни; RateLimit', () => {
+  let now = 0;
+  const r = new Reassembler({ maxBytes: 1000, ttl: 5000, now: () => now });
+  assert.equal(r.accept('p', { t: 'chunk', id: 'big', i: 0, of: 3, data: 'x'.repeat(600) }), null);
+  assert.equal(r.pending.size, 0, 'заявленный объём больше лимита — сборка не начинается');
+  r.accept('p', { t: 'chunk', id: 'a', i: 0, of: 3, data: 'y'.repeat(400) });
+  r.accept('p', { t: 'chunk', id: 'a', i: 1, of: 3, data: 'y'.repeat(400) });
+  assert.equal(r.held('p'), 800);
+  assert.equal(r.accept('p', { t: 'chunk', id: 'a', i: 2, of: 3, data: 'y'.repeat(400) }), null);
+  assert.equal(r.held('p'), 0, 'сборка сверх лимита удалена');
+  r.accept('p', { t: 'chunk', id: 'b', i: 0, of: 2, data: 'z'.repeat(450) });
+  r.accept('p', { t: 'chunk', id: 'c', i: 0, of: 2, data: 'z'.repeat(450) });
+  r.accept('p', { t: 'chunk', id: 'd', i: 0, of: 2, data: 'z'.repeat(450) });
+  assert.equal(r.held('p'), 900, 'суммарный объём на пира ограничен');
+  assert.deepEqual(r.accept('q', { t: 'chunk', id: 'b', i: 0, of: 1, data: '{"t":"ok"}' }), { t: 'ok' }, 'другой пир не страдает');
+  assert.equal(r.accept('p', { t: 'chunk', id: 'x'.repeat(65), i: 0, of: 1, data: '{}' }), null);
+  now += 6000;
+  r.accept('q', { t: 'chunk', id: 'e', i: 0, of: 2, data: '{' });
+  assert.equal(r.held('p'), 0, 'старые сборки удаляются по времени');
+  assert.equal(r.held(), 1);
+  r.drop('q');
+  assert.equal(r.held(), 0);
+  const parts = packMessage({ t: 'state', s: 'ж'.repeat(800) }, 300);
+  assert.equal(parts.length, 3);
+  let out = null;
+  for (const m of parts) out = r.accept('p', JSON.parse(JSON.stringify(m))) || out;
+  assert.equal(out && out.s.length, 800, 'обычное сообщение в пределах лимита собирается');
+  const off = new Reassembler({ chunks: false });
+  assert.equal(off.accept('p', { t: 'chunk', id: 'b', i: 0, of: 1, data: '{"t":"ok"}' }), null);
+  assert.deepEqual(off.accept('p', { t: 'x' }), { t: 'x' });
+  assert.equal(off.accept('p', [1]), null);
+  assert.equal(off.held(), 0);
+  assert.ok(MAX_ASSEMBLY >= 8 * 1024 * 1024);
+
+  let t = 0;
+  const rl = new RateLimit(2, 5, () => t);
+  assert.ok(rl.take('a'));
+  assert.ok(rl.take('a'));
+  assert.equal(rl.take('a'), false);
+  assert.ok(rl.firstMiss('a'));
+  rl.take('a');
+  assert.equal(rl.firstMiss('a'), false);
+  assert.ok(rl.take('b'));
+  t = 5;
+  assert.ok(rl.take('a'), 'новое окно');
+});
+
+const require = createRequire(import.meta.url);
+const ELECTRON_DIR = new URL('../electron/', import.meta.url).pathname;
+
+function loadMain(file, fakes) {
+  const stubs = [];
+  for (const [name, exports] of Object.entries(fakes)) {
+    const p = require.resolve(name, { paths: [ELECTRON_DIR] });
+    require.cache[p] = { id: p, filename: p, loaded: true, exports, children: [], paths: [] };
+    stubs.push(p);
+  }
+  const full = require.resolve(ELECTRON_DIR + file);
+  delete require.cache[full];
+  const mod = require(full);
+  return { mod, restore() { for (const p of [...stubs, full]) delete require.cache[p]; } };
+}
+
+function fakeIpc() {
+  const handlers = new Map();
+  const listeners = new Map();
+  return { handlers, listeners, ipcMain: { handle: (ch, fn) => handlers.set(ch, fn), on: (ch, fn) => listeners.set(ch, fn) } };
+}
+
+async function waitFor(cond, ms = 3000) {
+  const t0 = Date.now();
+  while (!cond()) {
+    if (Date.now() - t0 > ms) return false;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return true;
+}
+
+test('Steam (main): только участники лобби, состояние участника строкой и числом, сбои связи, список лобби', { timeout: 30000 }, async () => {
+  const ipc = fakeIpc();
+  const out = [];
+  const sent = [];
+  const accepted = [];
+  const packets = [];
+  const cbs = {};
+  let sendResult = true;
+  let pages = [];
+  let created = null;
+  const mkLobby = (id, data, members) => ({
+    id, data: { ...data }, members: members.slice(), left: false,
+    getMembers() { return this.members.map((m) => ({ steamId64: m, steamId32: '', accountId: 0 })); },
+    getOwner() { return { steamId64: this.members[0], steamId32: '', accountId: 0 }; },
+    getMemberCount() { return BigInt(this.members.length); },
+    getMemberLimit() { return 12n; },
+    getData(k) { return k in this.data ? this.data[k] : null; },
+    setData(k, v) { this.data[k] = v; return true; },
+    setJoinable() { return true; },
+    leave() { this.left = true; },
+    openInviteDialog() {},
+  });
+  const api = {
+    callback: { register(id, fn) { cbs[id] = fn; return { disconnect() {} }; } },
+    networking: {
+      sendP2PPacket(id, type, buf) { sent.push([id, type, buf.toString('utf8')]); return sendResult; },
+      isP2PPacketAvailable() { return packets.length ? packets[0].size : 0; },
+      readP2PPacket() { return packets.shift(); },
+      acceptP2PSession(id) { accepted.push(id); },
+    },
+    localplayer: { getSteamId: () => ({ steamId64: 100n, steamId32: '', accountId: 0 }), getName: () => 'Хост', setRichPresence() {} },
+    matchmaking: {
+      createLobby: async () => (created = mkLobby(555n, {}, [100n])),
+      joinLobby: async (id) => mkLobby(id, { game: 'pixel-conquest' }, [900n, 100n]),
+      getLobbies: async () => pages.shift() || [],
+    },
+    overlay: { activateInviteDialog() {} },
+  };
+  const env = process.env.STEAM_APP_ID;
+  process.env.STEAM_APP_ID = '480';
+  const { mod, restore } = loadMain('steam.cjs', { electron: { ipcMain: ipc.ipcMain }, 'steamworks.js': { init: () => api, electronEnableSteamOverlay() {} } });
+  try {
+    mod.attach({ isDestroyed: () => false, webContents: { send: (...a) => out.push(a) } });
+    mod.init({ getPath: () => '/nowhere/app' });
+    assert.deepEqual(Object.keys(cbs).map(Number).sort(), [5, 6, 7, 8]);
+    const init = await ipc.handlers.get('steam:init')();
+    assert.equal(init.ok, true);
+    assert.equal(init.shared, true, 'общий AppID 480 распознан');
+    const lob = await ipc.handlers.get('steam:createLobby')(null, 4, 'Комната Хоста');
+    assert.equal(lob.ok, true);
+    assert.equal(lob.lobbyId, '555');
+    assert.deepEqual(created.data, { game: 'pixel-conquest', ver: String(NET_VERSION), name: 'Комната Хоста', host: 'Хост' });
+
+    const pkt = (from, text) => ({ data: Buffer.from(text), size: Buffer.byteLength(text), steamId: { steamId64: from, steamId32: '', accountId: 0 } });
+    const got = () => out.filter((a) => a[0] === 'steam:packet').map((a) => a[1] + ' ' + a[2]);
+    const left = () => out.filter((a) => a[0] === 'steam:memberLeft').map((a) => a[1]);
+    const fails = () => out.filter((a) => a[0] === 'steam:linkFail').map((a) => a[1]);
+
+    cbs[6]({ remote: 200n });
+    assert.deepEqual(accepted, [], 'P2P-сессия от не-участника не принята');
+    packets.push(pkt(200n, '{"t":"hello"}'));
+    mod.readPackets();
+    assert.deepEqual(got(), [], 'пакет от не-участника отброшен');
+
+    created.members.push(200n);
+    cbs[5]({ lobby: 555n, user_changed: 200n, making_change: 200n, member_state_change: 'Entered' });
+    assert.deepEqual(accepted, [200n], 'сессия принята, когда игрок вошёл в лобби');
+    packets.push(pkt(200n, '{"t":"hello"}'), pkt(300n, '{"t":"chunk"}'));
+    mod.readPackets();
+    assert.deepEqual(got(), ['200 {"t":"hello"}']);
+    cbs[6]({ remote: 300n });
+    cbs[6]({ remote: 200n });
+    assert.deepEqual(accepted, [200n, 200n]);
+
+    created.members.push(400n);
+    cbs[5]({ lobby: 555n, user_changed: 400n, making_change: 400n, member_state_change: 0 });
+    cbs[5]({ lobby: 555n, user_changed: 400n, making_change: 400n, member_state_change: 1 });
+    assert.deepEqual(left(), [], 'вход участника — строкой или числом — не считается уходом');
+    created.members = created.members.filter((m) => m !== 200n);
+    cbs[5]({ lobby: 555n, user_changed: 200n, making_change: 200n, member_state_change: 'Left' });
+    created.members = created.members.filter((m) => m !== 400n);
+    cbs[5]({ lobby: 555n, user_changed: 400n, making_change: 400n, member_state_change: 2 });
+    cbs[5]({ lobby: 777n, user_changed: 100n, making_change: 100n, member_state_change: 'Left' });
+    assert.deepEqual(left(), ['200', '400']);
+    packets.push(pkt(200n, '{"t":"intent"}'));
+    mod.readPackets();
+    assert.equal(got().length, 1, 'после ухода пакеты игрока не принимаются');
+
+    ipc.listeners.get('steam:send')(null, '200', '{"t":"turn"}');
+    assert.deepEqual(sent[0], [200n, 2, '{"t":"turn"}']);
+    assert.deepEqual(fails(), []);
+    sendResult = false;
+    ipc.listeners.get('steam:send')(null, '200', '{"t":"turn"}');
+    ipc.listeners.get('steam:send')(null, '200', '{"t":"turn"}');
+    cbs[7]({ remote: 900n, error: 4 });
+    assert.deepEqual(fails(), ['200', '900'], 'о сбое связи сообщается, не чаще раза в секунду на игрока');
+
+    const foreign = (k) => mkLobby(BigInt(1000 + k), { name: 'spacewar' }, [1n]);
+    const ours = (id, name, ver = String(NET_VERSION)) => mkLobby(id, { game: 'pixel-conquest', name, host: 'Друг', ver }, [5n, 6n]);
+    const page1 = [...Array.from({ length: 49 }, (_, k) => foreign(k)), ours(2001n, 'Комната')];
+    const page2 = [ours(2002n, 'Старая', '1'), ...Array.from({ length: 48 }, (_, k) => foreign(k + 10)), ours(2001n, 'Комната')];
+    pages = [page1, page2, page1, page2];
+    const r = await ipc.handlers.get('steam:listLobbies')();
+    assert.equal(r.ok, true);
+    assert.equal(r.shared, true);
+    assert.deepEqual(r.list.map((l) => l.id), ['2001', '2002'], 'лобби игры из нескольких запросов, совместимые первыми');
+    assert.equal(r.list[0].name, 'Комната · Друг');
+    assert.equal(r.list[0].members, 2);
+    assert.equal(r.list[0].max, 12);
+    assert.equal(r.scanned, 60);
+    assert.equal(pages.length, 1, 'третий запрос без новых лобби — поиск остановлен');
+    pages = [[ours(2003n, 'Одна')], [ours(2004n, 'Другая')]];
+    const r2 = await ipc.handlers.get('steam:listLobbies')();
+    assert.deepEqual(r2.list.map((l) => l.id), ['2003']);
+    assert.equal(pages.length, 1, 'неполная страница — повторять запрос незачем');
+
+    const join = await ipc.handlers.get('steam:joinLobby')(null, '888');
+    assert.equal(join.hostId, '900');
+    assert.equal(created.left, true, 'прежнее лобби покинуто');
+    packets.push(pkt(900n, '{"t":"lobby"}'), pkt(200n, '{"t":"lobby"}'));
+    mod.readPackets();
+    assert.deepEqual(got().slice(1), ['900 {"t":"lobby"}']);
+    ipc.listeners.get('steam:leave')();
+    packets.push(pkt(900n, '{"t":"turn"}'));
+    mod.readPackets();
+    assert.equal(got().length, 2, 'без лобби пакеты не принимаются');
+  } finally {
+    mod.shutdown();
+    restore();
+    if (env === undefined) delete process.env.STEAM_APP_ID;
+    else process.env.STEAM_APP_ID = env;
+  }
+});
+
+test('LAN-сервер: слишком большое сообщение и флуд закрывают соединение', { timeout: 30000 }, async () => {
+  const ipc = fakeIpc();
+  const out = [];
+  const { mod, restore } = loadMain('lan.cjs', { electron: { ipcMain: ipc.ipcMain } });
+  const { WebSocket } = require('ws');
+  mod.attach({ isDestroyed: () => false, webContents: { send: (...a) => out.push(a) } });
+  let port = 0;
+  let r = null;
+  for (let k = 0; k < 8 && !(r && r.ok); k++) {
+    port = 30000 + Math.floor(Math.random() * 20000);
+    r = await ipc.handlers.get('lan:host')(null, port);
+  }
+  assert.ok(r && r.ok, 'сервер запущен');
+  const open = () => new Promise((res, rej) => {
+    const ws = new WebSocket('ws://127.0.0.1:' + port);
+    ws.once('open', () => res(ws));
+    ws.once('error', rej);
+  });
+  const closed = (ws) => new Promise((res) => {
+    const timer = setTimeout(() => res('открыто'), 5000);
+    ws.once('close', (code) => { clearTimeout(timer); res(code); });
+  });
+  const from = (id) => out.filter((a) => a[0] === 'lan:message' && a[1] === id).length;
+  try {
+    const a = await open();
+    a.send('{"t":"hello"}');
+    assert.ok(await waitFor(() => from('p1') === 1), 'обычное сообщение доставлено');
+    const aClosed = closed(a);
+    a.send('x'.repeat(2 * 1024 * 1024));
+    assert.equal(await aClosed, 1009, 'слишком большое сообщение закрывает соединение');
+    assert.equal(from('p1'), 1);
+    const b = await open();
+    const bClosed = closed(b);
+    for (let k = 0; k < 1500; k++) b.send('{"t":"chat","text":"x"}');
+    assert.notEqual(await bClosed, 'открыто', 'флуд закрывает соединение');
+    assert.ok(from('p2') <= 1000, `флуд обрезан: ${from('p2')}`);
+    assert.ok(await waitFor(() => out.filter((x) => x[0] === 'lan:disconnect').length === 2), 'хост узнал об обоих отключениях');
+  } finally {
+    mod.stop();
+    restore();
+  }
+});
+
+test('Steam-транспорт: сбой связи с хостом — клиент запрашивает состояние; результат поиска лобби', { timeout: 30000 }, async () => {
+  const sent = [];
+  const cb = {};
+  globalThis.window = {
+    native: {
+      steam: {
+        send: (peer, data) => sent.push([peer, JSON.parse(data)]),
+        onPacket: (f) => { cb.packet = f; },
+        onMemberLeft: (f) => { cb.left = f; },
+        onLinkFail: (f) => { cb.fail = f; },
+        listLobbies: async () => ({ ok: true, list: [{ id: '1', name: 'A', members: 1, max: 12 }], scanned: 50, shared: true }),
+        leave() {},
+      },
+    },
+  };
+  try {
+    const t = new SteamTransport(false, '2', '9', 'L');
+    const { map, state } = createMatch({ mapDesc: CUSTOM, seed: 5, players: [{ name: 'Хост' }, { name: 'Гость' }], settings: {} });
+    const ses = new Session({ map, state, localPid: 1, mode: 'client', transport: t });
+    assert.equal(sent[0][1].t, 'ready');
+    cb.packet('7', JSON.stringify({ t: 'turn', n: 0, intents: [] }));
+    assert.equal(ses.buffer.size, 0, 'ходы не от хоста игнорируются');
+    cb.packet('9', JSON.stringify({ t: 'turn', n: 0, intents: [] }));
+    ses.update(0.1);
+    assert.equal(ses.n, 1);
+    cb.fail('7');
+    assert.equal(ses.lost, 0);
+    cb.fail('9');
+    assert.equal(ses.lost, 1);
+    assert.equal(ses.awaitingState, true);
+    assert.equal(sent[sent.length - 1][1].t, 'desync');
+    const scan = await SteamTransport.scan();
+    assert.deepEqual(scan, { list: [{ id: '1', name: 'A', members: 1, max: 12 }], scanned: 50, shared: true });
+    assert.deepEqual(await SteamTransport.list(), scan.list);
+    cb.left('9');
+    assert.equal(ses.ended, true);
+    t.close();
+  } finally {
+    delete globalThis.window;
+  }
 });

@@ -2,7 +2,7 @@ import { TICK_MS } from '../core/config.js';
 import { Game } from '../core/game.js';
 import { generateMap } from '../core/map.js';
 import { createState, serializeState, deserializeState, hashState } from '../core/state.js';
-import { Reassembler, sendLarge } from './net.js';
+import { Reassembler, RateLimit, sendLarge } from './net.js';
 
 export const TURN_MS = TICK_MS;
 export const HASH_EVERY = 50;
@@ -11,12 +11,20 @@ export const OFFLINE_SPEEDS = [0, 1, 2, 3, 5];
 export const NET_SPEEDS = [0, 1, 2];
 export const READY_TIMEOUT = 30;
 export const STATE_RETRY = 5;
+export const STATE_GAP = 3;
+export const GAP_WAIT = 1;
+export const STALL_WAIT = 4;
+export const READY_RETRY = 2;
+export const PEER_INTENTS = 32;
+export const PEER_QUEUE = 256;
+export const CHAT_BURST = 5;
+export const CHAT_WINDOW = 5;
 const MAX_STEPS = 25;
 const MAX_CATCHUP = 20;
 const MAX_INTENTS = 256;
-const PEER_INTENTS = 32;
 const MAX_CMD = 1024;
 const MAX_QUEUE = 4096;
+const MAX_BUFFER = 20000;
 const CHAT_MAX = 200;
 const CHAT_KEEP = 200;
 const EPS = 1e-9;
@@ -110,12 +118,22 @@ export class Session {
     this.lastHash = null;
     this.errors = 0;
     this.lastError = null;
-    this.peerCount = new Map();
-    this.chunks = new Reassembler();
+    this.clock = 0;
+    this.idle = 0;
+    this.gap = 0;
+    this.readyRetry = 0;
+    this.lost = 0;
+    this.inbox = new Map();
+    this.overflow = new Set();
+    this.stateAt = new Map();
+    this.stateWanted = new Set();
+    this.chatLimit = new RateLimit(CHAT_BURST, CHAT_WINDOW, () => this.clock);
+    this.chunks = new Reassembler({ chunks: mode === 'client' });
     if (transport) {
       transport.onMessage = (peer, msg) => this.onNet(peer, msg);
       transport.onPeerLeave = (peer) => this.onPeerLeave(peer);
       transport.onPeerJoin = () => {};
+      transport.onTrouble = (peer) => this.onTrouble(peer);
       if (mode === 'client') transport.send(transport.hostId, { t: 'ready' });
     }
   }
@@ -130,6 +148,11 @@ export class Session {
     return 0;
   }
   get lag() { return this.mode === 'client' ? this.buffer.size : 0; }
+  get backlog() {
+    let n = 0;
+    for (const list of this.inbox.values()) n += list.length;
+    return n;
+  }
 
   on(fn) {
     this.listeners.push(fn);
@@ -214,8 +237,12 @@ export class Session {
   update(realDt) {
     if (this.ended) return;
     const dt = Number.isFinite(realDt) && realDt > 0 ? realDt : 0;
+    this.clock += dt;
     if (this.mode === 'client') this.updateClient(dt);
-    else this.updateAuthority(dt);
+    else {
+      if (this.stateWanted.size) this.flushStates();
+      this.updateAuthority(dt);
+    }
   }
 
   updateAuthority(dt) {
@@ -241,8 +268,8 @@ export class Session {
   }
 
   step() {
-    const intents = this.queue.length > MAX_INTENTS ? this.queue.splice(0, MAX_INTENTS) : this.queue.splice(0);
-    this.peerCount.clear();
+    const intents = this.queue.splice(0, MAX_INTENTS);
+    if (this.inbox.size) this.drainInbox(intents);
     if (this.mode === 'host') {
       const msg = { t: 'turn', n: this.n, intents };
       if (this.hashEvery > 0 && this.n > 0 && this.n % this.hashEvery === 0) {
@@ -252,6 +279,18 @@ export class Session {
       for (const peer of this.peers.keys()) this.transport.send(peer, msg);
     }
     this.runTurn(intents);
+  }
+
+  drainInbox(intents) {
+    for (const [peer, list] of this.inbox) {
+      const k = Math.min(list.length, PEER_INTENTS, MAX_INTENTS - intents.length);
+      for (let j = 0; j < k; j++) intents.push(list[j]);
+      if (k > 0) list.splice(0, k);
+      if (!list.length) {
+        this.inbox.delete(peer);
+        this.overflow.delete(peer);
+      }
+    }
   }
 
   runTurn(intents) {
@@ -273,6 +312,7 @@ export class Session {
   }
 
   updateClient(dt) {
+    this.idle += dt;
     if (this.awaitingState) {
       this.stateWait += dt;
       if (this.stateWait >= STATE_RETRY) {
@@ -285,8 +325,10 @@ export class Session {
     const avail = this.available();
     if (!avail) {
       this.acc = Math.min(this.acc + dt, step);
+      this.watch(dt);
       return;
     }
+    this.gap = 0;
     this.acc += Math.min(dt, 0.5);
     let budget = Math.floor((this.acc + EPS) / step);
     if (avail > LAG_TURNS) budget = Math.max(budget, avail - 1);
@@ -317,6 +359,41 @@ export class Session {
     return true;
   }
 
+  watch(dt) {
+    if (this.buffer.size) {
+      this.gap += dt;
+      if (this.gap >= GAP_WAIT) this.resync('lost');
+      return;
+    }
+    this.gap = 0;
+    if (this.n === 0) {
+      this.readyRetry += dt;
+      if (this.readyRetry >= READY_RETRY && this.transport) {
+        this.readyRetry = 0;
+        this.transport.send(this.transport.hostId, { t: 'ready' });
+      }
+      return;
+    }
+    if (this.speed > 0 && this.s.phase !== 'over' && this.idle >= STALL_WAIT) this.resync('stall');
+  }
+
+  resync(reason) {
+    if (this.mode !== 'client' || this.awaitingState || this.ended) return false;
+    this.lost++;
+    this.gap = 0;
+    this.idle = 0;
+    this.awaitingState = true;
+    this.stateWait = 0;
+    this.emit({ type: 'desync', n: this.n, hash: null, reason });
+    this.requestState();
+    return true;
+  }
+
+  onTrouble(peer) {
+    if (this.ended || this.mode !== 'client' || !this.transport || peer !== this.transport.hostId) return;
+    if (this.n > 0 || this.buffer.size) this.resync('link');
+  }
+
   catchUp(max = 1e9) {
     let k = 0;
     while (k < max && !this.ended && !this.awaitingState && this.buffer.has(this.n)) {
@@ -343,6 +420,27 @@ export class Session {
     return sendLarge(this.transport, peer, msg);
   }
 
+  queueState(peer) {
+    const last = this.stateAt.get(peer);
+    if (last === undefined || this.clock - last >= STATE_GAP) this.pushState(peer);
+    else this.stateWanted.add(peer);
+  }
+
+  pushState(peer) {
+    this.stateWanted.delete(peer);
+    if (!this.peers.has(peer)) return;
+    this.stateAt.set(peer, this.clock);
+    this.desyncs++;
+    this.emit({ type: 'desync', pid: this.peers.get(peer), n: this.n });
+    this.sendState(peer);
+  }
+
+  flushStates() {
+    for (const peer of this.stateWanted) {
+      if (this.clock - (this.stateAt.get(peer) || 0) >= STATE_GAP) this.pushState(peer);
+    }
+  }
+
   loadState(msg) {
     if (!Number.isInteger(msg.n) || !msg.state) return;
     let s;
@@ -358,6 +456,8 @@ export class Session {
     for (const k of [...this.buffer.keys()]) if (k < this.n) this.buffer.delete(k);
     this.awaitingState = false;
     this.stateWait = 0;
+    this.idle = 0;
+    this.gap = 0;
     this.resyncs++;
     this.acc = 0;
     if (Number(msg.resume) > 0) this.resumeSpeed = Number(msg.resume);
@@ -385,22 +485,15 @@ export class Session {
       return;
     }
     switch (msg.t) {
-      case 'intent': {
-        const cmd = cleanCmd(msg.cmd);
-        if (!cmd) return;
-        const c = this.peerCount.get(peer) || 0;
-        if (c >= PEER_INTENTS || this.queue.length >= MAX_QUEUE) return;
-        this.peerCount.set(peer, c + 1);
-        this.queue.push({ pid, cmd });
+      case 'intent':
+        this.takeIntent(peer, pid, msg.cmd);
         return;
-      }
       case 'chat':
-        this.postChat(pid, msg.text);
+        if (this.chatLimit.take(peer)) this.postChat(pid, msg.text);
+        else if (this.chatLimit.firstMiss(peer)) this.transport.send(peer, { t: 'err', error: 'Слишком много сообщений в чате — подождите несколько секунд' });
         return;
       case 'desync':
-        this.desyncs++;
-        this.emit({ type: 'desync', pid, n: Number(msg.n) || 0 });
-        this.sendState(peer);
+        this.queueState(peer);
         return;
       case 'ready':
         if (this.ready.delete(peer) && !this.ready.size && !this.started) {
@@ -415,16 +508,42 @@ export class Session {
     }
   }
 
+  takeIntent(peer, pid, raw) {
+    const cmd = cleanCmd(raw);
+    if (!cmd) return false;
+    let list = this.inbox.get(peer);
+    if (!list) {
+      list = [];
+      this.inbox.set(peer, list);
+    }
+    if (list.length >= PEER_QUEUE) {
+      if (!this.overflow.has(peer)) {
+        this.overflow.add(peer);
+        this.transport.send(peer, { t: 'err', error: 'Слишком много команд подряд — часть из них не выполнена' });
+      }
+      return false;
+    }
+    list.push({ pid, cmd });
+    return true;
+  }
+
   onClientMsg(peer, msg) {
     if (this.transport && peer !== this.transport.hostId) return;
     switch (msg.t) {
       case 'turn':
-        if (Number.isInteger(msg.n) && msg.n >= this.n && !this.buffer.has(msg.n)) this.buffer.set(msg.n, msg);
+        if (!Number.isInteger(msg.n) || msg.n < this.n || this.buffer.has(msg.n)) return;
+        if (this.buffer.size >= MAX_BUFFER) {
+          this.resync('lost');
+          return;
+        }
+        this.buffer.set(msg.n, msg);
+        this.idle = 0;
         return;
       case 'state':
         this.loadState(msg);
         return;
       case 'speed':
+        this.idle = 0;
         if (Number(msg.v) > 0) {
           this.resumeSpeed = Number(msg.v);
           if (this.speed > 0) this.speed = this.resumeSpeed;
@@ -432,6 +551,7 @@ export class Session {
         }
         return;
       case 'pause': {
+        this.idle = 0;
         const on = !!msg.on;
         if (Number(msg.v) > 0) this.resumeSpeed = Number(msg.v);
         if (on === this.paused) return;
@@ -462,7 +582,7 @@ export class Session {
       const pid = this.peers.get(peer);
       if (pid === undefined) return;
       this.peers.delete(peer);
-      this.chunks.drop(peer);
+      this.forget(peer);
       if (this.ready.delete(peer) && !this.ready.size && !this.started) {
         this.started = true;
         this.emit({ type: 'ready' });
@@ -473,6 +593,15 @@ export class Session {
     } else if (this.mode === 'client') {
       this.endWith('Соединение с хостом потеряно');
     }
+  }
+
+  forget(peer) {
+    this.chunks.drop(peer);
+    this.inbox.delete(peer);
+    this.overflow.delete(peer);
+    this.stateAt.delete(peer);
+    this.stateWanted.delete(peer);
+    this.chatLimit.drop(peer);
   }
 
   sendChat(text) {

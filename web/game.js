@@ -8,14 +8,15 @@ a;let r=((-.0464964749*q+.15931422)*q-.327622764)*q*a+a;if(ay>ax)r=1.57079632679
 land:true,cost:1.25,def:1.15},{key:"desert",name:"\u041F\u0443\u0441\u0442\u044B\u043D\u044F",land:true,cost:1.1,def:.95},{key:"hills",name:"\u0412\u043E\u0437\u0432\u044B\u0448\u0435\u043D\u043D\u043E\u0441\u0442\u044C",
 land:true,cost:1.5,def:1.3},{key:"mountain",name:"\u0413\u043E\u0440\u044B",land:true,cost:2.2,def:1.7},{key:"snow",name:"\u0422\u0443\u043D\u0434\u0440\u0430 \u0438 \u043B\u044C\u0434\u044B",
 land:true,cost:1.4,def:1.1}];var TERRAIN_COST=Float64Array.from(TERRAIN,t=>t.cost);var TERRAIN_DEF=Float64Array.from(TERRAIN,t=>t.def);var BUILDINGS={house:{name:"\
-\u0416\u0438\u043B\u043E\u0439 \u043A\u0432\u0430\u0440\u0442\u0430\u043B",short:"\u0414\u043E\u043C\u0430",max:5,cost:1e3,time:6,upkeep:0,hotkey:"1",desc:"+25 \
-000 \u043A \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C\u0443 \u0432\u043E\u0439\u0441\u043A \u0438 +6 \u0437\u043E\u043B\u043E\u0442\u0430/\u0441 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
+\u0416\u0438\u043B\u043E\u0439 \u043A\u0432\u0430\u0440\u0442\u0430\u043B",short:"\u0414\u043E\u043C\u0430",max:5,cost:1e3,time:6,upkeep:0,hotkey:"1",desc:"+3 0\
+00 \u043A \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C\u0443 \u0432\u043E\u0439\u0441\u043A \u0438 +6 \u0437\u043E\u043B\u043E\u0442\u0430/\u0441 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C (\u043A\u0430\u0436\u0434\u0430\u044F \u043A\u043B\u0435\u0442\u043A\u0430 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438 \u0434\u0430\u0451\u0442 +6)"},
 factory:{name:"\u0424\u0430\u0431\u0440\u0438\u043A\u0430",short:"\u0424\u0430\u0431\u0440\u0438\u043A\u0430",max:3,cost:2500,time:10,upkeep:0,hotkey:"2",desc:"\
-\u0412\u043E\u0437\u0438\u0442 \u0433\u0440\u0443\u0437\u044B \u0432 \u0431\u043B\u0438\u0436\u0430\u0439\u0448\u0438\u0439 \u043F\u043E\u0440\u0442 (\u043F\u043E \u0436/\u0434 \u2014 \u0432\u0434\u0432\u043E\u0435 \u0431\u044B\u0441\u0442\u0440\u0435\u0435). \u0411\u0435\u0437 \u043F\u043E\u0440\u0442\u0430 \u0434\u0430\u0451\u0442 4 \u0437\u043E\u043B\u043E\u0442\u0430/\u0441 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C. \u041E\u0442\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u0442\u0430\u043D\u043A\u0438 \u0438 \u0430\u0440\u0442\u0438\u043B\u043B\u0435\u0440\u0438\u044E"},
-port:{name:"\u041F\u043E\u0440\u0442",short:"\u041F\u043E\u0440\u0442",max:3,cost:3e3,time:10,upkeep:0,coast:true,hotkey:"3",desc:"\u0412\u0435\u0440\u0444\u044C, \u0442\u043E\u0440\u0433\u043E\u0432\u044B\u0435 \u0441\u0443\u0434\u0430 \u0438 \u043F\u0440\u0438\u0451\u043C \
-\u0433\u0440\u0443\u0437\u043E\u0432 \u0441 \u0444\u0430\u0431\u0440\u0438\u043A. \u0421\u0442\u0440\u043E\u0438\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u043C\u043E\u0440\u0441\u043A\u043E\u043C \u0431\u0435\u0440\u0435\u0433\u0443"},
-fort:{name:"\u0423\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u0435",short:"\u0424\u043E\u0440\u0442",max:3,cost:1500,time:8,upkeep:0,hotkey:"4",desc:"\u041E\u0431\u043E\u0440\
-\u043E\u043D\u0430 \xD71.6 \u0432 \u0440\u0430\u0434\u0438\u0443\u0441\u0435 18 \u043A\u043B\u0435\u0442\u043E\u043A, +25% \u0437\u0430 \u043A\u0430\u0436\u0434\u044B\u0439 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
+\u0412\u043E\u0437\u0438\u0442 \u0433\u0440\u0443\u0437 (75 \u0437\u043E\u043B\u043E\u0442\u0430 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C) \u0432 \u0441\u0432\u043E\u0439 \u043F\u043E\u0440\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u0441\u0432\u043E\u0435\u0439 \u0438\u043B\u0438 \u0441\u043E\u044E\u0437\u043D\u043E\u0439 \u0441\u0443\u0448\u0435: \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0440\u0435\u0439\u0441 \u2014 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0438\u0431\u044B\u0442\u0438\u044F \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0435\u0433\u043E. \u0413\u0440\u0443\u0437\u043E\u0432\u0438\u043A \u0435\u0437\u0434\u0438\u0442 \u0434\u043E 100 \u043A\u043B\u0435\u0442\u043E\u043A, \u043F\u043E\u0435\u0437\u0434\
+ \u043F\u043E \u043F\u0440\u044F\u043C\u043E\u0439 \u0436/\u0434 \u2014 \u0432\u0434\u0432\u043E\u0435 \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u0438 \u043F\u043E\u0442\u043E\u043C\u0443 \u043F\u0440\u0438\u0432\u043E\u0437\u0438\u0442 \u0432\u0434\u0432\u043E\u0435 \u0431\u043E\u043B\u044C\u0448\u0435. \u0411\u0435\u0437 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u043F\u043E\u0440\u0442\u0430 \u0434\u0430\u0451\u0442 4 \u0437\u043E\u043B\u043E\u0442\u0430/\u0441 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C. \u0423\u0434\u0432\u0430\u0438\u0432\u0430\u0435\u0442 \u0434\u043E\u043B\u044E \u0442\u0430\u043D\u043A\u043E\u0432 \u0438 \u0430\u0440\u0442\u0438\u043B\u043B\u0435\u0440\u0438\u0438 \u0432 \u0430\u0440\u043C\u0438\u0438, \u043A\u0430\u0436\u0434\
+\u0430\u044F \u0444\u0430\u0431\u0440\u0438\u043A\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442 \u0435\u0449\u0451"},port:{name:"\u041F\u043E\u0440\u0442",
+short:"\u041F\u043E\u0440\u0442",max:3,cost:3e3,time:10,upkeep:0,coast:true,hotkey:"3",desc:"\u0412\u0435\u0440\u0444\u044C, \u0442\u043E\u0440\u0433\u043E\u0432\u044B\u0435 \u0441\u0443\u0434\u0430 \u0438 \u043F\u0440\u0438\u0451\u043C \u0433\u0440\u0443\u0437\u043E\u0432 \u0441 \u0444\u0430\u0431\u0440\u0438\u043A. \u0421\u0442\u0440\u043E\u0438\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u043C\u043E\
+\u0440\u0441\u043A\u043E\u043C \u0431\u0435\u0440\u0435\u0433\u0443"},fort:{name:"\u0423\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0438\u0435",short:"\u0424\u043E\u0440\u0442",
+max:3,cost:1500,time:8,upkeep:0,hotkey:"4",desc:"\u041E\u0431\u043E\u0440\u043E\u043D\u0430 \xD71.6 \u0432 \u0440\u0430\u0434\u0438\u0443\u0441\u0435 18 \u043A\u043B\u0435\u0442\u043E\u043A, +25% \u0437\u0430 \u043A\u0430\u0436\u0434\u044B\u0439 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
 sam:{name:"\u041F\u0412\u041E",short:"\u041F\u0412\u041E",max:3,cost:4e3,time:10,upkeep:1.5,upkeepPerLevel:true,hotkey:"5",desc:"\u0421\u0431\u0438\u0432\u0430\u0435\u0442 \u0434\u0440\u043E\u043D\u044B, \u0440\u0430\u043A\u0435\u0442\u044B \u0438 \u0431\u043E\u043C\u0431\u044B \u0432\
  \u0440\u0430\u0434\u0438\u0443\u0441\u0435 40 \u043A\u043B\u0435\u0442\u043E\u043A (+10 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C)"},airbase:{name:"\
 \u0410\u044D\u0440\u043E\u0434\u0440\u043E\u043C \u0411\u041F\u041B\u0410",short:"\u0410\u044D\u0440\u043E\u0434\u0440\u043E\u043C",max:2,cost:3500,time:10,upkeep:1,
@@ -26,41 +27,52 @@ var BUILDING_KEYS=Object.keys(BUILDINGS);var CAPTURABLE={house:true,factory:true
 econ:{name:"\u042D\u043A\u043E\u043D\u043E\u043C\u0438\u043A\u0430",max:5,base:1200,desc:"+10% \u043A \u0434\u043E\u0445\u043E\u0434\u0443 \u0438 +5% \u043A \u043F\u0440\u0438\u0440\u043E\u0441\u0442\u0443 \u0432\u043E\u0439\u0441\u043A \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
 logistics:{name:"\u041B\u043E\u0433\u0438\u0441\u0442\u0438\u043A\u0430",max:3,base:1500,desc:"+10% \u043A \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u043D\u0430\u0441\u0442\u0443\u043F\u043B\u0435\u043D\u0438\u044F \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
 inf:{name:"\u041F\u0435\u0445\u043E\u0442\u0430",max:5,base:1e3,desc:"+8% \u043A \u0430\u0442\u0430\u043A\u0435 \u0438 \u043E\u0431\u043E\u0440\u043E\u043D\u0435 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
-armor:{name:"\u0411\u0440\u043E\u043D\u0435\u0442\u0435\u0445\u043D\u0438\u043A\u0430",max:5,base:2e3,desc:"\u0422\u0430\u043D\u043A\u0438 \u0441\u0430\u043C\u0438 \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u0432 \u0430\u0440\u043C\u0438\u0438 (\u043D\u0443\u0436\u043D\u0430 \u0444\u0430\u0431\u0440\u0438\u043A\u0430): \u043C\u043E\u0449\u043D\u0430\
-\u044F \u0430\u0442\u0430\u043A\u0430"},art:{name:"\u0410\u0440\u0442\u0438\u043B\u043B\u0435\u0440\u0438\u044F",max:5,base:1800,desc:"\u0410\u0440\u0442\u0438\u043B\u043B\u0435\u0440\u0438\u044F \u0441\u0430\u043C\u0430 \u043F\u043E\u044F\u0432\u043B\u044F\u0435\u0442\u0441\
-\u044F \u0432 \u0430\u0440\u043C\u0438\u0438 (\u043D\u0443\u0436\u043D\u0430 \u0444\u0430\u0431\u0440\u0438\u043A\u0430): \u0430\u0442\u0430\u043A\u0430 \u0438 \u043E\u0431\u043E\u0440\u043E\u043D\u0430"},
+armor:{name:"\u0411\u0440\u043E\u043D\u0435\u0442\u0435\u0445\u043D\u0438\u043A\u0430",max:5,base:2e3,desc:"\u0422\u0430\u043D\u043A\u0438 \u0441\u0430\u043C\u0438 \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F \u0432 \u0430\u0440\u043C\u0438\u0438: \u043C\u043E\u0449\u043D\u0430\u044F \u0430\u0442\u0430\u043A\u0430. \u0421 \u0444\u0430\u0431\u0440\u0438\
+\u043A\u0430\u043C\u0438 \u0438\u0445 \u0434\u043E\u043B\u044F \u0432\u0434\u0432\u043E\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 \u0438 \u0440\u0430\u0441\u0442\u0451\u0442 \u0441 \u043A\u0430\u0436\u0434\u043E\u0439 \u0444\u0430\u0431\u0440\u0438\u043A\u043E\u0439"},
+art:{name:"\u0410\u0440\u0442\u0438\u043B\u043B\u0435\u0440\u0438\u044F",max:5,base:1800,desc:"\u0410\u0440\u0442\u0438\u043B\u043B\u0435\u0440\u0438\u044F \u0441\u0430\u043C\u0430 \u043F\u043E\u044F\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0432 \u0430\u0440\u043C\u0438\u0438: \u0430\u0442\u0430\u043A\u0430 \u0438 \u043E\u0431\u043E\u0440\u043E\u043D\u0430. \u0421 \u0444\u0430\u0431\u0440\u0438\u043A\u0430\u043C\u0438 \
+\u0435\u0451 \u0434\u043E\u043B\u044F \u0432\u0434\u0432\u043E\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 \u0438 \u0440\u0430\u0441\u0442\u0451\u0442 \u0441 \u043A\u0430\u0436\u0434\u043E\u0439 \u0444\u0430\u0431\u0440\u0438\u043A\u043E\u0439"},
 fort:{name:"\u0424\u043E\u0440\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044F",max:3,base:1500,desc:"+12% \u043A \u043E\u0431\u043E\u0440\u043E\u043D\u0435 \u0432\u0441\u0435\u0439 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
 naval:{name:"\u0424\u043B\u043E\u0442",max:3,base:2e3,desc:"+20% \u043A \u043F\u0440\u043E\u0447\u043D\u043E\u0441\u0442\u0438 \u0438 \u0443\u0440\u043E\u043D\u0443 \u0432\u043E\u0435\u043D\u043D\u044B\u0445 \u043A\u043E\u0440\u0430\u0431\u043B\u0435\u0439 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
 drone:{name:"\u0411\u041F\u041B\u0410",max:3,base:3e3,desc:"1: \u0430\u044D\u0440\u043E\u0434\u0440\u043E\u043C\u044B \u0438 \u0443\u0434\u0430\u0440\u043D\u044B\u0435 \u0434\u0440\u043E\u043D\u044B, 2: \u0434\u0440\u043E\u043D\u044B-\u043A\u0430\u043C\u0438\u043A\u0430\u0434\u0437\u0435, 3: \u0443\u0441\u0438\u043B\u0435\u043D\u043D\u044B\u0435 \u0434\u0440\u043E\u043D\u044B"},
 missile:{name:"\u0420\u0430\u043A\u0435\u0442\u044B",max:3,base:5e3,desc:"1: \u0448\u0430\u0445\u0442\u044B \u0438 \u043A\u0440\u044B\u043B\u0430\u0442\u044B\u0435 \u0440\u0430\u043A\u0435\u0442\u044B, 2: \u0434\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C 500, 3: \u0431\u0435\u0437 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0434\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0438"},
 aa:{name:"\u0421\u0438\u0441\u0442\u0435\u043C\u044B \u041F\u0412\u041E",max:3,base:3e3,desc:"+10% \u043A \u0448\u0430\u043D\u0441\u0443 \u043F\u0435\u0440\u0435\u0445\u0432\u0430\u0442\u0430 \u0437\u0430 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"},
 nuclear:{name:"\u042F\u0434\u0435\u0440\u043D\u043E\u0435 \u043E\u0440\u0443\u0436\u0438\u0435",max:3,base:12e3,req:["missile",1],desc:"1: \u0430\u0442\u043E\u043C\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430, 2: \u0432\u043E\u0434\
-\u043E\u0440\u043E\u0434\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430, 3: \u043C\u0435\u0433\u0430\u0431\u043E\u043C\u0431\u0430 \xAB\u0421\u0443\u0434\u043D\u044B\u0439 \u0434\u0435\u043D\u044C\xBB"}};
+\u043E\u0440\u043E\u0434\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430, 3: \u043C\u0435\u0433\u0430\u0431\u043E\u043C\u0431\u0430 \xAB\u0421\u0443\u0434\u043D\u044B\u0439 \u0434\u0435\u043D\u044C\xBB \u2014 \u043E\u043F\u0443\u0441\u0442\u043E\u0448\u0430\u0435\u0442 \u0432\u0441\u0435 \u0432\u0440\u0430\u0436\u0434\u0435\u0431\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u043D\u044B"}};
 var RESEARCH_KEYS=Object.keys(RESEARCH);var researchCost=(key,lvl)=>Math.round(RESEARCH[key].base*dpow(lvl+1,1.6));var researchTicks=lvl=>(20+15*lvl)*TICKS_PER_SEC;
-var STRIKES={drone:{name:"\u0423\u0434\u0430\u0440\u043D\u044B\u0439 \u0411\u041F\u041B\u0410",src:"airbase",req:["drone",1],cost:300,r:3,speed:1.5,killPerLevel:1500},
+var STRIKES={drone:{name:"\u0423\u0434\u0430\u0440\u043D\u044B\u0439 \u0411\u041F\u041B\u0410",src:"airbase",req:["drone",1],cost:300,r:3,speed:1.5,killPerLevel:1500,
+desc:"\u0423\u043D\u0438\u0447\u0442\u043E\u0436\u0430\u0435\u0442 \u0432\u043E\u0439\u0441\u043A\u0430 \u0432\u043B\u0430\u0434\u0435\u043B\u044C\u0446\u0430 \u043A\u043B\u0435\u0442\u043A\u0438 \u0432 \u0442\u043E\u0447\u043A\u0435 \u0443\u0434\u0430\u0440\u0430"},
 kamikaze:{name:"\u0414\u0440\u043E\u043D-\u043A\u0430\u043C\u0438\u043A\u0430\u0434\u0437\u0435",src:"airbase",req:["drone",2],cost:600,r:0,speed:1.5,point:true,
-pick:2},cruise:{name:"\u041A\u0440\u044B\u043B\u0430\u0442\u0430\u044F \u0440\u0430\u043A\u0435\u0442\u0430",src:"silo",req:["missile",1],cost:2e3,r:0,speed:2.5,
-point:true,pick:2},atom:{name:"\u0410\u0442\u043E\u043C\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430",src:"silo",req:["nuclear",1],cost:15e3,r:14,speed:2,nuke:true},
-hbomb:{name:"\u0412\u043E\u0434\u043E\u0440\u043E\u0434\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430",src:"silo",req:["nuclear",2],cost:5e4,r:40,speed:2,nuke:true},
+pick:2,desc:"\u0423\u043D\u0438\u0447\u0442\u043E\u0436\u0430\u0435\u0442 \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u0435 \u0432\u0440\u0430\u0436\u0435\u0441\u043A\u043E\u0435 \u0437\u0434\u0430\u043D\u0438\u0435"},
+cruise:{name:"\u041A\u0440\u044B\u043B\u0430\u0442\u0430\u044F \u0440\u0430\u043A\u0435\u0442\u0430",src:"silo",req:["missile",1],cost:2e3,r:0,speed:2.5,point:true,
+pick:2,desc:"\u0423\u043D\u0438\u0447\u0442\u043E\u0436\u0430\u0435\u0442 \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u0435 \u0432\u0440\u0430\u0436\u0435\u0441\u043A\u043E\u0435 \u0437\u0434\u0430\u043D\u0438\u0435; \u0434\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u044C \u0440\u0430\u0441\u0442\u0451\u0442 \u0441 \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435\u043C \xAB\u0420\u0430\u043A\u0435\u0442\u044B\xBB"},
+atom:{name:"\u0410\u0442\u043E\u043C\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430",src:"silo",req:["nuclear",1],cost:15e3,r:14,speed:2,nuke:true,desc:"\u0412\u044B\u0436\u0438\u0433\
+\u0430\u0435\u0442 \u043A\u043B\u0435\u0442\u043A\u0438 \u0432 \u0440\u0430\u0434\u0438\u0443\u0441\u0435 14: \u0437\u0435\u043C\u043B\u044F \u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u043D\u0438\u0447\u044C\u0435\u0439, \u0437\u0434\u0430\u043D\u0438\u044F \u0440\u0443\u0448\u0430\u0442\u0441\u044F, \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u0437\u0430\u0440\u0430\u0436\u0435\u043D\u0438\u0435"},
+hbomb:{name:"\u0412\u043E\u0434\u043E\u0440\u043E\u0434\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430",src:"silo",req:["nuclear",2],cost:5e4,r:40,speed:2,nuke:true,
+desc:"\u0422\u043E \u0436\u0435, \u0447\u0442\u043E \u0430\u0442\u043E\u043C\u043D\u0430\u044F \u0431\u043E\u043C\u0431\u0430, \u0432 \u0440\u0430\u0434\u0438\u0443\u0441\u0435 40"},
 mega:{name:"\u041C\u0435\u0433\u0430\u0431\u043E\u043C\u0431\u0430 \xAB\u0421\u0443\u0434\u043D\u044B\u0439 \u0434\u0435\u043D\u044C\xBB",src:"silo",req:["nucle\
-ar",3],cost:25e4,r:24,speed:2,nuke:true,warheads:6}};var STRIKE_KEYS=Object.keys(STRIKES);var WARHEAD={r:24,speed:2};var FALLOUT_TICKS=600;var NUKE_TROOP_LOSS=1.5;
+ar",3],cost:25e4,r:40,speed:2,nuke:true,boost:30,incomeSec:120,perGame:1,desc:"\u041E\u0434\u043D\u0430 \u043D\u0430 \u043F\u0430\u0440\u0442\u0438\u044E. \u0426\u0435\u043D\u0430 \u2014 \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 250 000 \u0437\u043E\u043B\u043E\u0442\u0430 \u0438 \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 2 \u043C\u0438\u043D\u0443\u0442 \u0432\u0430\u0448\u0435\u0433\u043E \u0434\u043E\u0445\u043E\u0434\u0430\
+. \u0427\u0435\u0440\u0435\u0437 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u0435\u043A\u0443\u043D\u0434 \u043F\u043E\u0441\u043B\u0435 \u043F\u0443\u0441\u043A\u0430 \u0440\u0430\u0441\u043F\u0430\u0434\u0430\u0435\u0442\u0441\u044F \u043D\u0430 \u0441\u043E\u0442\u043D\u0438 \u044F\u0434\u0435\u0440\u043D\u044B\u0445 \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043E\u043A (\u043E\u0434\u043D\u0430 \u043D\u0430 \u043A\u0430\u0436\u0434\u044B\u0435 ~1200 \u043A\u043B\u0435\u0442\u043E\u043A \u0432\u0440\u0430\u0433\u0430, \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 8 \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0443, \u0440\u0430\u0434\u0438\u0443\u0441 40), \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0432\u044B\u0436\u0438\
+\u0433\u0430\u044E\u0442 \u043F\u043E\u0447\u0442\u0438 \u0432\u0441\u044E \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u044E \u0432\u0441\u0435\u0445 \u0432\u0440\u0430\u0436\u0434\u0435\u0431\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D: \u0437\u0435\u043C\u043B\u044F \u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0441\u044F \u043D\u0438\u0447\u044C\u0435\u0439 \u0438 \u0437\u0430\u0440\u0430\u0436\u0451\u043D\u043D\u043E\u0439, \u0432\u043E\u0439\u0441\u043A\u0430 \u0433\u0438\u0431\u043D\u0443\u0442, \u0437\u0434\u0430\u043D\u0438\u044F \u0440\u0443\u0448\u0430\u0442\u0441\u044F. \u041D\u043E\u0441\u0438\u0442\u0435\u043B\u044C \u043D\u0435 \u0441\u0431\u0438\u0432\u0430\u0435\u0442\u0441\u044F, \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043A\u0438 \u041F\u0412\u041E \u0441\u0431\u0438\u0432\
+\u0430\u0435\u0442 \u0440\u0435\u0434\u043A\u043E. \u0412\u0430\u0448\u0430 \u0437\u0435\u043C\u043B\u044F, \u0441\u043E\u044E\u0437\u043D\u0438\u043A\u0438 \u0438 \u043F\u0430\u0440\u0442\u043D\u0451\u0440\u044B \u043F\u043E \u043F\u0430\u043A\u0442\u0443 \u043D\u0435 \u0441\u0442\u0440\u0430\u0434\u0430\u044E\u0442"}};
+var STRIKE_KEYS=Object.keys(STRIKES);var WARHEAD={r:40,speed:3,perTiles:1200,min:8,minFlight:25,maxFlight:160,stagger:61,terminal:30};var FALLOUT_TICKS=600;var NUKE_TROOP_LOSS=1.5;
 var TRAITOR_TICKS=3e3;var cruiseRange=lvl=>lvl>=3?Infinity:300+200*(lvl-1);var siloReload=lvl=>Math.round(300/Math.max(1,lvl));var airbaseReload=lvl=>Math.round(
 100/Math.max(1,lvl));var SAM={every:5,radius:lvl=>40+10*(lvl-1),reload:lvl=>Math.round(30/Math.max(1,lvl))};var INTERCEPT={drone:.6,kamikaze:.6,cruise:.5,atom:.45,
-warhead:.45,mega:.45,hbomb:.35};var interceptChance=(kind,aaLvl)=>Math.min(.95,(INTERCEPT[kind]??.45)+.1*aaLvl);var SHIPS={warship:{name:"\u0412\u043E\u0435\u043D\u043D\u044B\u0439 \u043A\u043E\u0440\u0430\u0431\u043B\u044C",
-cost:2500,costStep:.1,hp:1e3,dmg:120,navalBonus:.2,range:14,chase:25,fireEvery:5,speed:.9,upkeep:3,perPortBase:3},transport:{name:"\u0414\u0435\u0441\u0430\u043D\u0442\u043D\u044B\u0439 \u043A\u043E\u0440\u0430\u0431\u043B\u044C",
-hp:300,speed:1.1,maxActive:3},trade:{name:"\u0422\u043E\u0440\u0433\u043E\u0432\u043E\u0435 \u0441\u0443\u0434\u043D\u043E",hp:300,speed:.8}};var LAND_UNITS={truck:{
-name:"\u0413\u0440\u0443\u0437\u043E\u0432\u0438\u043A",speed:.6},train:{name:"\u041F\u043E\u0435\u0437\u0434",speed:1.2}};var TRADE={interval:lvl=>(40-5*lvl)*TICKS_PER_SEC,
-base:100,perTile:1,treaty:.5,stockBonus:.1,maxStock:10,sunkLoot:.5};var ECON={startGold:1500,startTroops:3e3,maxGold:1e9,troopsBase:5e3,troopsPerTile:2.2,houseTroops:25e3,
-growthBase:60,growthExp:.73,growthDiv:8,growthEcon:.05,overCapDecay:.01,desertion:.01,incomePerTile:.008,incomeTroops:.06,houseIncome:6,factoryDirect:4,incomeEcon:.1,
-eventIncomeAlpha:.08,neutralCost:8,tileCost:8,densityCost:1.2,defenderLoss:.9,falloutCostMul:3,captureRate:.18,logisticsSpeed:.1,sampleMul:4,frontRescan:40,fortRadius:18,
-fortBonus:1.6,fortLevelBonus:.25,enclaveEvery:50,enclaveMax:200,spawnRadius:5,spawnMinDist:30,buildMinDist:5,buildCostStep:.25,upgradeStep:.5,demolishRefund:.25,
-factoryInterval:20,cargoPerLevel:150,railCostPerTile:40,railOwnShare:.8,railMaxLen:300};var ARMY={tankPerArmor:.07,tankPerFactory:.01,tankMax:.45,artPerLevel:.06,
-artMax:.3,infBonus:.08,tankAtk:1.3,artAtk:.9,artDef:.5,fortDef:.12,armorBonus:.1,artBonus:.1,shiftPerSec:.02};var DIPLO={requestTicks:30*TICKS_PER_SEC,pactTicks:600*
-TICKS_PER_SEC,traitorTicks:TRAITOR_TICKS,aiReplyEvery:10};var RELATIONS={none:"\u041D\u0435\u0442 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430",alliance:"\u0421\u043E\
-\u044E\u0437",pact:"\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438",trade:"\u0422\u043E\u0440\u0433\u043E\u0432\u044B\u0439 \u0434\u043E\u0433\u043E\u0432\u043E\u0440"};
-var PROPOSALS={alliance:true,pact:true,trade:true};var DEFAULT_SETTINGS={victory:{territory:true,territoryPct:70,economy:false,economyMinutes:20},spawnSeconds:15,
-difficulty:"normal"};var VICTORY={econLead:.15,econCheckEvery:10,minTerritoryPct:30,maxTerritoryPct:100,minEconMinutes:5,maxEconMinutes:60};var WIN_REASONS={territory:"\
-\u0417\u0430\u0445\u0432\u0430\u0442 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438",economy:"\u042D\u043A\u043E\u043D\u043E\u043C\u0438\u0447\u0435\u0441\u043A\u043E\u0435 \u043B\u0438\u0434\u0435\u0440\u0441\u0442\u0432\u043E",
+warhead:.15,mega:0,hbomb:.35};var interceptChance=(kind,aaLvl)=>INTERCEPT[kind]===0?0:Math.min(.95,(INTERCEPT[kind]??.45)+.1*aaLvl);var SHIPS={warship:{name:"\u0412\u043E\
+\u0435\u043D\u043D\u044B\u0439 \u043A\u043E\u0440\u0430\u0431\u043B\u044C",cost:2500,costStep:.1,hp:1e3,dmg:120,navalBonus:.2,range:14,chase:25,fireEvery:5,speed:.9,
+upkeep:3,perPortBase:3},transport:{name:"\u0414\u0435\u0441\u0430\u043D\u0442\u043D\u044B\u0439 \u043A\u043E\u0440\u0430\u0431\u043B\u044C",hp:300,speed:1.1,maxActive:3},
+trade:{name:"\u0422\u043E\u0440\u0433\u043E\u0432\u043E\u0435 \u0441\u0443\u0434\u043D\u043E",hp:300,speed:.8}};var LAND_UNITS={truck:{name:"\u0413\u0440\u0443\u0437\u043E\u0432\u0438\u043A",
+speed:.6},train:{name:"\u041F\u043E\u0435\u0437\u0434",speed:1.2}};var TRADE={interval:lvl=>(40-5*lvl)*TICKS_PER_SEC,base:100,perTile:1,treaty:.5,stockBonus:.1,
+maxStock:10,sunkLoot:.5};var ECON={startGold:1500,startTroops:3e3,maxGold:1e9,troopsBase:5e3,troopsPerTile:6,houseTroops:3e3,growthBase:60,growthExp:.73,growthDiv:8,
+growthEcon:.05,overCapDecay:.01,desertion:.01,incomePerTile:.008,incomeTroops:.06,houseIncome:6,factoryDirect:4,incomeEcon:.1,eventIncomeAlpha:.08,neutralCost:8,
+tileCost:8,densityCost:1.2,defenderLoss:.9,falloutCostMul:3,captureRate:.18,logisticsSpeed:.1,sampleMul:4,frontRescan:40,fortRadius:18,fortBonus:1.6,fortLevelBonus:.25,
+enclaveEvery:50,enclaveMax:200,spawnRadius:5,spawnMinDist:30,buildMinDist:5,buildCostStep:.25,upgradeStep:.5,demolishRefund:.25,factoryInterval:6,factoryLoad:1,
+cargoPerLevel:75,truckMaxLen:100,railCostPerTile:40,railMaxLen:300};var ARMY={tankPerArmor:.07,tankPerFactory:.01,tankMax:.45,artPerLevel:.06,artPerFactory:.005,
+artMax:.3,noFactory:.5,infBonus:.08,tankAtk:1.3,artAtk:.9,artDef:.5,fortDef:.12,armorBonus:.1,artBonus:.1,shiftPerSec:.02};var DIPLO={requestTicks:30*TICKS_PER_SEC,
+pactTicks:600*TICKS_PER_SEC,traitorTicks:TRAITOR_TICKS,aiReplyEvery:10};var RELATIONS={none:"\u041D\u0435\u0442 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430",
+alliance:"\u0421\u043E\u044E\u0437",pact:"\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438",trade:"\u0422\u043E\u0440\u0433\u043E\u0432\u044B\u0439 \u0434\u043E\
+\u0433\u043E\u0432\u043E\u0440"};var PROPOSALS={alliance:true,pact:true,trade:true};var DEFAULT_SETTINGS={victory:{territory:true,territoryPct:70,economy:false,
+economyMinutes:20},spawnSeconds:15,difficulty:"normal"};var VICTORY={econLead:.15,econCheckEvery:10,minTerritoryPct:30,maxTerritoryPct:100,minEconMinutes:5,maxEconMinutes:60};
+var WIN_REASONS={territory:"\u0417\u0430\u0445\u0432\u0430\u0442 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438",economy:"\u042D\u043A\u043E\u043D\u043E\u043C\u0438\u0447\u0435\u0441\u043A\u043E\u0435 \u043B\u0438\u0434\u0435\u0440\u0441\u0442\u0432\u043E",
 survivor:"\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0432\u044B\u0436\u0438\u0432\u0448\u0438\u0439"};var DIFFICULTY={easy:{name:"\u041B\u0451\u0433\u043A\u0438\u0439",
 income:.8,think:30,aggression:.7},normal:{name:"\u041D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u044B\u0439",income:1,think:18,aggression:1},hard:{name:"\u0421\u043B\u043E\u0436\u043D\u044B\
 \u0439",income:1.25,think:10,aggression:1.3}};function makeRng(seed){let a=seed>>>0;const next=()=>{a=a+1831565813>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296};
@@ -2041,16 +2053,25 @@ w,h);const ctx2=c.getContext("2d");if(type==="warship"||type==="transport"||type
 2+L2*.03,h/2+L2*.05);drawUnitShape(sx,type,L2,color,opts);sx.setTransform(1,0,0,1,0,0);sx.globalCompositeOperation="source-in";sx.fillStyle="rgba(0,0,0,0.38)";sx.
 fillRect(0,0,w,h);ctx2.drawImage(sh,0,0)}ctx2.translate(w/2,h/2);drawUnitShape(ctx2,type,L2,color,opts);u={c,ox:w/2,oy:h/2};if(unitCache.size>800)unitCache.clear();
 unitCache.set(key,u);return u}var units_exports={};__export(units_exports,{INTENTS:()=>INTENTS,advance:()=>advance,boatError:()=>boatError,boatPlan:()=>boatPlan,buildShipError:()=>buildShipError,
-canEngage:()=>canEngage,clearWater:()=>clearWater,countUnits:()=>countUnits,isShip:()=>isShip,portShipCap:()=>portShipCap,portShips:()=>portShips,sendTrade:()=>sendTrade,
-sharedSea:()=>sharedSea,shipCost:()=>shipCost,shipPath:()=>shipPath,shipSpawnTile:()=>shipSpawnTile,sinkUnit:()=>sinkUnit,sinkUnitsIn:()=>sinkUnitsIn,tickUnits:()=>tickUnits,
-tradeCargo:()=>tradeCargo,tradeIncome:()=>tradeIncome,tradePartners:()=>tradePartners,warshipDamage:()=>warshipDamage,warshipHp:()=>warshipHp,waterPath:()=>waterPath});var WS=SHIPS.warship;var SHIP_TYPES={warship:true,transport:true,trade:true};var SEARCH=NAV_SCALE*NAV_SEARCH;var INTENTS={buildShip:{check:checkBuildShip,run:runBuildShip},
+canEngage:()=>canEngage,clearWater:()=>clearWater,countUnits:()=>countUnits,freeBerth:()=>freeBerth,isShip:()=>isShip,portShipCap:()=>portShipCap,portShips:()=>portShips,
+sendTrade:()=>sendTrade,sharedSea:()=>sharedSea,shipCost:()=>shipCost,shipPath:()=>shipPath,shipSpawnTile:()=>shipSpawnTile,sinkUnit:()=>sinkUnit,sinkUnitsIn:()=>sinkUnitsIn,
+tickUnits:()=>tickUnits,tradeCargo:()=>tradeCargo,tradeIncome:()=>tradeIncome,tradePartners:()=>tradePartners,warshipDamage:()=>warshipDamage,warshipHp:()=>warshipHp,
+waterPath:()=>waterPath});var WS=SHIPS.warship;var SHIP_TYPES={warship:true,transport:true,trade:true};var SEARCH=NAV_SCALE*NAV_SEARCH;var INTENTS={buildShip:{check:checkBuildShip,run:runBuildShip},
 moveShip:{check:checkMoveShip,run:runMoveShip},boat:{check:checkBoat,run:runBoat}};var isShip=u=>!!u&&SHIP_TYPES[u.type]===true;function clampRatio(r){const v=Number(
 r);if(!Number.isFinite(v))return .3;return Math.min(1,Math.max(.01,v))}var cellOf=(game,x,y)=>game.tileAt(x,y);var center=(game,i)=>[i%game.W+.5,Math.floor(i/game.
 W)+.5];function countUnits(game,pid,type){let n=0;for(const u of game.s.units)if(u.owner===pid&&u.type===type)n++;return n}function portShips(game,port){let n=0;
 for(const u of game.s.units)if(u.type==="warship"&&u.from===port.id&&u.owner===port.owner)n++;return n}var portShipCap=port=>WS.perPortBase+port.level;function shipCost(game,pid){
 return Math.round(WS.cost*(1+WS.costStep*countUnits(game,pid,"warship")))}var warshipHp=naval=>Math.round(WS.hp*(1+WS.navalBonus*naval));var warshipDamage=naval=>Math.
-round(WS.dmg*(1+WS.navalBonus*naval));function shipSpawnTile(game,port){return nearestOceanTile(game.map,port.x+.5,port.y+.5,3)}function buildShipError(game,pid,portId){
-const b=game.buildingById(portId);if(!b||b.owner!==pid||b.type!=="port")return"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 \u043F\u043E\u0440\u0442";
+round(WS.dmg*(1+WS.navalBonus*naval));var BERTH_R=5;function berthTaken(game,pid,i,skip){const W=game.W;for(const u of game.s.units){if(u===skip||u.type!=="wars\
+hip"||u.owner!==pid||u.hp<=0)continue;if(Math.floor(u.y)*W+Math.floor(u.x)===i)return true;if(u.dest&&Math.floor(u.dest[1])*W+Math.floor(u.dest[0])===i)return true}
+return false}function freeBerth(game,pid,i0,skip=null){const map=game.map,W=game.W,H=game.H,ocean=map.nav.ocean;if(i0<0||!ocean[i0])return-1;if(!berthTaken(game,
+pid,i0,skip))return i0;const body=map.waterBody[i0];const x0=i0%W,y0=(i0-x0)/W;const cands=[];for(let dy=-BERTH_R;dy<=BERTH_R;dy++){const y=y0+dy;if(y<0||y>=H)continue;
+for(let dx=-BERTH_R;dx<=BERTH_R;dx++){const x=x0+dx;if(x<0||x>=W||dx*dx+dy*dy>BERTH_R*BERTH_R)continue;const i=y*W+x;if(ocean[i]&&map.waterBody[i]===body&&clearWater(
+map,x0+.5,y0+.5,x+.5,y+.5))cands.push(dx*dx+dy*dy,i)}}let best=-1,bd=Infinity;for(let k=0;k<cands.length;k+=2){const d=cands[k],i=cands[k+1];if(d<bd||d===bd&&i<
+best){if(berthTaken(game,pid,i,skip))continue;bd=d;best=i}}return best}function shipSpawnTile(game,port){const base=nearestOceanTile(game.map,port.x+.5,port.y+.5,
+3);if(base<0)return-1;const free=freeBerth(game,port.owner,base);return free>=0?free:base}function spreadOut(game,u){const here=cellOf(game,u.x,u.y);if(here<0||
+!berthTaken(game,u.owner,here,u))return;const t=freeBerth(game,u.owner,here,u);if(t<0||t===here)return;const c=center(game,t);u.path=[c];u.pi=0;u.order=1;u.dest=
+[c[0],c[1]]}function buildShipError(game,pid,portId){const b=game.buildingById(portId);if(!b||b.owner!==pid||b.type!=="port")return"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 \u043F\u043E\u0440\u0442";
 if(!game.buildingActive(b))return"\u041F\u043E\u0440\u0442 \u0435\u0449\u0451 \u0441\u0442\u0440\u043E\u0438\u0442\u0441\u044F";const cap=portShipCap(b);if(portShips(
 game,b)>=cap)return`\u041F\u043E\u0440\u0442 \u0443\u0436\u0435 \u0441\u043F\u0443\u0441\u0442\u0438\u043B \u043D\u0430 \u0432\u043E\u0434\u0443 \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u043A\u043E\u0440\u0430\u0431\u043B\u0435\u0439 (${cap}\
 )`;if(shipSpawnTile(game,b)<0)return"\u0423 \u043F\u043E\u0440\u0442\u0430 \u043D\u0435\u0442 \u0432\u044B\u0445\u043E\u0434\u0430 \u0432 \u043C\u043E\u0440\u0435";
@@ -2121,9 +2142,9 @@ p?p.research.naval:0);game.emit({k:"shipFire",id:u.id,x:u.x,y:u.y,tx:t.x,ty:t.y}
 length){u.chase=-1;u.path=[];u.pi=0}}function tickCombat(game){const s=game.s,every=WS.fireEvery;for(const u of s.units){if(u.type!=="warship"||u.hp<=0||(s.tick+
 u.id)%every!==0)continue;warshipTurn(game,u)}}function moveShips(game){const s=game.s;let gone=null;for(const u of s.units){if(!isShip(u))continue;if(u.hp<=0){(gone||
 (gone=new Set)).add(u);continue}if(u.type==="warship"&&u.pi>=u.path.length)continue;if(u.pi<u.path.length&&!advance(u,SHIPS[u.type].speed))continue;if(u.type===
-"warship"){u.path=[];u.pi=0;if(u.order){u.order=0;u.dest=null}continue}if(u.type==="transport")arriveTransport(game,u);else arriveTrade(game,u);(gone||(gone=new Set)).
-add(u)}if(gone)s.units=s.units.filter(u=>!gone.has(u))}function tickUnits(game){const s=game.s;if(s.phase!=="play")return;tickPorts(game);if(!s.units.length)return;
-tickCombat(game);moveShips(game)}var CH=256;var BLK=32;var BPR=CH/BLK;var NBLK=BPR*BPR;var LEVELS=[2,4,8,16,32];var CHUNK_Z=1.7;var MAX_CHUNKS=96;var TB=64;var GRAIN=512;var TAU=Math.PI*2;var FONT='\
+"warship"){u.path=[];u.pi=0;u.dest=null;if(u.order)u.order=0;spreadOut(game,u);continue}if(u.type==="transport")arriveTransport(game,u);else arriveTrade(game,u);
+(gone||(gone=new Set)).add(u)}if(gone)s.units=s.units.filter(u=>!gone.has(u))}function tickUnits(game){const s=game.s;if(s.phase!=="play")return;tickPorts(game);
+if(!s.units.length)return;tickCombat(game);moveShips(game)}var CH=256;var BLK=32;var BPR=CH/BLK;var NBLK=BPR*BPR;var LEVELS=[2,4,8,16,32];var CHUNK_Z=1.7;var MAX_CHUNKS=96;var TB=64;var GRAIN=512;var TAU=Math.PI*2;var FONT='\
 Inter, "Segoe UI", system-ui, -apple-system, sans-serif';var NUKES={atom:true,hbomb:true,mega:true,warhead:true};var UNIT_LEN={warship:3.8,transport:3,trade:3.4,
 train:3.4,truck:1.7};var UNIT_MIN={warship:19,transport:15,trade:16,train:15,truck:10};var UNIT_MAX={warship:84,transport:64,trade:74,train:76,truck:40};var clamp=(v,a,b)=>v<
 a?a:v>b?b:v;var smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t)};var easeOut=t=>1-(1-clamp(t,0,1))*(1-clamp(t,0,1));var wrapPi=a=>{while(a>Math.
@@ -2550,18 +2571,20 @@ hot|0},${88-30*hot|0},${a*.95})`);g3.addColorStop(.85,`rgba(78,66,60,${a*.75})`)
 x,cy,cr,cr*.7,0,0,TAU);ctx2.fill();if(hot>0){ctx2.globalCompositeOperation="lighter";const g4=ctx2.createRadialGradient(x,cy+cr*.25,0,x,cy+cr*.25,cr*.85);g4.addColorStop(
 0,`rgba(255,150,60,${.6*hot})`);g4.addColorStop(1,"rgba(255,90,30,0)");ctx2.fillStyle=g4;ctx2.beginPath();ctx2.arc(x,cy+cr*.25,cr*.85,0,TAU);ctx2.fill();ctx2.globalCompositeOperation=
 "source-over"}}ctx2.restore()}};var buildings_exports={};__export(buildings_exports,{INTENTS:()=>INTENTS2,buildCost:()=>buildCost,buildError:()=>buildError,buildTicks:()=>buildTicks,countBuildings:()=>countBuildings,
-deliverCargo:()=>deliverCargo,demolishRefund:()=>demolishRefund,destroyBuilding:()=>destroyBuilding,factoryInterval:()=>factoryInterval,nearestPort:()=>nearestPort,
-onTileOwnerChanged:()=>onTileOwnerChanged,placeError:()=>placeError,railBetween:()=>railBetween,railCost:()=>railCost,railError:()=>railError,railOwnShare:()=>railOwnShare,
-railRoute:()=>railRoute,removeRails:()=>removeRails,shipCargo:()=>shipCargo,stepLandUnit:()=>stepLandUnit,tickBuildings:()=>tickBuildings,upgradeCost:()=>upgradeCost,
-upgradeError:()=>upgradeError});var has=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var INTENTS2={build:{check:checkBuild,run:runBuild},upgrade:{check:checkUpgrade,run:runUpgrade},
+deliverCargo:()=>deliverCargo,demolishRefund:()=>demolishRefund,destroyBuilding:()=>destroyBuilding,factoryCargo:()=>factoryCargo,factoryCycle:()=>factoryCycle,
+factoryInterval:()=>factoryInterval,factoryLoad:()=>factoryLoad,factoryOutlook:()=>factoryOutlook,factoryRoute:()=>factoryRoute,landLine:()=>landLine,nearestPort:()=>nearestPort,
+onTileOwnerChanged:()=>onTileOwnerChanged,placeError:()=>placeError,railBetween:()=>railBetween,railClear:()=>railClear,railCost:()=>railCost,railError:()=>railError,
+railLength:()=>railLength,railRoute:()=>railRoute,removeRails:()=>removeRails,shipCargo:()=>shipCargo,stepLandUnit:()=>stepLandUnit,tickBuildings:()=>tickBuildings,
+trainRoute:()=>trainRoute,tripTicks:()=>tripTicks,truckError:()=>truckError,upgradeCost:()=>upgradeCost,upgradeError:()=>upgradeError});var has=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var INTENTS2={build:{check:checkBuild,run:runBuild},upgrade:{check:checkUpgrade,run:runUpgrade},
 demolish:{check:checkDemolish,run:runDemolish},rail:{check:checkRail,run:runRail}};function countBuildings(game,pid,type){let n=0;for(const b of game.s.buildings)
 if(b.owner===pid&&b.type===type)n++;return n}function buildCost(game,pid,type){return Math.round(BUILDINGS[type].cost*(1+ECON.buildCostStep*countBuildings(game,
-pid,type)))}function upgradeCost(game,b){return Math.round(BUILDINGS[b.type].cost*(1+ECON.upgradeStep*b.level))}var buildTicks=type=>sec(BUILDINGS[type].time);var factoryInterval=level=>Math.
-max(1,Math.round(ECON.factoryInterval*TICKS_PER_SEC/Math.max(1,level)));var railCost=len=>Math.round(ECON.railCostPerTile*len);var dist=(a,b)=>Math.sqrt((a.x-b.
-x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y));function placeError(game,pid,type,i){const s=game.s,def=BUILDINGS[type];if(i<0)return"\u0422\u043E\u0447\u043A\u0430 \u0432\u043D\u0435 \u043A\u0430\u0440\u0442\u044B";
-if(!game.isLandTile(i))return"\u0421\u0442\u0440\u043E\u0439\u0442\u0435 \u043D\u0430 \u0441\u0443\u0448\u0435";if(s.owner[i]!==pid+1)return"\u0421\u0442\u0440\u043E\u0439\u0442\u0435 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0441\
-\u0432\u043E\u0435\u0439 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438";if(s.fallout[i])return"\u0417\u0435\u043C\u043B\u044F \u0437\u0430\u0440\u0430\u0436\u0435\u043D\u0430 \u0440\u0430\u0434\u0438\u0430\u0446\u0438\u0435\u0439";
-if(def.req&&s.players[pid].research[def.req[0]]<def.req[1]){return`\u041D\u0443\u0436\u043D\u043E \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435 \xAB${RESEARCH[def.
+pid,type)))}function upgradeCost(game,b){return Math.round(BUILDINGS[b.type].cost*(1+ECON.upgradeStep*b.level))}var buildTicks=type=>sec(BUILDINGS[type].time);var factoryInterval=()=>Math.
+max(1,Math.round(ECON.factoryInterval*TICKS_PER_SEC));var factoryLoad=()=>Math.max(1,Math.round(ECON.factoryLoad*TICKS_PER_SEC));var factoryCargo=level=>ECON.cargoPerLevel*
+Math.max(1,level);var railCost=len=>Math.round(ECON.railCostPerTile*len);var dist=(a,b)=>Math.sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y));function placeError(game,pid,type,i){
+const s=game.s,def=BUILDINGS[type];if(i<0)return"\u0422\u043E\u0447\u043A\u0430 \u0432\u043D\u0435 \u043A\u0430\u0440\u0442\u044B";if(!game.isLandTile(i))return"\
+\u0421\u0442\u0440\u043E\u0439\u0442\u0435 \u043D\u0430 \u0441\u0443\u0448\u0435";if(s.owner[i]!==pid+1)return"\u0421\u0442\u0440\u043E\u0439\u0442\u0435 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0441\u0432\u043E\u0435\u0439 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438";
+if(s.fallout[i])return"\u0417\u0435\u043C\u043B\u044F \u0437\u0430\u0440\u0430\u0436\u0435\u043D\u0430 \u0440\u0430\u0434\u0438\u0430\u0446\u0438\u0435\u0439";if(def.
+req&&s.players[pid].research[def.req[0]]<def.req[1]){return`\u041D\u0443\u0436\u043D\u043E \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435 \xAB${RESEARCH[def.
 req[0]].name}\xBB ${def.req[1]} \u0443\u0440.`}if(def.coast&&!game.oceanCoast[i])return"\u041F\u043E\u0440\u0442 \u0441\u0442\u0440\u043E\u0438\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u043C\u043E\u0440\u0441\u043A\u043E\u043C \u0431\u0435\u0440\u0435\u0433\u0443";
 const W=game.W,x=i%W,y=(i-x)/W,D2=ECON.buildMinDist;for(const b of s.buildings){if(Math.abs(b.x-x)<D2&&Math.abs(b.y-y)<D2)return`\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043B\u0438\u0437\u043A\u043E \u043A \u0434\u0440\u0443\u0433\u043E\u043C\u0443 \u0437\u0434\u0430\u043D\u0438\u044E\
  (\u043D\u0443\u0436\u043D\u043E ${D2} \u043A\u043B\u0435\u0442\u043E\u043A)`}return null}function upgradeError(game,pid,b){if(!b||b.owner!==pid)return"\u0417\u0434\u0430\u043D\u0438\u0435 \u043D\
@@ -2580,17 +2603,22 @@ b);const t=buildTicks(b.type);p.gold-=cost;b.spent+=cost;b.build=t;b.total=t;b.u
 cmd.id))}function runUpgrade(game,pid,cmd){startUpgrade(game,game.buildingById(cmd.id))}function checkDemolish(game,pid,cmd){const b=game.buildingById(cmd.id);if(!b||
 b.owner!==pid)return"\u0417\u0434\u0430\u043D\u0438\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";return null}var demolishRefund=b=>Math.round(
 (b.spent||0)*ECON.demolishRefund);function runDemolish(game,pid,cmd){const b=game.buildingById(cmd.id);game.addGold(pid,demolishRefund(b),false);destroyBuilding(
-game,b,pid,true)}function railBetween(game,a,b){for(const r of game.s.rails)if(r.a===a&&r.b===b||r.a===b&&r.b===a)return r;return null}function railOwnShare(game,pid,A,B){
-const own=game.s.owner,W=game.W,me=pid+1;const ax=A.x+.5,ay=A.y+.5,bx=B.x+.5,by=B.y+.5;const steps=Math.max(1,Math.ceil(dist(A,B)));let mine=0;for(let k=0;k<=steps;k++){
-const x=Math.floor(ax+(bx-ax)*k/steps),y=Math.floor(ay+(by-ay)*k/steps);if(own[y*W+x]===me)mine++}return mine/(steps+1)}function railError(game,pid,aId,bId){const A=game.
-buildingById(aId),B=game.buildingById(bId);if(!A||!B||A===B)return"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0432\u0430 \u0440\u0430\u0437\u043D\u044B\u0445 \u0437\u0434\u0430\u043D\u0438\u044F";
+game,b,pid,true)}function railBetween(game,a,b){for(const r of game.s.rails)if(r.a===a&&r.b===b||r.a===b&&r.b===a)return r;return null}var LINE_OK=0;var LINE_WATER=1;
+var LINE_FOREIGN=2;function landCode(game,pid,x,y){const i=y*game.W+x;if(!game.isLandTile(i))return LINE_WATER;const o=game.s.owner[i]-1;return o===pid||o>=0&&game.
+isAllied(pid,o)?LINE_OK:LINE_FOREIGN}function landLine(game,pid,ax,ay,bx,by){const dx=bx-ax,dy=by-ay;const sx=Math.sign(dx),sy=Math.sign(dy);const nx=Math.abs(dx),
+ny=Math.abs(dy);let x=ax,y=ay,worst=landCode(game,pid,x,y);const see=c=>{if(c===LINE_WATER||c===LINE_FOREIGN&&worst===LINE_OK)worst=c};for(let ix=0,iy=0;ix<nx||
+iy<ny;){const d=(1+2*ix)*ny-(1+2*iy)*nx;if(d===0){const a=landCode(game,pid,x+sx,y),b=landCode(game,pid,x,y+sy);if(a!==LINE_OK&&b!==LINE_OK)see(Math.min(a,b));x+=
+sx;y+=sy;ix++;iy++}else if(d<0){x+=sx;ix++}else{y+=sy;iy++}see(landCode(game,pid,x,y));if(worst===LINE_WATER)return worst}return worst}var LINE_ERROR={[LINE_WATER]:"\
+\u0416/\u0434 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0438\u0434\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 \u0432\u043E\u0434\u0443",[LINE_FOREIGN]:"\u0416/\u0434 \
+\u0441\u0442\u0440\u043E\u0438\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u0432\u0430\u0448\u0435\u0439 \u0438\u043B\u0438 \u0441\u043E\u044E\u0437\u043D\u043E\u0439 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438"};
+function railError(game,pid,aId,bId){const A=game.buildingById(aId),B=game.buildingById(bId);if(!A||!B||A===B)return"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0432\u0430 \u0440\u0430\u0437\u043D\u044B\u0445 \u0437\u0434\u0430\u043D\u0438\u044F";
 if(A.owner!==pid||B.owner!==pid)return"\u041E\u0431\u0430 \u0437\u0434\u0430\u043D\u0438\u044F \u0434\u043E\u043B\u0436\u043D\u044B \u0431\u044B\u0442\u044C \u0432\u0430\u0448\u0438\u043C\u0438";
 if(!RAIL_TYPES[A.type]||!RAIL_TYPES[B.type])return"\u0416/\u0434 \u0441\u043E\u0435\u0434\u0438\u043D\u044F\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0444\u0430\u0431\u0440\u0438\u043A\u0438, \u043F\u043E\u0440\u0442\u044B \u0438 \u0436\u0438\u043B\u044B\u0435 \u043A\u0432\u0430\u0440\u0442\u0430\u043B\u044B";
 if(!game.buildingActive(A)||!game.buildingActive(B))return"\u0417\u0434\u0430\u043D\u0438\u0435 \u0435\u0449\u0451 \u0441\u0442\u0440\u043E\u0438\u0442\u0441\u044F";
 if(railBetween(game,A.id,B.id))return"\u042D\u0442\u0438 \u0437\u0434\u0430\u043D\u0438\u044F \u0443\u0436\u0435 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u044B";
 const len=dist(A,B);if(len>ECON.railMaxLen)return`\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u0430\u044F \u0434\u043E\u0440\u043E\u0433\u0430 (\u043D\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 ${ECON.
-railMaxLen} \u043A\u043B\u0435\u0442\u043E\u043A)`;if(railOwnShare(game,pid,A,B)<ECON.railOwnShare)return"\u0414\u043E\u0440\u043E\u0433\u0430 \u0434\u043E\u043B\u0436\u043D\u0430 \u0438\u0434\u0442\u0438 \u043F\u043E \u0432\u0430\u0448\u0435\u0439 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u0438 (\u043D\u0435 \u043C\u0435\u043D\u0435\u0435 80%)";
-const cost=railCost(len);if(game.s.players[pid].gold<cost)return`\u041D\u0443\u0436\u043D\u043E ${cost} \u0437\u043E\u043B\u043E\u0442\u0430`;return null}function checkRail(game,pid,cmd){
+railMaxLen} \u043A\u043B\u0435\u0442\u043E\u043A)`;const line=landLine(game,pid,A.x,A.y,B.x,B.y);if(line!==LINE_OK)return LINE_ERROR[line];const cost=railCost(len);
+if(game.s.players[pid].gold<cost)return`\u041D\u0443\u0436\u043D\u043E ${cost} \u0437\u043E\u043B\u043E\u0442\u0430`;return null}function checkRail(game,pid,cmd){
 return railError(game,pid,Number(cmd.a),Number(cmd.b))}function runRail(game,pid,cmd){const A=game.buildingById(cmd.a),B=game.buildingById(cmd.b);const len=dist(
 A,B);game.s.players[pid].gold-=railCost(len);game.s.rails.push({id:game.nextId(),owner:pid,a:A.id,b:B.id,len})}function removeRails(game,id){const s=game.s;let n=0;
 for(const r of s.rails)if(r.a===id||r.b===id)n++;if(n)s.rails=s.rails.filter(r=>r.a!==id&&r.b!==id);return n}function railRoute(game,pid,fromId,toId){if(fromId===
@@ -2606,38 +2634,61 @@ emit({k:"capture",pid:next,from,x:b.x,y:b.y,id:b.id,type:b.type});const name=BUI
 \u0445\u0432\u0430\u0442\u0438\u043B \u0432\u0430\u0448\u0435 \u0437\u0434\u0430\u043D\u0438\u0435: ${name}`,"danger");game.msg(next,`\u0417\u0430\u0445\u0432\u0430\u0447\u0435\u043D\u043E \u0437\u0434\u0430\u043D\u0438\u0435: ${name}`,
 "good")}function complete(game,b){const name=BUILDINGS[b.type].name;if(b.up){b.level=Math.min(BUILDINGS[b.type].max,b.level+1);b.up=0;game.msg(b.owner,`${name}:\
  \u0443\u043B\u0443\u0447\u0448\u0435\u043D\u043E \u0434\u043E \u0443\u0440. ${b.level}`,"good")}else{game.msg(b.owner,`\u041F\u043E\u0441\u0442\u0440\u043E\u0435\u043D\u043E: ${name}`,
-"good")}if(b.type==="factory")b.cd=Math.min(b.cd>0?b.cd:Infinity,factoryInterval(b.level));game.emit({k:"built",pid:b.owner,id:b.id})}function nearestPort(game,pid,x,y){
-let best=null,bd=Infinity;for(const b of game.s.buildings){if(b.owner!==pid||b.type!=="port"||!game.buildingActive(b))continue;const d=(b.x-x)*(b.x-x)+(b.y-y)*(b.
-y-y);if(d<bd){bd=d;best=b}}return best}function shipCargo(game,f){const port=nearestPort(game,f.owner,f.x,f.y);if(!port)return null;const route=railRoute(game,f.
-owner,f.id,port.id);const type=route?"train":"truck";const stops=route?route.map(id=>game.buildingById(id)):[f,port];const path=stops.map(b=>[b.x+.5,b.y+.5]);const u={
-owner:f.owner,type,x:path[0][0],y:path[0][1],path,pi:1,hp:1,maxHp:1,cargo:ECON.cargoPerLevel*f.level,from:f.id,to:port.id,heading:heading(path[1][0]-path[0][0],
-path[1][1]-path[0][1])};return game.spawnUnit(u)}function tickFactory(game,b){if(b.cd>0)b.cd--;if(b.cd>0)return;b.cd=factoryInterval(b.level);shipCargo(game,b)}
-function deliverCargo(game,u){const port=game.buildingById(u.to);if(!port||port.type!=="port"||port.owner!==u.owner)return false;const p=game.s.players[u.owner];
-if(!p||!p.alive)return false;const gold=Math.round(u.cargo*game.incomeMult(u.owner));game.addGold(u.owner,gold);port.stock=Math.min(TRADE.maxStock,(port.stock||
-0)+1);game.emit({k:"cargo",pid:u.owner,id:port.id,x:port.x,y:port.y,gold,by:u.type});return true}function stepLandUnit(u){let left=LAND_UNITS[u.type].speed;while(left>
-0&&u.pi<u.path.length){const t=u.path[u.pi];const dx=t[0]-u.x,dy=t[1]-u.y;const d=Math.sqrt(dx*dx+dy*dy);if(d>0)u.heading=heading(dx,dy);if(d<=left){u.x=t[0];u.
-y=t[1];left-=d;u.pi++}else{u.x+=dx/d*left;u.y+=dy/d*left;left=0}}return u.pi>=u.path.length}function tickLandUnits(game){const s=game.s;let done=null;for(const u of s.
-units){if(u.type!=="train"&&u.type!=="truck")continue;if(!stepLandUnit(u))continue;deliverCargo(game,u);(done||(done=new Set)).add(u)}if(done)s.units=s.units.filter(
-u=>!done.has(u))}function tickBuildings(game){const s=game.s;if(s.phase!=="play")return;for(const b of s.buildings){if(b.build>0){b.build--;if(b.build===0)complete(
-game,b)}if(b.type==="factory"&&game.buildingActive(b))tickFactory(game,b)}tickLandUnits(game)}var strikes_exports={};__export(strikes_exports,{INTENTS:()=>INTENTS3,THREAT:()=>THREAT,aimPoint:()=>aimPoint,makeProjectile:()=>makeProjectile,megaTargets:()=>megaTargets,
-nukeArea:()=>nukeArea,reloadOf:()=>reloadOf,strikeError:()=>strikeError,strikeName:()=>strikeName,strikeRange:()=>strikeRange,strikeTarget:()=>strikeTarget,tickStrikes:()=>tickStrikes});var has2=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var INTENTS3={strike:{check:checkStrike,run:runStrike}};var THREAT={mega:6,hbomb:5,
-atom:4,warhead:4,cruise:3,kamikaze:2,drone:1};var VALUE={silo:600,sam:400,airbase:400,factory:300,port:300,house:200,fort:150};var strikeName=kind=>kind==="warh\
-ead"?"\u042F\u0434\u0435\u0440\u043D\u0430\u044F \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043A\u0430":STRIKES[kind]?STRIKES[kind].name:kind;var strikeRange=(game,pid,kind)=>kind===
-"cruise"?cruiseRange(game.s.players[pid].research.missile):Infinity;function strikeTarget(game,pid,x,y,pick=2){const cx=Math.floor(Number(x)),cy=Math.floor(Number(
-y));if(!Number.isFinite(cx)||!Number.isFinite(cy))return null;let best=null,bd=Infinity;for(const b of game.s.buildings){const dx=b.x-cx,dy=b.y-cy;if(Math.abs(dx)>
-pick||Math.abs(dy)>pick)continue;if(b.owner===pid||!game.isHostile(pid,b.owner))continue;const d=dx*dx+dy*dy;if(d<bd||d===bd&&b.id<best.id){bd=d;best=b}}return best}
-function aimPoint(game,kind,x,y){const fx=Number(x),fy=Number(y);if(kind==="mega"&&(x===void 0||y===void 0||!Number.isFinite(fx)||!Number.isFinite(fy))){return{
-x:Math.floor(game.W/2)+.5,y:Math.floor(game.H/2)+.5}}const i=game.tileAt(fx,fy);if(i<0)return null;return{x:i%game.W+.5,y:Math.floor(i/game.W)+.5}}function reloadOf(b){
-return b.type==="silo"?siloReload(b.level):airbaseReload(b.level)}function hostileVictims(game,pid){const out=[];for(const q of game.s.players)if(q.alive&&q.id!==
-pid&&game.isHostile(pid,q.id)&&q.tiles>0)out.push(q.id);return out}function strikeError(game,pid,kind,fromId,x,y){if(!has2(STRIKES,kind))return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0442\u0438\u043F \
-\u0443\u0434\u0430\u0440\u0430";const def=STRIKES[kind];const s=game.s,p=s.players[pid];const[rk,rl]=def.req;if(p.research[rk]<rl)return`\u041D\u0443\u0436\u043D\u043E \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435 \xAB${RESEARCH[rk].
+"good")}if(b.type==="factory")b.cd=Math.min(b.cd>0?b.cd:Infinity,factoryLoad());game.emit({k:"built",pid:b.owner,id:b.id})}function nearestPort(game,pid,x,y){let best=null,
+bd=Infinity;for(const b of game.s.buildings){if(b.owner!==pid||b.type!=="port"||!game.buildingActive(b))continue;const d=(b.x-x)*(b.x-x)+(b.y-y)*(b.y-y);if(d<bd){
+bd=d;best=b}}return best}function railLength(game,route){let L2=0;for(let k=1;k<route.length;k++){const a=game.buildingById(route[k-1]),b=game.buildingById(route[k]);
+if(a&&b)L2+=dist(a,b)}return L2}var tripTicks=(len,type)=>Math.max(1,Math.ceil(len/LAND_UNITS[type].speed));function railClear(game,pid,route){for(let k=1;k<route.
+length;k++){const a=game.buildingById(route[k-1]),b=game.buildingById(route[k]);if(!a||!b||landLine(game,pid,a.x,a.y,b.x,b.y)!==LINE_OK)return false}return true}
+function truckError(game,f,port){const W=game.W;if(game.landId[f.y*W+f.x]!==game.landId[port.y*W+port.x])return"\u041F\u043E\u0440\u0442 \u043D\u0430 \u0434\u0440\u0443\u0433\u043E\u043C \u0431\u0435\u0440\u0435\u0433\u0443 \u043C\u043E\u0440\u044F";
+if(dist(f,port)>ECON.truckMaxLen)return`\u0413\u0440\u0443\u0437\u043E\u0432\u0438\u043A \u0432\u043E\u0437\u0438\u0442 \u043D\u0435 \u0434\u0430\u043B\u044C\u0448\u0435 ${ECON.
+truckMaxLen} \u043A\u043B\u0435\u0442\u043E\u043A`;const line=landLine(game,f.owner,f.x,f.y,port.x,port.y);if(line===LINE_WATER)return"\u041F\u0443\u0442\u044C \u0433\u0440\u0443\u0437\u043E\u0432\u0438\u043A\u0430 \u043F\u0435\u0440\u0435\u0441\u0435\u043A\u0430\u0435\u0442\
+ \u0432\u043E\u0434\u0443";if(line===LINE_FOREIGN)return"\u041F\u0443\u0442\u044C \u0433\u0440\u0443\u0437\u043E\u0432\u0438\u043A\u0430 \u0438\u0434\u0451\u0442 \u043F\u043E \u0447\u0443\u0436\u043E\u0439 \u0437\u0435\u043C\u043B\u0435";
+return null}function trainRoute(game,f,port){const route=railRoute(game,f.owner,f.id,port.id);if(!route||route.length<2)return null;const len=railLength(game,route);
+const straight=dist(f,port);if(len>straight*(LAND_UNITS.train.speed/(2*LAND_UNITS.truck.speed))+1e-9)return null;if(!railClear(game,f.owner,route))return null;return{
+route,len}}function factoryRoute(game,f){let best=null;const take=plan=>{if(!best||plan.trip<best.trip||plan.trip===best.trip&&plan.port.id<best.port.id)best=plan};
+for(const b of game.s.buildings){if(b.owner!==f.owner||b.type!=="port"||!game.buildingActive(b))continue;const straight=dist(f,b);const tr=trainRoute(game,f,b);
+if(tr)take({type:"train",port:b,route:tr.route,len:tr.len,straight,trip:tripTicks(tr.len,"train")});if(!truckError(game,f,b))take({type:"truck",port:b,route:null,
+len:straight,straight,trip:tripTicks(straight,"truck")})}return best}var factoryCycle=trip=>Math.max(factoryInterval(),trip+factoryLoad());function factoryOutlook(game,f){
+const cargo=factoryCargo(f.level);const rate=cycle2=>cargo*TICKS_PER_SEC/cycle2;const plan=factoryRoute(game,f);if(!plan){const direct=ECON.factoryDirect*f.level;
+return{type:"direct",port:null,route:null,len:0,trip:0,cycle:0,cargo:0,perSec:direct,perMin:direct*60,railPerSec:0,railPerMin:0}}const cycle=factoryCycle(plan.trip);
+const out={...plan,cargo,cycle,perSec:rate(cycle),perMin:rate(cycle)*60,railPerSec:0,railPerMin:0};if(plan.type==="truck"){out.railPerSec=rate(factoryCycle(tripTicks(
+plan.straight,"train")))-out.perSec;out.railPerMin=out.railPerSec*60}return out}function shipCargo(game,f){const plan=factoryRoute(game,f);if(!plan)return null;
+const stops=plan.route?plan.route.map(id=>game.buildingById(id)):[f,plan.port];const path=stops.map(b=>[b.x+.5,b.y+.5]);const u={owner:f.owner,type:plan.type,x:path[0][0],
+y:path[0][1],path,pi:1,hp:1,maxHp:1,cargo:factoryCargo(f.level),from:f.id,to:plan.port.id,heading:heading(path[1][0]-path[0][0],path[1][1]-path[0][1])};game.spawnUnit(
+u);f.veh=u.id;return u}function liveVehicles(game){let set=game.tickCache.get("veh");if(!set){set=new Map;for(const u of game.s.units)if(u.type==="train"||u.type===
+"truck")set.set(u.id,u);game.tickCache.set("veh",set)}return set}function vehicleOut(game,b){if(!b.veh)return false;const u=liveVehicles(game).get(b.veh);if(u&&
+u.from===b.id&&u.owner===b.owner)return true;b.veh=0;return false}function tickFactory(game,b){if(b.cd>0)b.cd--;if(b.cd>0||vehicleOut(game,b))return;b.cd=factoryInterval();
+const u=shipCargo(game,b);b.direct=u?0:1;if(u)liveVehicles(game).set(u.id,u)}function deliverCargo(game,u){const port=game.buildingById(u.to);if(!port||port.type!==
+"port"||port.owner!==u.owner)return false;const p=game.s.players[u.owner];if(!p||!p.alive)return false;const gold=Math.round(u.cargo*game.incomeMult(u.owner));game.
+addGold(u.owner,gold);port.stock=Math.min(TRADE.maxStock,(port.stock||0)+1);game.emit({k:"cargo",pid:u.owner,id:port.id,from:u.from,x:port.x,y:port.y,gold,by:u.
+type});return true}function stepLandUnit(u){let left=LAND_UNITS[u.type].speed;while(left>0&&u.pi<u.path.length){const t=u.path[u.pi];const dx=t[0]-u.x,dy=t[1]-u.
+y;const d=Math.sqrt(dx*dx+dy*dy);if(d>0)u.heading=heading(dx,dy);if(d<=left){u.x=t[0];u.y=t[1];left-=d;u.pi++}else{u.x+=dx/d*left;u.y+=dy/d*left;left=0}}return u.
+pi>=u.path.length}function tickLandUnits(game){const s=game.s;let done=null;for(const u of s.units){if(u.type!=="train"&&u.type!=="truck")continue;if(!stepLandUnit(
+u))continue;if(!u.back)deliverCargo(game,u);const f=game.buildingById(u.from);if(f&&f.veh===u.id){f.veh=0;f.cd=Math.max(f.cd|0,factoryLoad())}(done||(done=new Set)).
+add(u)}if(done)s.units=s.units.filter(u=>!done.has(u))}function tickBuildings(game){const s=game.s;if(s.phase!=="play")return;for(const b of s.buildings){if(b.build>
+0){b.build--;if(b.build===0)complete(game,b)}if(b.type==="factory"&&game.buildingActive(b))tickFactory(game,b)}tickLandUnits(game)}var strikes_exports={};__export(strikes_exports,{INTENTS:()=>INTENTS3,THREAT:()=>THREAT,aimPoint:()=>aimPoint,makeProjectile:()=>makeProjectile,megaCell:()=>megaCell,
+megaTargets:()=>megaTargets,megasUsed:()=>megasUsed,nukeArea:()=>nukeArea,reloadOf:()=>reloadOf,strikeCost:()=>strikeCost,strikeError:()=>strikeError,strikeName:()=>strikeName,
+strikeRange:()=>strikeRange,strikeTarget:()=>strikeTarget,tickStrikes:()=>tickStrikes,warheadFlight:()=>warheadFlight});var has2=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var INTENTS3={strike:{check:checkStrike,run:runStrike}};var THREAT={mega:6,hbomb:5,
+atom:4,warhead:4,cruise:3,kamikaze:2,drone:1};var strikeName=kind=>kind==="warhead"?"\u042F\u0434\u0435\u0440\u043D\u0430\u044F \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043A\u0430":
+STRIKES[kind]?STRIKES[kind].name:kind;var strikeRange=(game,pid,kind)=>kind==="cruise"?cruiseRange(game.s.players[pid].research.missile):Infinity;function strikeTarget(game,pid,x,y,pick=2){
+const cx=Math.floor(Number(x)),cy=Math.floor(Number(y));if(!Number.isFinite(cx)||!Number.isFinite(cy))return null;let best=null,bd=Infinity;for(const b of game.
+s.buildings){const dx=b.x-cx,dy=b.y-cy;if(Math.abs(dx)>pick||Math.abs(dy)>pick)continue;if(b.owner===pid||!game.isHostile(pid,b.owner))continue;const d=dx*dx+dy*
+dy;if(d<bd||d===bd&&b.id<best.id){bd=d;best=b}}return best}function aimPoint(game,kind,x,y){const fx=Number(x),fy=Number(y);if(kind==="mega"&&(x===void 0||y===void 0||
+!Number.isFinite(fx)||!Number.isFinite(fy))){return{x:Math.floor(game.W/2)+.5,y:Math.floor(game.H/2)+.5}}const i=game.tileAt(fx,fy);if(i<0)return null;return{x:i%
+game.W+.5,y:Math.floor(i/game.W)+.5}}function reloadOf(b){return b.type==="silo"?siloReload(b.level):airbaseReload(b.level)}var megasUsed=p=>p&&p.stats?p.stats.
+megas|0:0;function strikeCost(game,pid,kind){const def=STRIKES[kind];if(!def)return 0;if(!def.incomeSec)return def.cost;const p=game.s.players[pid];const inc=p&&
+Number.isFinite(p.income)?Math.max(0,p.income):0;return Math.max(def.cost,Math.ceil(inc*def.incomeSec/1e3)*1e3)}function hostileVictims(game,pid){const out=[];for(const q of game.
+s.players)if(q.alive&&q.id!==pid&&game.isHostile(pid,q.id)&&q.tiles>0)out.push(q.id);return out}function strikeError(game,pid,kind,fromId,x,y){if(!has2(STRIKES,
+kind))return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0442\u0438\u043F \u0443\u0434\u0430\u0440\u0430";const def=STRIKES[kind];const s=game.
+s,p=s.players[pid];const[rk,rl]=def.req;if(p.research[rk]<rl)return`\u041D\u0443\u0436\u043D\u043E \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435 \xAB${RESEARCH[rk].
 name}\xBB ${rl} \u0443\u0440.`;const b=game.buildingById(fromId);if(!b||b.owner!==pid)return def.src==="silo"?"\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u0432\u043E\u044E \u0440\u0430\u043A\u0435\u0442\u043D\u0443\u044E \u0448\u0430\u0445\u0442\u0443":
 "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u0432\u043E\u0439 \u0430\u044D\u0440\u043E\u0434\u0440\u043E\u043C \u0411\u041F\u041B\u0410";if(b.type!==
 def.src)return def.src==="silo"?"\u0417\u0430\u043F\u0443\u0441\u043A \u0442\u043E\u043B\u044C\u043A\u043E \u0438\u0437 \u0440\u0430\u043A\u0435\u0442\u043D\u043E\u0439 \u0448\u0430\u0445\u0442\u044B":
 "\u0417\u0430\u043F\u0443\u0441\u043A \u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u0430\u044D\u0440\u043E\u0434\u0440\u043E\u043C\u0430 \u0411\u041F\u041B\u0410";
 if(!game.buildingActive(b))return"\u0417\u0434\u0430\u043D\u0438\u0435 \u0435\u0449\u0451 \u0441\u0442\u0440\u043E\u0438\u0442\u0441\u044F";if(b.cd>0)return`\u041F\u0435\u0440\
-\u0435\u0437\u0430\u0440\u044F\u0434\u043A\u0430: ${Math.ceil(b.cd/TICKS_PER_SEC)} \u0441`;if(p.gold<def.cost)return`\u041D\u0443\u0436\u043D\u043E ${def.cost} \
-\u0437\u043E\u043B\u043E\u0442\u0430`;const aim=aimPoint(game,kind,x,y);if(!aim)return"\u0422\u043E\u0447\u043A\u0430 \u0432\u043D\u0435 \u043A\u0430\u0440\u0442\u044B";
+\u0435\u0437\u0430\u0440\u044F\u0434\u043A\u0430: ${Math.ceil(b.cd/TICKS_PER_SEC)} \u0441`;if(def.perGame&&megasUsed(p)>=def.perGame)return"\u041C\u0435\u0433\u0430\u0431\u043E\u043C\u0431\u0430 \u0443\u0436\u0435 \u043F\u0440\u0438\u043C\u0435\u043D\
+\u0435\u043D\u0430: \u043E\u043D\u0430 \u043E\u0434\u043D\u0430 \u043D\u0430 \u043F\u0430\u0440\u0442\u0438\u044E";const cost=strikeCost(game,pid,kind);if(p.gold<
+cost)return`\u041D\u0443\u0436\u043D\u043E ${cost} \u0437\u043E\u043B\u043E\u0442\u0430`;const aim=aimPoint(game,kind,x,y);if(!aim)return"\u0422\u043E\u0447\u043A\u0430 \u0432\u043D\u0435 \u043A\u0430\u0440\u0442\u044B";
 if(kind==="mega")return hostileVictims(game,pid).length?null:"\u041D\u0435\u0442 \u0432\u0440\u0430\u0436\u0434\u0435\u0431\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D \u0434\u043B\u044F \u0443\u0434\u0430\u0440\u0430";
 if(def.point){const t=strikeTarget(game,pid,x,y,def.pick);if(!t)return"\u0412 \u0442\u043E\u0447\u043A\u0435 \u0443\u0434\u0430\u0440\u0430 \u043D\u0435\u0442 \u0432\u0440\u0430\u0436\u0435\u0441\u043A\u043E\u0433\u043E \u0437\u0434\u0430\u043D\u0438\u044F";
 const range=strikeRange(game,pid,kind);const dx=t.x-b.x,dy=t.y-b.y;if(dx*dx+dy*dy>range*range)return`\u0426\u0435\u043B\u044C \u0432\u043D\u0435 \u0434\u043E\u0441\u044F\u0433\u0430\u0435\u043C\u043E\u0441\u0442\u0438 (${range}\
@@ -2646,50 +2697,65 @@ if(o>=0&&!game.isHostile(pid,o))return"\u041D\u0435\u043B\u044C\u0437\u044F \u04
 if(kind==="drone"&&o<0)return"\u0426\u0435\u043B\u044C \u0434\u0440\u043E\u043D\u0430 \u2014 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u044F \u043F\u0440\u043E\u0442\u0438\u0432\u043D\u0438\u043A\u0430";
 return null}function checkStrike(game,pid,cmd){return strikeError(game,pid,cmd.kind,cmd.from,cmd.x,cmd.y)}function makeProjectile(game,owner,type,sx,sy,tx,ty,extra){
 const speed=type==="warhead"?WARHEAD.speed:STRIKES[type].speed;const dx=tx-sx,dy=ty-sy;const dur=Math.max(1,Math.ceil(Math.sqrt(dx*dx+dy*dy)/speed));return{id:game.
-nextId(),owner,type,sx,sy,tx,ty,x:sx,y:sy,t:0,dur,targetBuilding:-1,intercepted:false,from:-1,lvl:0,victim:-1,sel:0,...extra}}function runStrike(game,pid,cmd){const s=game.
-s,p=s.players[pid];const kind=cmd.kind,def=STRIKES[kind];const b=game.buildingById(cmd.from);const aim=aimPoint(game,kind,cmd.x,cmd.y);let tx=aim.x,ty=aim.y,targetBuilding=-1;
-if(def.point){const t=strikeTarget(game,pid,cmd.x,cmd.y,def.pick);tx=t.x+.5;ty=t.y+.5;targetBuilding=t.id}p.gold-=def.cost;b.cd=reloadOf(b);const sx=b.x+.5,sy=b.
-y+.5;const pr=makeProjectile(game,pid,kind,sx,sy,tx,ty,{targetBuilding,from:b.id,lvl:p.research[def.req[0]]});s.projectiles.push(pr);if(def.nuke)p.stats.nukes++;
-game.emit({k:"launch",pid,kind,x:sx,y:sy,tx,ty,id:pr.id});if(kind==="mega"){game.msg(-1,`${p.name} \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B \u043C\u0435\u0433\u0430\u0431\u043E\u043C\u0431\u0443 \xAB\u0421\u0443\u0434\u043D\u044B\u0439 \u0434\u0435\u043D\u044C\xBB!`,
+nextId(),owner,type,sx,sy,tx,ty,x:sx,y:sy,t:0,dur,targetBuilding:-1,intercepted:false,from:-1,lvl:0,victim:-1,sel:0,...extra}}function boostPoint(game,def,sx,sy,aim){
+let dx=aim.x-sx,dy=aim.y-sy;const d=Math.sqrt(dx*dx+dy*dy);if(d<1){dx=0;dy=-1}else{dx/=d;dy/=d}const L2=def.boost||0;const x=Math.min(game.W-.5,Math.max(.5,sx+dx*
+L2)),y=Math.min(game.H-.5,Math.max(.5,sy+dy*L2));return{x,y}}function runStrike(game,pid,cmd){const s=game.s,p=s.players[pid];const kind=cmd.kind,def=STRIKES[kind];
+const b=game.buildingById(cmd.from);const aim=aimPoint(game,kind,cmd.x,cmd.y);let tx=aim.x,ty=aim.y,targetBuilding=-1;if(def.point){const t=strikeTarget(game,pid,
+cmd.x,cmd.y,def.pick);tx=t.x+.5;ty=t.y+.5;targetBuilding=t.id}const sx=b.x+.5,sy=b.y+.5;if(kind==="mega"){const bp=boostPoint(game,def,sx,sy,aim);tx=bp.x;ty=bp.
+y}p.gold-=strikeCost(game,pid,kind);b.cd=reloadOf(b);const pr=makeProjectile(game,pid,kind,sx,sy,tx,ty,{targetBuilding,from:b.id,lvl:p.research[def.req[0]]});s.
+projectiles.push(pr);if(def.nuke)p.stats.nukes++;game.emit({k:"launch",pid,kind,x:sx,y:sy,tx,ty,id:pr.id});if(kind==="mega"){p.stats.megas=megasUsed(p)+1;game.msg(
+-1,`${p.name} \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u043B \u043C\u0435\u0433\u0430\u0431\u043E\u043C\u0431\u0443 \xAB\u0421\u0443\u0434\u043D\u044B\u0439 \u0434\u0435\u043D\u044C\xBB! \u0427\u0435\u0440\u0435\u0437 ${Math.
+ceil(pr.dur/TICKS_PER_SEC)} \u0441 \u043E\u043D\u0430 \u0440\u0430\u0441\u043F\u0430\u0434\u0451\u0442\u0441\u044F \u043D\u0430 \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043A\u0438`,
 "danger");return}const i=game.tileAt(tx,ty);const o=i>=0?s.owner[i]-1:-1;if(o>=0&&o!==pid)game.msg(o,`${p.name} \u043D\u0430\u043D\u043E\u0441\u0438\u0442 \u043F\u043E \u0432\u0430\u043C \u0443\u0434\u0430\u0440: ${def.
 name}!`,"danger");game.msg(pid,`\u0417\u0430\u043F\u0443\u0441\u043A: ${def.name}`,"info")}function reload(game){for(const b of game.s.buildings){if(b.cd>0&&(b.
-type==="silo"||b.type==="airbase"||b.type==="sam"))b.cd--}}function samDefense(game){const s=game.s,P=s.players;let hit=false;for(const b of s.buildings){if(b.type!==
-"sam"||b.cd>0||!game.buildingActive(b))continue;const owner=P[b.owner];if(!owner||!owner.alive)continue;const R=SAM.radius(b.level),R2=R*R;const bx=b.x+.5,by=b.
-y+.5;let best=null,bp=-1,bd=Infinity;for(const pr of s.projectiles){if(pr.intercepted||pr.owner===b.owner||!game.isHostile(b.owner,pr.owner))continue;const dx=pr.
-x-bx,dy=pr.y-by;const d=dx*dx+dy*dy;if(d>R2)continue;const th=THREAT[pr.type]||0;if(th>bp||th===bp&&d<bd){best=pr;bp=th;bd=d}}if(!best)continue;b.cd=SAM.reload(
-b.level);const ok=game.rand()<interceptChance(best.type,owner.research.aa);game.emit({k:"samShot",id:b.id,x:bx,y:by,tx:best.x,ty:best.y,hit:ok});if(!ok)continue;
-best.intercepted=true;hit=true;game.emit({k:"intercept",x:best.x,y:best.y,kind:best.type,by:b.owner,owner:best.owner});game.msg(b.owner,`\u041F\u0412\u041E \u0441\u0431\u0438\u043B\u0430 \u0446\u0435\u043B\u044C: ${strikeName(
+type==="silo"||b.type==="airbase"||b.type==="sam"))b.cd--}}function interceptPoint(pr,bx,by,R){const dx=pr.x-bx,dy=pr.y-by;if(dx*dx+dy*dy<=R*R)return{x:pr.x,y:pr.
+y};const ex=pr.x-pr.tx,ey=pr.y-pr.ty;const L2=Math.sqrt(ex*ex+ey*ey)||1;const k=Math.min(L2,R*.5)/L2;return{x:pr.tx+ex*k,y:pr.ty+ey*k}}function samDefense(game){
+const s=game.s,P=s.players;let hit=false;for(const b of s.buildings){if(b.type!=="sam"||b.cd>0||!game.buildingActive(b))continue;const owner=P[b.owner];if(!owner||
+!owner.alive)continue;const R=SAM.radius(b.level),R2=R*R;const bx=b.x+.5,by=b.y+.5;let best=null,bp=-1,bd=Infinity;for(const pr of s.projectiles){if(pr.intercepted||
+!INTERCEPT[pr.type]||pr.owner===b.owner||!game.isHostile(b.owner,pr.owner))continue;const dx=pr.x-bx,dy=pr.y-by;let d=dx*dx+dy*dy;if(d>R2&&pr.type==="warhead"&&
+pr.dur-pr.t<=WARHEAD.terminal){const ex=pr.tx-bx,ey=pr.ty-by;d=ex*ex+ey*ey}if(d>R2)continue;const th=THREAT[pr.type]||0;if(th>bp||th===bp&&d<bd){best=pr;bp=th;bd=
+d}}if(!best)continue;b.cd=SAM.reload(b.level);const ok=game.rand()<interceptChance(best.type,owner.research.aa);const aimAt=interceptPoint(best,bx,by,R);game.emit(
+{k:"samShot",id:b.id,x:bx,y:by,tx:aimAt.x,ty:aimAt.y,hit:ok});if(!ok)continue;best.intercepted=true;hit=true;const at=interceptPoint(best,bx,by,R);game.emit({k:"\
+intercept",x:at.x,y:at.y,kind:best.type,by:b.owner,owner:best.owner});game.msg(b.owner,`\u041F\u0412\u041E \u0441\u0431\u0438\u043B\u0430 \u0446\u0435\u043B\u044C: ${strikeName(
 best.type)}`,"good");if(P[best.owner]&&P[best.owner].alive)game.msg(best.owner,`${owner.name}: \u041F\u0412\u041E \u043F\u0435\u0440\u0435\u0445\u0432\u0430\u0442\u0438\u043B\u0430 \u0432\u0430\u0448 \u0443\u0434\u0430\u0440`,
 "danger")}if(hit)s.projectiles=s.projectiles.filter(pr=>!pr.intercepted)}function droneHit(game,pr){const s=game.s;const i=game.tileAt(pr.tx,pr.ty);const o=i>=0?
 s.owner[i]-1:-1;game.emit({k:"impact",kind:pr.type,x:pr.tx,y:pr.ty,r:STRIKES.drone.r,owner:pr.owner});if(o<0||o===pr.owner||!game.isHostile(pr.owner,o))return;const d=s.
 players[o];const k=game.killTroops(o,Math.min(d.troops,STRIKES.drone.killPerLevel*Math.max(1,pr.lvl)),pr.owner);if(k>0)game.msg(o,`\u0423\u0434\u0430\u0440 \u0411\u041F\u041B\u0410: \u043F\u043E\u0442\u0435\u0440\u044F\u043D\u043E ${Math.
 round(k)} \u0432\u043E\u0439\u0441\u043A`,"danger")}function pointHit(game,pr){const b=game.buildingById(pr.targetBuilding);game.emit({k:"impact",kind:pr.type,x:pr.
 tx,y:pr.ty,r:1,owner:pr.owner});if(!b||b.owner===pr.owner||!game.isHostile(pr.owner,b.owner))return;game.destroyBuilding(b,pr.owner)}function nukeArea(game,pr,r,selective){
-const s=game.s,P=s.players,own=s.owner,W=game.W,H=game.H;const by=pr.owner;const spare=o=>selective&&(o===by||!game.isHostile(by,o));const dens=P.map(q=>q.troops/
+const s=game.s,P=s.players,own=s.owner,W=game.W,H=game.H;const by=pr.owner;const spare=o=>o===by||selective&&!game.isHostile(by,o);const dens=P.map(q=>q.troops/
 Math.max(1,q.tiles));const lost=new Float64Array(P.length);const cx=Math.floor(pr.tx),cy=Math.floor(pr.ty),r2=r*r;for(let dy=-r;dy<=r;dy++){const y=cy+dy;if(y<0||
 y>=H)continue;for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r2)continue;const x=cx+dx;if(x<0||x>=W)continue;const i=y*W+x;if(!game.isLandTile(i))continue;const o=own[i]-
 1;if(o>=0){if(spare(o))continue;lost[o]++;game.setOwner(i,-1)}game.setFallout(i,FALLOUT_TICKS)}}const sunk=new Float64Array(P.length);sinkUnitsIn(game,pr.tx,pr.
 ty,r,by,u=>{if(spare(u.owner))return false;if(u.owner>=0&&u.owner<sunk.length)sunk[u.owner]++;return true});for(const q of P){const n=lost[q.id];if(n>0){q.stats.
-tilesLost+=n;game.killTroops(q.id,Math.min(q.troops,n*dens[q.id]*NUKE_TROOP_LOSS),by);if(q.id!==by&&q.alive)game.msg(q.id,`\u042F\u0434\u0435\u0440\u043D\u044B\u0439 \u0443\u0434\u0430\u0440! \u041F\u043E\u0442\u0435\u0440\u044F\u043D\u043E ${n}\
- \u043A\u043B\u0435\u0442\u043E\u043A`,"danger")}if(selective||q.id===by||!n&&!sunk[q.id])continue;const t=game.relation(by,q.id).type;if((t==="alliance"||t==="\
-pact")&&P[by]&&P[by].alive)game.breakRelation(by,q.id,true)}game.emit({k:"nuke",x:pr.tx,y:pr.ty,r,kind:pr.type,owner:by});game.emit({k:"impact",kind:pr.type,x:pr.
-tx,y:pr.ty,r,owner:by});return lost}function megaTargets(game,pid,perPlayer=STRIKES.mega.warheads){const s=game.s,W=game.W,H=game.H,own=s.owner,P=s.players;const G=WARHEAD.
-r;const gw=Math.ceil(W/G),gh=Math.ceil(H/G),C=gw*gh;const slot=new Int32Array(P.length).fill(-1);const vic=hostileVictims(game,pid);vic.forEach((q,k)=>{slot[q]=
-k});if(!vic.length)return[];const cnt=new Float64Array(vic.length*C),sx=new Float64Array(vic.length*C),sy=new Float64Array(vic.length*C);const land=game.landList;
-for(let k=0;k<land.length;k++){const i=land[k];const o=own[i];if(!o)continue;const v=slot[o-1];if(v<0)continue;const x=i%W,y=(i-x)/W;const c=v*C+Math.floor(y/G)*
-gw+Math.floor(x/G);cnt[c]++;sx[c]+=x;sy[c]+=y}const score=Float64Array.from(cnt);for(const b of s.buildings){const v=slot[b.owner];if(v<0)continue;score[v*C+Math.
-floor(b.y/G)*gw+Math.floor(b.x/G)]+=(VALUE[b.type]||100)*b.level}const out=[];for(let v=0;v<vic.length;v++){const base=v*C;const cells=[];for(let c=0;c<C;c++)if(cnt[base+
-c]>0)cells.push(c);cells.sort((a,b)=>score[base+b]-score[base+a]||a-b);const picked=[];const near=c=>picked.some(q=>Math.abs(q%gw-c%gw)<=1&&Math.abs(Math.floor(
-q/gw)-Math.floor(c/gw))<=1);for(const c of cells)if(picked.length<perPlayer&&!near(c))picked.push(c);for(const c of cells)if(picked.length<perPlayer&&!picked.includes(
-c))picked.push(c);for(const c of picked){const k=base+c;out.push({pid:vic[v],x:Math.floor(sx[k]/cnt[k])+.5,y:Math.floor(sy[k]/cnt[k])+.5})}}return out}function splitMega(game,pr,spawned){
-const targets=megaTargets(game,pr.owner);for(const t of targets){spawned.push(makeProjectile(game,pr.owner,"warhead",pr.x,pr.y,t.x,t.y,{victim:t.pid,sel:1,from:pr.
-from}))}game.emit({k:"impact",kind:"mega",x:pr.x,y:pr.y,r:0,owner:pr.owner,warheads:targets.length})}function impact(game,pr,spawned){switch(pr.type){case"drone":
-droneHit(game,pr);break;case"kamikaze":case"cruise":pointHit(game,pr);break;case"atom":case"hbomb":nukeArea(game,pr,STRIKES[pr.type].r,false);break;case"warhead":
-nukeArea(game,pr,WARHEAD.r,true);break;case"mega":splitMega(game,pr,spawned);break;default:break}}function fly(game){const s=game.s;const list=s.projectiles;const keep=[],
-spawned=[];for(const pr of list){if(pr.intercepted)continue;pr.t++;const k=pr.t>=pr.dur?1:pr.t/pr.dur;pr.x=pr.sx+(pr.tx-pr.sx)*k;pr.y=pr.sy+(pr.ty-pr.sy)*k;if(pr.
-t<pr.dur)keep.push(pr);else impact(game,pr,spawned)}s.projectiles=spawned.length?keep.concat(spawned):keep}function tickStrikes(game){const s=game.s;if(s.phase!==
-"play")return;reload(game);if(!s.projectiles.length)return;if(s.tick%SAM.every===0)samDefense(game);fly(game)}var diplomacy_exports={};__export(diplomacy_exports,{INTENTS:()=>INTENTS5,TRAITOR_TICKS:()=>TRAITOR_TICKS2,answer:()=>answer,breakRelation:()=>breakRelation,embargoBy:()=>embargoBy,
-establish:()=>establish,hasTradeTreaty:()=>hasTradeTreaty,markTraitor:()=>markTraitor,proposeError:()=>proposeError,relKey:()=>relKey,tickDiplomacy:()=>tickDiplomacy});var territory_exports={};__export(territory_exports,{INTENTS:()=>INTENTS4,bordersByLand:()=>bordersByLand,cancelAttacks:()=>cancelAttacks,pickSpawn:()=>pickSpawn,
+tilesLost+=n;game.killTroops(q.id,Math.min(q.troops,n*dens[q.id]*NUKE_TROOP_LOSS),by);if(q.id!==by&&q.alive&&pr.type!=="warhead")game.msg(q.id,`\u042F\u0434\u0435\u0440\u043D\u044B\u0439 \u0443\u0434\u0430\u0440! \u041F\u043E\
+\u0442\u0435\u0440\u044F\u043D\u043E ${n} \u043A\u043B\u0435\u0442\u043E\u043A`,"danger")}if(selective||q.id===by||!n&&!sunk[q.id])continue;const t=game.relation(
+by,q.id).type;if((t==="alliance"||t==="pact")&&P[by]&&P[by].alive)game.breakRelation(by,q.id,true)}game.emit({k:"nuke",x:pr.tx,y:pr.ty,r,kind:pr.type,owner:by});
+game.emit({k:"impact",kind:pr.type,x:pr.tx,y:pr.ty,r,owner:by});return lost}var megaCell=()=>Math.max(1,Math.floor(Math.sqrt(WARHEAD.perTiles)));var SPREAD=[[0,
+0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];function megaTargets(game,pid){const s=game.s,W=game.W,H=game.H,own=s.owner,P=s.players;const vic=hostileVictims(
+game,pid);if(!vic.length)return[];const G=megaCell();const gw=Math.ceil(W/G),gh=Math.ceil(H/G),C=gw*gh;const slot=new Int32Array(P.length).fill(-1);vic.forEach(
+(q,k)=>{slot[q]=k});const per=new Int32Array(vic.length*C);const land=game.landList;for(let k=0;k<land.length;k++){const i=land[k];const o=own[i];if(!o)continue;
+const v=slot[o-1];if(v<0)continue;const x=i%W,y=(i-x)/W;per[v*C+Math.floor(y/G)*gw+Math.floor(x/G)]++}const center2=(c,k)=>{const gx=c%gw,gy=(c-gx)/gw;const x0=gx*
+G,y0=gy*G,x1=Math.min(W,x0+G),y1=Math.min(H,y0+G);const[ox,oy]=SPREAD[k%SPREAD.length];const d=Math.floor(G/3);const x=Math.min(W-1,Math.max(0,Math.floor((x0+x1-
+1)/2)+ox*d));const y=Math.min(H-1,Math.max(0,Math.floor((y0+y1-1)/2)+oy*d));return{x:x+.5,y:y+.5}};const out=[];const count=new Int32Array(vic.length);for(let c=0;c<
+C;c++){let best=-1,bn=0;for(let v=0;v<vic.length;v++){const n=per[v*C+c];if(n>bn){bn=n;best=v}}if(best<0)continue;out.push({pid:vic[best],...center2(c,0)});count[best]++}
+for(let v=0;v<vic.length;v++){if(count[v]>=WARHEAD.min)continue;const cells=[];for(let c=0;c<C;c++)if(per[v*C+c]>0)cells.push(c);cells.sort((a,b)=>per[v*C+b]-per[v*
+C+a]||a-b);for(let k=0;count[v]<WARHEAD.min;k++){const c=cells[k%cells.length];out.push({pid:vic[v],...center2(c,1+Math.floor(k/cells.length))});count[v]++}}return out}
+function warheadFlight(sx,sy,tx,ty,k){const dx=tx-sx,dy=ty-sy;const base=Math.ceil(Math.sqrt(dx*dx+dy*dy)/WARHEAD.speed);return Math.min(WARHEAD.maxFlight,Math.
+max(WARHEAD.minFlight,base))+k*7%WARHEAD.stagger}function splitMega(game,pr,spawned){const s=game.s,P=s.players;const targets=megaTargets(game,pr.owner);const per=new Int32Array(
+P.length);targets.forEach((t,k)=>{const dur=warheadFlight(pr.x,pr.y,t.x,t.y,k);spawned.push(makeProjectile(game,pr.owner,"warhead",pr.x,pr.y,t.x,t.y,{victim:t.pid,
+sel:1,from:pr.from,dur}));per[t.pid]++});game.emit({k:"impact",kind:"mega",x:pr.x,y:pr.y,r:0,owner:pr.owner,warheads:targets.length});for(const q of P){if(per[q.
+id]>0&&q.alive)game.msg(q.id,`\xAB\u0421\u0443\u0434\u043D\u044B\u0439 \u0434\u0435\u043D\u044C\xBB: \u043D\u0430 \u0432\u0430\u0448\u0443 \u0441\u0442\u0440\u0430\u043D\u0443 \u043B\u0435\u0442\u044F\u0442 ${per[q.
+id]} \u044F\u0434\u0435\u0440\u043D\u044B\u0445 \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043E\u043A!`,"danger")}if(P[pr.owner])game.msg(pr.owner,`\u041C\u0435\u0433\u0430\u0431\
+\u043E\u043C\u0431\u0430 \u0440\u0430\u0441\u043F\u0430\u043B\u0430\u0441\u044C \u043D\u0430 ${targets.length} \u0431\u043E\u0435\u0433\u043E\u043B\u043E\u0432\u043E\u043A`,
+"info")}function impact(game,pr,spawned){switch(pr.type){case"drone":droneHit(game,pr);break;case"kamikaze":case"cruise":pointHit(game,pr);break;case"atom":case"\
+hbomb":nukeArea(game,pr,STRIKES[pr.type].r,false);break;case"warhead":nukeArea(game,pr,WARHEAD.r,true);break;case"mega":splitMega(game,pr,spawned);break;default:
+break}}function fly(game){const s=game.s;const list=s.projectiles;const keep=[],spawned=[];for(const pr of list){if(pr.intercepted)continue;pr.t++;const k=pr.t>=
+pr.dur?1:pr.t/pr.dur;pr.x=pr.sx+(pr.tx-pr.sx)*k;pr.y=pr.sy+(pr.ty-pr.sy)*k;if(pr.t<pr.dur)keep.push(pr);else impact(game,pr,spawned)}s.projectiles=spawned.length?
+keep.concat(spawned):keep}function tickStrikes(game){const s=game.s;if(s.phase!=="play")return;reload(game);if(!s.projectiles.length)return;if(s.tick%SAM.every===
+0)samDefense(game);fly(game)}var diplomacy_exports={};__export(diplomacy_exports,{INTENTS:()=>INTENTS5,TRAITOR_TICKS:()=>TRAITOR_TICKS2,answer:()=>answer,breakMakesTraitor:()=>breakMakesTraitor,
+breakRelation:()=>breakRelation,embargoBy:()=>embargoBy,establish:()=>establish,hasTradeTreaty:()=>hasTradeTreaty,hasTreaty:()=>hasTreaty,isProposal:()=>isProposal,
+makeRelation:()=>makeRelation,markTraitor:()=>markTraitor,proposeError:()=>proposeError,relKey:()=>relKey,tickDiplomacy:()=>tickDiplomacy,treaties:()=>treaties});var territory_exports={};__export(territory_exports,{INTENTS:()=>INTENTS4,bordersByLand:()=>bordersByLand,cancelAttacks:()=>cancelAttacks,pickSpawn:()=>pickSpawn,
 placeSpawn:()=>placeSpawn,spawnTicks:()=>spawnTicks,startAttack:()=>startAttack,tickTerritory:()=>tickTerritory,tileCost:()=>tileCost});var NO_BORDER="\u041D\u0435\u0442 \u043E\u0431\u0449\u0435\u0439 \u0433\u0440\u0430\u043D\u0438\u0446\u044B \u2014 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0432\u044B\u0441\u0430\u0434\u043A\u0443";
 var KEEP=0;var END=1;var DROP=2;var spawnTicks=s=>s.settings.spawnSeconds*TICKS_PER_SEC;var INTENTS4={spawn:{phase:"spawn",check:checkSpawn,run:runSpawn},attack:{
 check:checkAttack,run:runAttack}};function clampRatio2(r){const v=Number(r);if(!Number.isFinite(v))return .3;return Math.min(1,Math.max(.01,v))}function spawnError(game,pid,i){
@@ -2712,10 +2778,10 @@ if(d>=minD){if(score>bestScore){bestScore=score;best=i}}else if(score>fbScore){f
 land.length;k++)if(!s.owner[land[k]]&&!s.fallout[land[k]])return land[k];return-1}function finishSpawn(game){const s=game.s;for(const p of s.players){if(!p.alive||
 p.spawned)continue;const i=pickSpawn(game,p.id);if(i>=0)placeSpawn(game,p.id,i)}s.phase="play";game.emit({k:"phase",phase:"play"});game.msg(-1,"\u041C\u0435\u0441\u0442\u0430 \u0432\u044B\u0431\u0440\u0430\u043D\u044B \u2014 \
 \u0432 \u0431\u043E\u0439!","good")}function bordersByLand(game,pid,i){if(!game.isLandTile(i)||!game.borders[pid])return false;const s=game.s,own=s.owner,W=game.
-W,N=game.N;const lm=game.landId[i];if(!game.ownsOnLandmass(pid,lm))return false;const tOwner=own[i];if(tOwner===pid+1)return false;const fo=s.fallout;const okTile=j=>own[j]===
-tOwner&&game.landId[j]===lm&&(tOwner===0||fo[j]===0);for(const j of game.borders[pid]){if(game.landId[j]!==lm)continue;const x=j%W;if(x>0&&okTile(j-1)||x<W-1&&okTile(
-j+1)||j>=W&&okTile(j-W)||j<N-W&&okTile(j+W))return true}return false}function checkAttack(game,pid,cmd){const s=game.s;const i=game.tileAt(cmd.x,cmd.y);if(i<0)return"\
-\u0422\u043E\u0447\u043A\u0430 \u0432\u043D\u0435 \u043A\u0430\u0440\u0442\u044B";if(!game.isLandTile(i))return"\u0417\u0434\u0435\u0441\u044C \u0432\u043E\u0434\u0430 \u2014 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u0443\u0448\u0443";
+W,N=game.N;const lm=game.landId[i];if(!game.ownsOnLandmass(pid,lm))return false;const tOwner=own[i];if(tOwner===pid+1)return false;const okTile=j=>own[j]===tOwner&&
+game.landId[j]===lm;for(const j of game.borders[pid]){if(game.landId[j]!==lm)continue;const x=j%W;if(x>0&&okTile(j-1)||x<W-1&&okTile(j+1)||j>=W&&okTile(j-W)||j<
+N-W&&okTile(j+W))return true}return false}function checkAttack(game,pid,cmd){const s=game.s;const i=game.tileAt(cmd.x,cmd.y);if(i<0)return"\u0422\u043E\u0447\u043A\u0430 \u0432\u043D\u0435 \u043A\u0430\u0440\u0442\u044B";
+if(!game.isLandTile(i))return"\u0417\u0434\u0435\u0441\u044C \u0432\u043E\u0434\u0430 \u2014 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u0443\u0448\u0443";
 const target=s.owner[i]-1;if(target===pid)return"\u042D\u0442\u043E \u0432\u0430\u0448\u0430 \u0442\u0435\u0440\u0440\u0438\u0442\u043E\u0440\u0438\u044F";if(target>=
 0&&!game.isHostile(pid,target))return"\u041D\u0435\u043B\u044C\u0437\u044F \u043D\u0430\u043F\u0430\u0434\u0430\u0442\u044C \u043D\u0430 \u0441\u043E\u044E\u0437\u043D\u0438\u043A\u0430 \u0438\u043B\u0438 \u043F\u0430\u0440\u0442\u043D\u0451\u0440\u0430 \u043F\u043E \u043F\u0430\u043A\u0442\u0443";
 const troops=Math.floor(s.players[pid].troops*clampRatio2(cmd.ratio));if(troops<1)return"\u041D\u0435\u0434\u043E\u0441\u0442\u0430\u0442\u043E\u0447\u043D\u043E \u0432\u043E\u0439\u0441\u043A";
@@ -2724,34 +2790,33 @@ floor(p.troops*clampRatio2(cmd.ratio));p.troops-=troops;startAttack(game,pid,s.o
 s;troops=Math.max(0,Number(troops)||0);if(landing<0){for(const a2 of s.attacks){if(a2.attacker===pid&&a2.target===target&&a2.landing<0&&!a2.local){a2.troops+=troops;
 return a2}}}const a={id:s.nextId++,attacker:pid,target,troops,landing,local:landing>=0,front:[],scan:0};if(landing<0)rescan(game,a);s.attacks.push(a);if(target>=
 0&&s.players[target]){game.msg(target,`${s.players[pid].name} \u043D\u0430\u043F\u0430\u0434\u0430\u0435\u0442 \u043D\u0430 \u0432\u0430\u0441!`,"danger")}return a}
-function rescan(game,a){const s=game.s,own=s.owner,fo=s.fallout,terrain=game.map.terrain,W=game.W,N=game.N;const tOwner=a.target+1;const mark=game.mark,st=game.
-nextStamp();const out=[];const add=j=>{if(own[j]!==tOwner||terrain[j]<2||mark[j]===st)return;if(tOwner&&fo[j])return;mark[j]=st;out.push(j)};const border=game.borders[a.
-attacker];if(border){for(const j of border){const x=j%W;if(x>0)add(j-1);if(x<W-1)add(j+1);if(j>=W)add(j-W);if(j<N-W)add(j+W)}}out.sort((p,q)=>p-q);a.front=out;a.
-scan=s.tick+ECON.frontRescan}function nbCount(own,W,N,i,v){const x=i%W;let n=0;if(x>0&&own[i-1]===v)n++;if(x<W-1&&own[i+1]===v)n++;if(i>=W&&own[i-W]===v)n++;if(i<
-N-W&&own[i+W]===v)n++;return n}function gather(game,a,k,out){const s=game.s,own=s.owner,fo=s.fallout,terrain=game.map.terrain,W=game.W,N=game.N;const tOwner=a.target+
-1,me=a.attacker+1;const F=a.front;const mark=game.mark,st=game.nextStamp();const valid=i=>own[i]===tOwner&&terrain[i]>=2&&(tOwner===0||fo[i]===0)&&nbCount(own,W,
-N,i,me)>0;out.length=0;if(F.length<=k){let w=0;for(let r=0;r<F.length;r++){const i=F[r];if(mark[i]===st||!valid(i))continue;mark[i]=st;F[w++]=i;out.push(i)}F.length=
-w}else{for(let t=0;t<k&&F.length;t++){const r=Math.floor(game.rand()*F.length);const i=F[r];if(!valid(i)){F[r]=F[F.length-1];F.pop();continue}if(mark[i]===st)continue;
-mark[i]=st;out.push(i)}}return out}function fortBonus(game,pid,i){const list=game.fortList(pid);if(!list.length)return 1;const W=game.W,x=i%W,y=(i-x)/W;const R2=ECON.
-fortRadius*ECON.fortRadius;let best=1;for(let k=0;k<list.length;k+=3){const dx=list[k]-x,dy=list[k+1]-y;if(dx*dx+dy*dy>R2)continue;const v=ECON.fortBonus*(1+ECON.
-fortLevelBonus*(list[k+2]-1));if(v>best)best=v}return best}function tileCost(game,attacker,target,i,atkMul,defMul){const t=game.map.terrain[i];if(target<0)return ECON.
-neutralCost*TERRAIN_COST[t]*(game.s.fallout[i]?ECON.falloutCostMul:1);const d=game.s.players[target];const density=d.troops/Math.max(1,d.tiles);const am=atkMul===
-void 0?game.attackMult(attacker):atkMul;const dm=defMul===void 0?game.defenseMult(target):defMul;return(ECON.tileCost+density*ECON.densityCost)*TERRAIN_COST[t]*
-TERRAIN_DEF[t]*fortBonus(game,target,i)*dm/am}function capture(game,a,i,cost){const s=game.s,att=s.players[a.attacker];a.troops-=cost;if(a.target>=0){const d=s.
-players[a.target];const density=d.troops/Math.max(1,d.tiles);const loss=Math.min(d.troops,density*ECON.defenderLoss);d.troops-=loss;att.stats.kills+=loss;d.stats.
-kills+=cost;d.stats.tilesLost++}game.setOwner(i,a.attacker);att.stats.tilesCaptured++}function pushNeighbors(game,a,i){const s=game.s,own=s.owner,fo=s.fallout,terrain=game.
-map.terrain,W=game.W,N=game.N;const tOwner=a.target+1,F=a.front;const x=i%W;const add=j=>{if(own[j]===tOwner&&terrain[j]>=2&&(tOwner===0||fo[j]===0))F.push(j)};
-if(x>0)add(i-1);if(x<W-1)add(i+1);if(i>=W)add(i-W);if(i<N-W)add(i+W)}var scratch={cands:[],b2:[],b1:[],key:[]};function stepLanding(game,a){const s=game.s,i=a.landing;
-if(!game.isLandTile(i))return END;const o=s.owner[i];if(o===a.attacker+1)return END;a.target=o-1;if(a.target>=0){const d=s.players[a.target];if(!d.alive||!game.
-isHostile(a.attacker,a.target))return END}const cost=tileCost(game,a.attacker,a.target,i);if(a.troops<cost)return END;capture(game,a,i,cost);a.landing=-1;a.local=
-true;a.front=[];pushNeighbors(game,a,i);a.scan=s.tick+ECON.frontRescan;return KEEP}function stepAttack(game,a){const s=game.s,P=s.players;const att=P[a.attacker];
-if(!att||!att.alive)return DROP;if(a.target>=0){const d=P[a.target];if(!d||!d.alive||!game.isHostile(a.attacker,a.target))return END}if(a.troops<1)return END;if(a.
-landing>=0)return stepLanding(game,a);if(!a.local&&s.tick>=a.scan)rescan(game,a);const speed=1+ECON.logisticsSpeed*att.research.logistics;const n=Math.max(1,Math.
-floor(Math.sqrt(a.troops)*ECON.captureRate*speed));let cands=gather(game,a,n*ECON.sampleMul,scratch.cands);if(!cands.length){if(a.local||a.scan===s.tick+ECON.frontRescan)
-return END;rescan(game,a);cands=gather(game,a,n*ECON.sampleMul,scratch.cands);if(!cands.length)return END}const own=s.owner,W=game.W,N=game.N,me=a.attacker+1;const b2=scratch.
-b2,b1=scratch.b1,key=scratch.key,terrain=game.map.terrain;b2.length=0;b1.length=0;for(let k=0;k<cands.length;k++){const i=cands[k];const c=nbCount(own,W,N,i,me);
-if(c>=3)b2.push(c*16777216+k);else{key[k]=game.rand()*(c===2?2:1)/TERRAIN_COST[terrain[i]];b1.push(k)}}if(b2.length>1)b2.sort((p,q)=>q-p);if(b1.length>1)b1.sort(
-(p,q)=>key[q]-key[p]||p-q);const atkMul=a.target>=0?game.attackMult(a.attacker):1;const defMul=a.target>=0?game.defenseMult(a.target):1;let taken=0;for(let k=0;k<
+function rescan(game,a){const s=game.s,own=s.owner,terrain=game.map.terrain,W=game.W,N=game.N;const tOwner=a.target+1;const mark=game.mark,st=game.nextStamp();const out=[];
+const add=j=>{if(own[j]!==tOwner||terrain[j]<2||mark[j]===st)return;mark[j]=st;out.push(j)};const border=game.borders[a.attacker];if(border){for(const j of border){
+const x=j%W;if(x>0)add(j-1);if(x<W-1)add(j+1);if(j>=W)add(j-W);if(j<N-W)add(j+W)}}out.sort((p,q)=>p-q);a.front=out;a.scan=s.tick+ECON.frontRescan}function nbCount(own,W,N,i,v){
+const x=i%W;let n=0;if(x>0&&own[i-1]===v)n++;if(x<W-1&&own[i+1]===v)n++;if(i>=W&&own[i-W]===v)n++;if(i<N-W&&own[i+W]===v)n++;return n}function gather(game,a,k,out){
+const s=game.s,own=s.owner,terrain=game.map.terrain,W=game.W,N=game.N;const tOwner=a.target+1,me=a.attacker+1;const F=a.front;const mark=game.mark,st=game.nextStamp();
+const valid=i=>own[i]===tOwner&&terrain[i]>=2&&nbCount(own,W,N,i,me)>0;out.length=0;if(F.length<=k){let w=0;for(let r=0;r<F.length;r++){const i=F[r];if(mark[i]===
+st||!valid(i))continue;mark[i]=st;F[w++]=i;out.push(i)}F.length=w}else{for(let t=0;t<k&&F.length;t++){const r=Math.floor(game.rand()*F.length);const i=F[r];if(!valid(
+i)){F[r]=F[F.length-1];F.pop();continue}if(mark[i]===st)continue;mark[i]=st;out.push(i)}}return out}function fortBonus(game,pid,i){const list=game.fortList(pid);
+if(!list.length)return 1;const W=game.W,x=i%W,y=(i-x)/W;const R2=ECON.fortRadius*ECON.fortRadius;let best=1;for(let k=0;k<list.length;k+=3){const dx=list[k]-x,dy=list[k+
+1]-y;if(dx*dx+dy*dy>R2)continue;const v=ECON.fortBonus*(1+ECON.fortLevelBonus*(list[k+2]-1));if(v>best)best=v}return best}function tileCost(game,attacker,target,i,atkMul,defMul){
+const t=game.map.terrain[i];const hot=game.s.fallout[i]?ECON.falloutCostMul:1;if(target<0)return ECON.neutralCost*TERRAIN_COST[t]*hot;const d=game.s.players[target];
+const density=d.troops/Math.max(1,d.tiles);const am=atkMul===void 0?game.attackMult(attacker):atkMul;const dm=defMul===void 0?game.defenseMult(target):defMul;return(ECON.
+tileCost+density*ECON.densityCost)*TERRAIN_COST[t]*TERRAIN_DEF[t]*fortBonus(game,target,i)*dm*hot/am}function capture(game,a,i,cost){const s=game.s,att=s.players[a.
+attacker];a.troops-=cost;if(a.target>=0){const d=s.players[a.target];const density=d.troops/Math.max(1,d.tiles);const loss=Math.min(d.troops,density*ECON.defenderLoss);
+d.troops-=loss;att.stats.kills+=loss;d.stats.kills+=cost;d.stats.tilesLost++}game.setOwner(i,a.attacker);att.stats.tilesCaptured++}function pushNeighbors(game,a,i){
+const s=game.s,own=s.owner,terrain=game.map.terrain,W=game.W,N=game.N;const tOwner=a.target+1,F=a.front;const x=i%W;const add=j=>{if(own[j]===tOwner&&terrain[j]>=
+2)F.push(j)};if(x>0)add(i-1);if(x<W-1)add(i+1);if(i>=W)add(i-W);if(i<N-W)add(i+W)}var scratch={cands:[],b2:[],b1:[],key:[]};function stepLanding(game,a){const s=game.
+s,i=a.landing;if(!game.isLandTile(i))return END;const o=s.owner[i];if(o===a.attacker+1)return END;a.target=o-1;if(a.target>=0){const d=s.players[a.target];if(!d.
+alive||!game.isHostile(a.attacker,a.target))return END}const cost=tileCost(game,a.attacker,a.target,i);if(a.troops<cost)return END;capture(game,a,i,cost);a.landing=
+-1;a.local=true;a.front=[];pushNeighbors(game,a,i);a.scan=s.tick+ECON.frontRescan;return KEEP}function stepAttack(game,a){const s=game.s,P=s.players;const att=P[a.
+attacker];if(!att||!att.alive)return DROP;if(a.target>=0){const d=P[a.target];if(!d||!d.alive||!game.isHostile(a.attacker,a.target))return END}if(a.troops<1)return END;
+if(a.landing>=0)return stepLanding(game,a);if(!a.local&&s.tick>=a.scan)rescan(game,a);const speed=1+ECON.logisticsSpeed*att.research.logistics;const n=Math.max(
+1,Math.floor(Math.sqrt(a.troops)*ECON.captureRate*speed));let cands=gather(game,a,n*ECON.sampleMul,scratch.cands);if(!cands.length){if(a.local||a.scan===s.tick+
+ECON.frontRescan)return END;rescan(game,a);cands=gather(game,a,n*ECON.sampleMul,scratch.cands);if(!cands.length)return END}const own=s.owner,W=game.W,N=game.N,me=a.
+attacker+1;const b2=scratch.b2,b1=scratch.b1,key=scratch.key,terrain=game.map.terrain;b2.length=0;b1.length=0;for(let k=0;k<cands.length;k++){const i=cands[k];const c=nbCount(
+own,W,N,i,me);if(c>=3)b2.push(c*16777216+k);else{key[k]=game.rand()*(c===2?2:1)/TERRAIN_COST[terrain[i]];b1.push(k)}}if(b2.length>1)b2.sort((p,q)=>q-p);if(b1.length>
+1)b1.sort((p,q)=>key[q]-key[p]||p-q);const atkMul=a.target>=0?game.attackMult(a.attacker):1;const defMul=a.target>=0?game.defenseMult(a.target):1;let taken=0;for(let k=0;k<
 b2.length+b1.length&&taken<n;k++){const i=cands[k<b2.length?b2[k]%16777216:b1[k-b2.length]];if(own[i]!==a.target+1)continue;const cost=tileCost(game,a.attacker,
 a.target,i,atkMul,defMul);if(a.troops<cost)return END;capture(game,a,i,cost);pushNeighbors(game,a,i);taken++}return KEEP}function tickAttacks(game){const s=game.
 s;if(!s.attacks.length)return;const keep=[];for(let k=0;k<s.attacks.length;k++){const a=s.attacks[k];const r=stepAttack(game,a);if(r===KEEP){keep.push(a);continue}
@@ -2771,52 +2836,61 @@ comp=found[k+1];for(const i of comp)game.setOwner(i,q);s.players[q].stats.tilesC
 \u0432 ${p.name} (${comp.length} \u043A\u043B.) \u043F\u0440\u0438\u0441\u043E\u0435\u0434\u0438\u043D\u0451\u043D`,"good")}}}function spawnAIs(game){for(const p of game.
 s.players){if(!p.alive||!p.ai||p.spawned)continue;const i=pickSpawn(game,p.id);if(i>=0)placeSpawn(game,p.id,i)}}function tickTerritory(game){const s=game.s;if(s.
 phase==="spawn"){spawnAIs(game);if(s.tick+1>=spawnTicks(s))finishSpawn(game);return}if(s.phase!=="play")return;tickAttacks(game);tickFallout(game);tickEnclaves(
-game)}var TRAITOR_TICKS2=DIPLO.traitorTicks;var relKey=(a,b)=>a<b?a+":"+b:b+":"+a;var TYPE_ACC={alliance:"\u0441\u043E\u044E\u0437",pact:"\u043F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438",
-trade:"\u0442\u043E\u0440\u0433\u043E\u0432\u044B\u0439 \u0434\u043E\u0433\u043E\u0432\u043E\u0440"};var INTENTS5={propose:{phase:"any",check:checkPropose,run:runPropose},
-respond:{phase:"any",check:checkRespond,run:runRespond},break:{phase:"any",check:checkBreak,run:runBreak},embargo:{phase:"any",check:checkEmbargo,run:runEmbargo}};
-function otherPlayer(game,pid,v){const q=Number(v);if(!Number.isInteger(q)||q===pid||!game.s.players[q])return-1;return q}function hasTradeTreaty(game,a,b){const t=game.
-relation(a,b).type;return t==="trade"||t==="alliance"}function pendingRequest(game,a,b,type){for(const r of game.s.requests){if(r.type===type&&(r.from===a&&r.to===
-b||r.from===b&&r.to===a))return r}return null}function proposeError(game,pid,to,type){const q=otherPlayer(game,pid,to);if(q<0)return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";
-if(!game.s.players[q].alive)return"\u042D\u0442\u043E\u0442 \u0438\u0433\u0440\u043E\u043A \u0432\u044B\u0431\u044B\u043B";if(typeof type!=="string"||!PROPOSALS[type])
-return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0442\u0438\u043F \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430";const cur=game.relation(
-pid,q).type;if(cur===type)return"\u0422\u0430\u043A\u043E\u0439 \u0434\u043E\u0433\u043E\u0432\u043E\u0440 \u0443\u0436\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442";
-if(cur==="alliance")return"\u0421\u043E\u044E\u0437 \u0443\u0436\u0435 \u0432\u043A\u043B\u044E\u0447\u0430\u0435\u0442 \u043F\u0430\u043A\u0442 \u0438 \u0442\u043E\u0440\u0433\u043E\u0432\u043B\u044E";
-const r=pendingRequest(game,pid,q,type);if(r&&r.from===pid)return"\u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0443\u0436\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E";
+game)}var TRAITOR_TICKS2=DIPLO.traitorTicks;var relKey=(a,b)=>a<b?a+":"+b:b+":"+a;var has3=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var TYPE_ACC={
+alliance:"\u0441\u043E\u044E\u0437",pact:"\u043F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438",trade:"\u0442\u043E\u0440\u0433\u043E\u0432\u044B\u0439 \u0434\u043E\
+\u0433\u043E\u0432\u043E\u0440"};var MILITARY={none:true,pact:true,alliance:true};var isProposal=type=>has3(PROPOSALS,type);function makeRelation(src){const r=src&&
+typeof src==="object"?src:{};const legacyTrade=r.type==="trade";const type=!legacyTrade&&has3(MILITARY,r.type)?r.type:"none";const emb=(r.emb|0)&3;return{type,until:type===
+"pact"&&Number.isFinite(r.until)?r.until:0,trade:legacyTrade||r.trade===true,embargo:emb!==0,emb}}var idle=r=>r.type==="none"&&!r.trade&&!r.embargo;var INTENTS5={
+propose:{phase:"any",check:checkPropose,run:runPropose},respond:{phase:"any",check:checkRespond,run:runRespond},break:{phase:"any",check:checkBreak,run:runBreak},
+embargo:{phase:"any",check:checkEmbargo,run:runEmbargo}};function otherPlayer(game,pid,v){const q=Number(v);if(!Number.isInteger(q)||q===pid||!game.s.players[q])
+return-1;return q}function hasTradeTreaty(game,a,b){const r=game.relation(a,b);return r.type==="alliance"||r.trade===true}function treaties(game,a,b){const r=game.
+relation(a,b);return{type:r.type,until:r.until,trade:r.trade===true,embargo:!!r.embargo}}function hasTreaty(game,a,b){const r=game.relation(a,b);return r.type!==
+"none"||r.trade===true}function coveredBy(game,a,b,type){const rel=game.relation(a,b);if(rel.type==="alliance")return type==="alliance"?"\u0421\u043E\u044E\u0437 \u0443\u0436\u0435 \u0437\u0430\u043A\u043B\u044E\u0447\u0451\u043D":
+"\u0421\u043E\u044E\u0437 \u0443\u0436\u0435 \u0432\u043A\u043B\u044E\u0447\u0430\u0435\u0442 \u043F\u0430\u043A\u0442 \u0438 \u0442\u043E\u0440\u0433\u043E\u0432\u043B\u044E";
+if(type==="pact"&&rel.type==="pact")return"\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438 \u0443\u0436\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442";
+if(type==="trade"&&rel.trade)return"\u0422\u043E\u0440\u0433\u043E\u0432\u044B\u0439 \u0434\u043E\u0433\u043E\u0432\u043E\u0440 \u0443\u0436\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442";
+return null}function pendingRequest(game,a,b,type){for(const r of game.s.requests){if(r.type===type&&(r.from===a&&r.to===b||r.from===b&&r.to===a))return r}return null}
+function proposeError(game,pid,to,type){const q=otherPlayer(game,pid,to);if(q<0)return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";
+if(!game.s.players[q].alive)return"\u042D\u0442\u043E\u0442 \u0438\u0433\u0440\u043E\u043A \u0432\u044B\u0431\u044B\u043B";if(!isProposal(type))return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\
+\u044B\u0439 \u0442\u0438\u043F \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430";const dup=coveredBy(game,pid,q,type);if(dup)return dup;const r=pendingRequest(
+game,pid,q,type);if(r&&r.from===pid)return"\u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0443\u0436\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E";
 return null}function checkPropose(game,pid,cmd){return proposeError(game,pid,cmd.to,cmd.type)}function runPropose(game,pid,cmd){const s=game.s;const to=Number(cmd.
-to);const back=pendingRequest(game,pid,to,cmd.type);if(back){s.requests=s.requests.filter(r=>r!==back);establish(game,pid,to,cmd.type);return}const req={id:game.
-nextId(),from:pid,to,type:cmd.type,expires:s.tick+DIPLO.requestTicks,at:s.tick};s.requests.push(req);game.emit({k:"request",req:{...req}});game.msg(to,`${s.players[pid].
-name} \u043F\u0440\u0435\u0434\u043B\u0430\u0433\u0430\u0435\u0442 ${TYPE_ACC[req.type]}`,"info");game.msg(pid,`\u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E: ${s.
-players[to].name}`,"info")}function checkRespond(game,pid,cmd){const id=Number(cmd.id);const r=game.s.requests.find(q=>q.id===id);if(!r||r.to!==pid)return"\u041F\u0440\u0435\u0434\u043B\
-\u043E\u0436\u0435\u043D\u0438\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";return null}function runRespond(game,pid,cmd){const id=Number(cmd.
-id);const r=game.s.requests.find(q=>q.id===id);answer(game,r,!!cmd.accept)}function answer(game,r,accept){const s=game.s;s.requests=s.requests.filter(q=>q!==r);
-const from=s.players[r.from],to=s.players[r.to];if(!from||!to||!from.alive||!to.alive)return;if(accept){establish(game,r.from,r.to,r.type)}else{game.msg(r.from,
-`${to.name} \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B ${TYPE_ACC[r.type]}`,"info")}}function establish(game,a,b,type){const s=game.s;const key=relKey(a,b);
-const prev=s.relations[key];const emb=prev?prev.emb|0:0;s.relations[key]={type,until:type==="pact"?s.tick+DIPLO.pactTicks:0,embargo:emb!==0,emb};if(type==="alli\
-ance"||type==="pact"){cancelAttacks(game,x=>x.attacker===a&&x.target===b||x.attacker===b&&x.target===a)}game.emit({k:"relation",a,b,type});const A=s.players[a],
-B=s.players[b];const text=RELATIONS[type];game.msg(a,`${text}: ${B.name}`,"good");game.msg(b,`${text}: ${A.name}`,"good")}function markTraitor(game,pid){const p=game.
-s.players[pid];if(!p)return;p.traitorUntil=game.s.tick+TRAITOR_TICKS2}function breakRelation(game,a,b,traitor=false){const s=game.s;const key=relKey(a,b);const r=s.
-relations[key];if(!r||r.type==="none")return false;const was=r.type;r.type="none";r.until=0;if(!r.embargo)delete s.relations[key];if(traitor){markTraitor(game,a);
-game.msg(-1,`${s.players[a].name} \u043D\u0430\u0440\u0443\u0448\u0438\u043B \u0434\u043E\u0433\u043E\u0432\u043E\u0440 \u0438 \u0441\u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044F \u043F\u0440\u0435\u0434\u0430\u0442\u0435\u043B\u0435\u043C`,
-"danger")}game.emit({k:"relation",a,b,type:"none"});game.msg(b,`${s.players[a].name} \u0440\u0430\u0437\u043E\u0440\u0432\u0430\u043B \u0434\u043E\u0433\u043E\u0432\u043E\u0440 (${RELATIONS[was]}\
+to);const type=String(cmd.type);const back=pendingRequest(game,pid,to,type);if(back){s.requests=s.requests.filter(r=>r!==back);establish(game,pid,to,type);return}
+const req={id:game.nextId(),from:pid,to,type,expires:s.tick+DIPLO.requestTicks,at:s.tick};s.requests.push(req);game.emit({k:"request",req:{...req}});game.msg(to,
+`${s.players[pid].name} \u043F\u0440\u0435\u0434\u043B\u0430\u0433\u0430\u0435\u0442 ${TYPE_ACC[type]}`,"info");game.msg(pid,`\u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E: ${s.
+players[to].name}`,"info")}function checkRespond(game,pid,cmd){const id=Number(cmd.id);const r=game.s.requests.find(q=>q.id===id);if(!r||r.to!==pid||!isProposal(
+r.type))return"\u041F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E";return null}function runRespond(game,pid,cmd){
+const id=Number(cmd.id);const r=game.s.requests.find(q=>q.id===id);answer(game,r,!!cmd.accept)}function answer(game,r,accept){const s=game.s;s.requests=s.requests.
+filter(q=>q!==r);const from=s.players[r.from],to=s.players[r.to];if(!from||!to||!from.alive||!to.alive||!isProposal(r.type))return;if(accept){if(!coveredBy(game,
+r.from,r.to,r.type))establish(game,r.from,r.to,r.type)}else{game.msg(r.from,`${to.name} \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B ${TYPE_ACC[r.type]}`,"i\
+nfo")}}function establish(game,a,b,type){if(!isProposal(type))return;const s=game.s;const key=relKey(a,b);const r=makeRelation(s.relations[key]);if(type==="trad\
+e")r.trade=true;else{r.type=type;r.until=type==="pact"?s.tick+DIPLO.pactTicks:0}s.relations[key]=r;if(type==="alliance"||type==="pact"){cancelAttacks(game,x=>x.
+attacker===a&&x.target===b||x.attacker===b&&x.target===a)}game.emit({k:"relation",a,b,type:r.type,trade:r.trade});const A=s.players[a],B=s.players[b];const text=RELATIONS[type];
+game.msg(a,`${text}: ${B.name}`,"good");game.msg(b,`${text}: ${A.name}`,"good")}function markTraitor(game,pid){const p=game.s.players[pid];if(!p)return;p.traitorUntil=
+game.s.tick+TRAITOR_TICKS2}function breakRelation(game,a,b,traitor=false){const s=game.s;const key=relKey(a,b);const cur=s.relations[key];if(!cur||cur.type==="n\
+one"&&!cur.trade)return false;const r=makeRelation(cur);const was=r.type!=="none"?r.type:"trade";r.type="none";r.until=0;r.trade=false;if(r.embargo)s.relations[key]=
+r;else delete s.relations[key];if(traitor){markTraitor(game,a);game.msg(-1,`${s.players[a].name} \u043D\u0430\u0440\u0443\u0448\u0438\u043B \u0434\u043E\u0433\u043E\u0432\u043E\u0440 \u0438 \u0441\u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044F \u043F\u0440\u0435\u0434\u0430\u0442\u0435\u043B\u0435\u043C`,
+"danger")}game.emit({k:"relation",a,b,type:"none",trade:false});game.msg(b,`${s.players[a].name} \u0440\u0430\u0437\u043E\u0440\u0432\u0430\u043B \u0434\u043E\u0433\u043E\u0432\u043E\u0440 (${RELATIONS[was]}\
 )`,"danger");game.msg(a,`\u0414\u043E\u0433\u043E\u0432\u043E\u0440 \u0440\u0430\u0437\u043E\u0440\u0432\u0430\u043D: ${s.players[b].name}`,"info");return true}
-function checkBreak(game,pid,cmd){const q=otherPlayer(game,pid,cmd.with);if(q<0)return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";
-if(game.relation(pid,q).type==="none")return"\u041D\u0435\u0442 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u044E\u0449\u0435\u0433\u043E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430";
-return null}function runBreak(game,pid,cmd){const q=Number(cmd.with);const r=game.relation(pid,q);const traitor=r.type==="alliance"||r.type==="pact"&&r.until>game.
-s.tick;breakRelation(game,pid,q,traitor)}function checkEmbargo(game,pid,cmd){if(otherPlayer(game,pid,cmd.with)<0)return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";
-return null}function embargoBy(game,pid,q){const r=game.relation(pid,q);return!!((r.emb|0)&(pid<q?1:2))}function runEmbargo(game,pid,cmd){const s=game.s;const q=Number(
-cmd.with);const key=relKey(pid,q);const on=cmd.on===void 0?!embargoBy(game,pid,q):!!cmd.on;let r=s.relations[key];if(!r)r=s.relations[key]={type:"none",until:0,
-embargo:false,emb:0};const bit=pid<q?1:2;r.emb=on?r.emb|0|bit:(r.emb|0)&~bit;r.embargo=r.emb!==0;if(r.type==="none"&&!r.embargo)delete s.relations[key];game.emit(
-{k:"relation",a:pid,b:q,type:r.type,embargo:r.embargo});const P=s.players;if(on){game.msg(q,`${P[pid].name} \u0432\u0432\u0451\u043B \u043F\u0440\u043E\u0442\u0438\u0432 \u0432\u0430\u0441 \u044D\u043C\u0431\u0430\u0440\u0433\u043E`,
-"danger");game.msg(pid,`\u042D\u043C\u0431\u0430\u0440\u0433\u043E \u043F\u0440\u043E\u0442\u0438\u0432 ${P[q].name} \u0432\u0432\u0435\u0434\u0435\u043D\u043E`,
-"info")}else{game.msg(q,`${P[pid].name} \u0441\u043D\u044F\u043B \u044D\u043C\u0431\u0430\u0440\u0433\u043E`,"good");game.msg(pid,`\u042D\u043C\u0431\u0430\u0440\u0433\u043E \u043F\u0440\u043E\u0442\u0438\u0432 ${P[q].
+var breakMakesTraitor=(game,a,b)=>{const r=game.relation(a,b);return r.type==="alliance"||r.type==="pact"&&r.until>game.s.tick};function checkBreak(game,pid,cmd){
+const q=otherPlayer(game,pid,cmd.with);if(q<0)return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";if(!hasTreaty(
+game,pid,q))return"\u041D\u0435\u0442 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u044E\u0449\u0435\u0433\u043E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430";
+return null}function runBreak(game,pid,cmd){const q=Number(cmd.with);breakRelation(game,pid,q,breakMakesTraitor(game,pid,q))}function checkEmbargo(game,pid,cmd){
+if(otherPlayer(game,pid,cmd.with)<0)return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";return null}function embargoBy(game,pid,q){
+const r=game.relation(pid,q);return!!((r.emb|0)&(pid<q?1:2))}function runEmbargo(game,pid,cmd){const s=game.s;const q=Number(cmd.with);const key=relKey(pid,q);const on=cmd.
+on===void 0?!embargoBy(game,pid,q):!!cmd.on;const r=makeRelation(s.relations[key]);const bit=pid<q?1:2;r.emb=on?r.emb|bit:r.emb&~bit;r.embargo=r.emb!==0;if(idle(
+r))delete s.relations[key];else s.relations[key]=r;game.emit({k:"relation",a:pid,b:q,type:r.type,trade:r.trade,embargo:r.embargo});const P=s.players;if(on){game.
+msg(q,`${P[pid].name} \u0432\u0432\u0451\u043B \u043F\u0440\u043E\u0442\u0438\u0432 \u0432\u0430\u0441 \u044D\u043C\u0431\u0430\u0440\u0433\u043E`,"danger");game.
+msg(pid,`\u042D\u043C\u0431\u0430\u0440\u0433\u043E \u043F\u0440\u043E\u0442\u0438\u0432 ${P[q].name} \u0432\u0432\u0435\u0434\u0435\u043D\u043E`,"info")}else{game.
+msg(q,`${P[pid].name} \u0441\u043D\u044F\u043B \u044D\u043C\u0431\u0430\u0440\u0433\u043E`,"good");game.msg(pid,`\u042D\u043C\u0431\u0430\u0440\u0433\u043E \u043F\u0440\u043E\u0442\u0438\u0432 ${P[q].
 name} \u0441\u043D\u044F\u0442\u043E`,"info")}}function tickRequests(game){const s=game.s;const list=s.requests.slice();for(const r of list){if(!s.requests.includes(
-r))continue;const from=s.players[r.from],to=s.players[r.to];if(!from||!to||!from.alive||!to.alive){s.requests=s.requests.filter(q=>q!==r);continue}if(s.tick>=r.
-expires){s.requests=s.requests.filter(q=>q!==r);game.msg(r.from,`${to.name} \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435`,
+r))continue;const from=s.players[r.from],to=s.players[r.to];if(!from||!to||!from.alive||!to.alive||!isProposal(r.type)){s.requests=s.requests.filter(q=>q!==r);continue}
+if(s.tick>=r.expires){s.requests=s.requests.filter(q=>q!==r);game.msg(r.from,`${to.name} \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u043D\u0430 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435`,
 "info");continue}if(to.ai&&s.tick-(r.at??r.expires-DIPLO.requestTicks)>=DIPLO.aiReplyEvery){const v=game.aiRespond(r.to,r);if(v===true||v===false)answer(game,r,
 v)}}}function tickPacts(game){const s=game.s;const keys=Object.keys(s.relations).sort();for(const key of keys){const r=s.relations[key];if(r.type!=="pact"||!r.until||
-r.until>s.tick)continue;const[a,b]=key.split(":").map(Number);r.type="none";r.until=0;if(!r.embargo)delete s.relations[key];game.emit({k:"relation",a,b,type:"no\
-ne"});if(s.players[a])game.msg(a,`\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438 \u0441 ${s.players[b].name}\
- \u0438\u0441\u0442\u0451\u043A`,"info");if(s.players[b])game.msg(b,`\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438 \u0441 ${s.
+r.until>s.tick)continue;const[a,b]=key.split(":").map(Number);r.type="none";r.until=0;if(idle(r))delete s.relations[key];game.emit({k:"relation",a,b,type:"none",
+trade:r.trade===true});if(s.players[a])game.msg(a,`\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438 \u0441 ${s.
+players[b].name} \u0438\u0441\u0442\u0451\u043A`,"info");if(s.players[b])game.msg(b,`\u041F\u0430\u043A\u0442 \u043E \u043D\u0435\u043D\u0430\u043F\u0430\u0434\u0435\u043D\u0438\u0438 \u0441 ${s.
 players[a].name} \u0438\u0441\u0442\u0451\u043A`,"info")}}function tickDiplomacy(game){const s=game.s;if(s.phase==="over")return;if(s.requests.length)tickRequests(
 game);if(s.tick%10===0)tickPacts(game)}var ctx=null;var master=null;var noiseBuf=null;var volume=.5;var last={};function setVolume(v){volume=Math.max(0,Math.min(1,Number(v)||0));if(master)master.gain.
 value=volume}function ac(){if(!ctx){const AC=typeof window!=="undefined"&&(window.AudioContext||window.webkitAudioContext);if(!AC)return null;try{ctx=new AC}catch{return null}
@@ -3342,45 +3416,56 @@ const src=typeof obj==="string"?JSON.parse(obj):obj;if(!src||typeof src!=="objec
 const s={};for(const k of Object.keys(src)){const v=src[k];s[k]=isRle(v)?rleDecode(v):clone(v)}if(map){const N=map.W*map.H;if(!(s.owner instanceof Uint16Array)||
 s.owner.length!==N)throw new Error("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043D\u0435 \u043F\u043E\u0434\u0445\u043E\u0434\u0438\u0442 \u043A \u043A\u0430\u0440\u0442\u0435");
 if(!(s.fallout instanceof Uint16Array)||s.fallout.length!==N)s.fallout=new Uint16Array(N)}for(const key of["buildings","rails","attacks","units","projectiles","\
-requests","players"])if(!Array.isArray(s[key]))s[key]=[];if(!s.relations||typeof s.relations!=="object")s.relations={};s.settings=normalizeSettings(s.settings);
-return s}var FNV=16777619;var BTYPE=Object.fromEntries(BUILDING_KEYS.map((k,i)=>[k,i+1]));var UTYPE={warship:1,transport:2,trade:3,train:4,truck:5};var PHASE={spawn:1,
-play:2,over:3};function hashState(s){let h=2166136261;const mix2=v=>{h=Math.imul(h^(v|0),FNV)};const num=(v,m=1)=>mix2(Number.isFinite(v)?Math.floor(v*m):-7);mix2(
-s.tick);mix2(s.rngState);mix2(PHASE[s.phase]||0);mix2(s.winner);mix2(s.nextId);const own=s.owner,fo=s.fallout;for(let i=0;i<own.length;i++)h=Math.imul(h^(own[i]|
-fo[i]<<16),FNV);for(const p of s.players){mix2(p.alive?1:0);num(p.troops);mix2(Math.round(p.gold));mix2(p.tiles);num(p.maxTroops);for(const k of RESEARCH_KEYS)mix2(
-p.research[k])}for(const b of s.buildings){mix2(b.id);mix2(b.owner);mix2(BTYPE[b.type]||0);mix2(b.x);mix2(b.y);mix2(b.level);mix2(b.build);mix2(b.cd|0)}for(const r of s.
-rails){mix2(r.id);mix2(r.a);mix2(r.b)}for(const a of s.attacks){mix2(a.id);mix2(a.attacker);mix2(a.target);num(a.troops);mix2(a.landing)}for(const u of s.units){
-mix2(u.id);mix2(u.owner);mix2(UTYPE[u.type]||0);num(u.x,8);num(u.y,8);num(u.hp)}for(const p of s.projectiles){mix2(p.id);mix2(p.owner);num(p.x,8);num(p.y,8);mix2(
-p.t)}mix2(s.requests.length);return h>>>0}var economy_exports={};__export(economy_exports,{INTENTS:()=>INTENTS6,incomeMult:()=>incomeMult,maxTroopsOf:()=>maxTroopsOf,playerAssets:()=>playerAssets,researchError:()=>researchError,
-targetComposition:()=>targetComposition,tickEconomy:()=>tickEconomy,troopGrowth:()=>troopGrowth});var has3=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var INTENTS6={research:{phase:"any",check:checkResearch,run:runResearch}};function researchError(game,pid,key){
-if(!has3(RESEARCH,key))return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E\u0435 \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435";
+requests","players"])if(!Array.isArray(s[key]))s[key]=[];s.relations=normalizeRelations(s.relations,s.players.length);s.requests=s.requests.filter(r=>r&&typeof r===
+"object"&&isProposal(r.type));s.settings=normalizeSettings(s.settings);return s}var REL_KEY=/^(\d+):(\d+)$/;function normalizeRelations(src,n){const out={};if(!src||
+typeof src!=="object")return out;for(const key of Object.keys(src)){const m=REL_KEY.exec(key);if(!m)continue;const a=Number(m[1]),b=Number(m[2]);if(a>=b||b>=n)continue;
+const r=makeRelation(src[key]);if(r.type!=="none"||r.trade||r.embargo)out[key]=r}return out}var FNV=16777619;var BTYPE=Object.fromEntries(BUILDING_KEYS.map((k,i)=>[
+k,i+1]));var UTYPE={warship:1,transport:2,trade:3,train:4,truck:5};var PHASE={spawn:1,play:2,over:3};var RTYPE={none:1,pact:2,alliance:3};var PTYPE={alliance:1,
+pact:2,trade:3};var RKEY=Object.fromEntries(RESEARCH_KEYS.map((k,i)=>[k,i+1]));var SKIND=Object.fromEntries([...STRIKE_KEYS,"warhead"].map((k,i)=>[k,i+1]));var AILVL={
+easy:1,normal:2,hard:3};function hashState(s){let h=2166136261;const mix2=v=>{h=Math.imul(h^(v|0),FNV)};const num=(v,m=1)=>mix2(Number.isFinite(v)?Math.floor(v*
+m):-7);const int=v=>mix2(Number.isFinite(v)?v:-7);mix2(s.tick);mix2(s.rngState);mix2(PHASE[s.phase]||0);mix2(s.winner);mix2(s.nextId);int(s.econLeader);int(s.econLeadTicks);
+const own=s.owner,fo=s.fallout;for(let i=0;i<own.length;i++)h=Math.imul(h^(own[i]|fo[i]<<16),FNV);for(const p of s.players){mix2(p.alive?1:0);mix2(p.spawned?1:0);
+mix2(AILVL[p.ai]||0);num(p.troops);num(p.gold,16);mix2(p.tiles);num(p.maxTroops);num(p.income,64);num(p.upkeep,64);num(p.eventIncome,64);int(p.traitorUntil);int(
+p.capital);int(p.eliminatedAt);for(const k of RESEARCH_KEYS)mix2(p.research[k]);const r=p.researching;if(r){mix2(RKEY[r.key]||-1);int(r.progress);int(r.total)}else
+mix2(-2);const c=p.composition;if(c){num(c.tank,1e6);num(c.art,1e6)}const a=p.aiState;if(a&&typeof a==="object"&&a.v){mix2(a.rng);int(a.turn);int(a.war);int(a.warAt);
+int(a.nukeAt);int(a.boatAt);int(a.dipAt);int(a.atkAt)}}const keys=Object.keys(s.relations).sort();mix2(keys.length);for(const key of keys){const r=s.relations[key];
+const k=key.indexOf(":");mix2(Number(key.slice(0,k)));mix2(Number(key.slice(k+1)));mix2(RTYPE[r.type]||9);int(r.until);mix2(r.trade?1:0);mix2(r.emb)}mix2(s.requests.
+length);for(const r of s.requests){mix2(r.id);mix2(r.from);mix2(r.to);mix2(PTYPE[r.type]||9);int(r.expires);int(r.at)}for(const b of s.buildings){mix2(b.id);mix2(
+b.owner);mix2(BTYPE[b.type]||0);mix2(b.x);mix2(b.y);mix2(b.level);mix2(b.build);mix2(b.cd|0);mix2(b.up|0);mix2(b.stock|0);mix2(b.veh|0);mix2(b.direct|0)}for(const r of s.
+rails){mix2(r.id);mix2(r.owner);mix2(r.a);mix2(r.b)}for(const a of s.attacks){mix2(a.id);mix2(a.attacker);mix2(a.target);num(a.troops);mix2(a.landing);mix2(a.local?
+1:0);int(a.scan);const F=a.front;mix2(F.length);for(let k=0;k<F.length;k++)mix2(F[k])}for(const u of s.units){mix2(u.id);mix2(u.owner);mix2(UTYPE[u.type]||0);num(
+u.x,8);num(u.y,8);num(u.hp);int(u.pi);num(u.cargo);num(u.troops);int(u.chase);mix2(u.order|0);mix2(u.path?u.path.length:-1)}for(const p of s.projectiles){mix2(p.
+id);mix2(p.owner);mix2(SKIND[p.type]||0);num(p.x,8);num(p.y,8);num(p.tx,8);num(p.ty,8);mix2(p.t);mix2(p.dur)}return h>>>0}var economy_exports={};__export(economy_exports,{INTENTS:()=>INTENTS6,incomeMult:()=>incomeMult,maxTroopsOf:()=>maxTroopsOf,playerAssets:()=>playerAssets,researchError:()=>researchError,
+targetComposition:()=>targetComposition,tickEconomy:()=>tickEconomy,troopGrowth:()=>troopGrowth});var has4=(o,k)=>typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k);var INTENTS6={research:{phase:"any",check:checkResearch,run:runResearch}};function researchError(game,pid,key){
+if(!has4(RESEARCH,key))return"\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E\u0435 \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435";
 const p=game.s.players[pid];const def=RESEARCH[key];if(p.researching)return"\u0423\u0436\u0435 \u0438\u0434\u0451\u0442 \u0434\u0440\u0443\u0433\u043E\u0435 \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435";
 const lvl=p.research[key];if(lvl>=def.max)return"\u0414\u043E\u0441\u0442\u0438\u0433\u043D\u0443\u0442 \u043C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u044B\u0439 \u0443\u0440\u043E\u0432\u0435\u043D\u044C";
 if(def.req&&p.research[def.req[0]]<def.req[1])return`\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0438\u0441\u0441\u043B\u0435\u0434\u0443\u0439\u0442\u0435 \xAB${RESEARCH[def.
 req[0]].name}\xBB \u0434\u043E ${def.req[1]} \u0443\u0440.`;const cost=researchCost(key,lvl);if(p.gold<cost)return`\u041D\u0443\u0436\u043D\u043E ${cost} \u0437\u043E\u043B\u043E\u0442\u0430`;
 return null}function checkResearch(game,pid,cmd){return researchError(game,pid,cmd.key)}function runResearch(game,pid,cmd){const p=game.s.players[pid];const lvl=p.
 research[cmd.key];p.gold-=researchCost(cmd.key,lvl);p.researching={key:cmd.key,progress:0,total:researchTicks(lvl)}}var emptyAssets=()=>({houseLv:0,factoryLv:0,
-factories:0,ports:0,forts:0,samLv:0,airbases:0,silos:0,warships:0,transports:0,trade:0});function playerAssets(game){const s=game.s;const out=s.players.map(emptyAssets);
-for(const b of s.buildings){const a=out[b.owner];if(!a||!game.buildingActive(b))continue;switch(b.type){case"house":a.houseLv+=b.level;break;case"factory":a.factoryLv+=
-b.level;a.factories++;break;case"port":a.ports++;break;case"fort":a.forts++;break;case"sam":a.samLv+=b.level;break;case"airbase":a.airbases++;break;case"silo":a.
-silos++;break;default:break}}for(const u of s.units){const a=out[u.owner];if(!a)continue;if(u.type==="warship")a.warships++;else if(u.type==="transport")a.transports++;else if(u.
-type==="trade")a.trade++}return out}function incomeMult(p){const diff=p.ai?(DIFFICULTY[p.ai]||DIFFICULTY.normal).income:1;return(1+ECON.incomeEcon*p.research.econ)*
-diff}function maxTroopsOf(p,a){return ECON.troopsBase+p.tiles*ECON.troopsPerTile+a.houseLv*ECON.houseTroops}function troopGrowth(p){const T=Math.max(0,p.troops),
-M=p.maxTroops;if(T>=M)return-Math.min(T-M,T*ECON.overCapDecay/TICKS_PER_SEC);return(ECON.growthBase+dpow(T,ECON.growthExp)/ECON.growthDiv)*(1-T/M)*(1+ECON.growthEcon*
-p.research.econ)}function updateIncome(p,a){const base=p.tiles*ECON.incomePerTile+Math.sqrt(Math.max(0,p.troops))*ECON.incomeTroops+a.houseLv*ECON.houseIncome+(a.
-ports?0:a.factoryLv*ECON.factoryDirect);p.incBase=base*incomeMult(p);p.eventIncome=p.eventIncome*(1-ECON.eventIncomeAlpha)+p.eventAcc*ECON.eventIncomeAlpha;p.eventAcc=
-0;p.income=p.incBase+p.eventIncome;p.upkeep=a.warships*SHIPS.warship.upkeep+a.samLv*BUILDINGS.sam.upkeep+a.silos*BUILDINGS.silo.upkeep+a.airbases*BUILDINGS.airbase.
-upkeep}var approach=(v,target,step)=>v<target?Math.min(target,v+step):Math.max(target,v-step);function targetComposition(p,a){const r=p.research;const fac=a.factories;
-const tank=r.armor>=1&&fac>0?Math.min(ARMY.tankMax,ARMY.tankPerArmor*r.armor+ARMY.tankPerFactory*fac):0;const art=r.art>=1&&fac>0?Math.min(ARMY.artMax,ARMY.artPerLevel*
-r.art):0;return{tank,art}}function updateComposition(p,a){const t=targetComposition(p,a);const c=p.composition;c.tank=approach(c.tank,t.tank,ARMY.shiftPerSec);c.
-art=approach(c.art,t.art,ARMY.shiftPerSec);c.inf=1-c.tank-c.art}function tickResearch(game,p){const r=p.researching;if(!r)return;r.progress++;if(r.progress<r.total)
-return;p.research[r.key]=Math.min(RESEARCH[r.key].max,p.research[r.key]+1);p.researching=null;game.emit({k:"research",pid:p.id,key:r.key});game.msg(p.id,`\u0418\u0441\u0441\u043B\u0435\u0434\
-\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E: ${RESEARCH[r.key].name}, \u0443\u0440. ${p.research[r.key]}`,"good")}
-function tickEconomy(game){const s=game.s;if(s.phase==="over")return;const assets=playerAssets(game);const play2=s.phase==="play";const second=s.tick%TICKS_PER_SEC===
-0;for(const p of s.players){if(!p.alive)continue;const a=assets[p.id];p.maxTroops=maxTroopsOf(p,a);if(!play2)continue;if(second){updateIncome(p,a);updateComposition(
-p,a);if(p.tiles>p.stats.peakTiles)p.stats.peakTiles=p.tiles}if(p.spawned)p.troops=Math.max(0,p.troops+troopGrowth(p));const net=(p.incBase-p.upkeep)/TICKS_PER_SEC;
-p.gold=Math.min(ECON.maxGold,p.gold+net);if(p.incBase>0)p.stats.goldEarned+=p.incBase/TICKS_PER_SEC;if(p.gold<0)p.troops-=p.troops*ECON.desertion/TICKS_PER_SEC;
-tickResearch(game,p)}}var victory_exports={};__export(victory_exports,{INTENTS:()=>INTENTS7,econStanding:()=>econStanding,eliminate:()=>eliminate,finish:()=>finish,territoryGoal:()=>territoryGoal,
-tickVictory:()=>tickVictory});var INTENTS7={surrender:{phase:"any",check:()=>null,run:runSurrender}};function runSurrender(game,pid){const s=game.s,own=s.owner,me=pid+1,land=game.landList;for(let k=0;k<
+directLv:0,factories:0,ports:0,forts:0,samLv:0,airbases:0,silos:0,warships:0,transports:0,trade:0});function playerAssets(game){const s=game.s;const out=s.players.
+map(emptyAssets);for(const b of s.buildings){const a=out[b.owner];if(!a||!game.buildingActive(b))continue;switch(b.type){case"house":a.houseLv+=b.level;break;case"\
+factory":a.factoryLv+=b.level;a.factories++;if(b.direct)a.directLv+=b.level;break;case"port":a.ports++;break;case"fort":a.forts++;break;case"sam":a.samLv+=b.level;
+break;case"airbase":a.airbases++;break;case"silo":a.silos++;break;default:break}}for(const u of s.units){const a=out[u.owner];if(!a)continue;if(u.type==="warshi\
+p")a.warships++;else if(u.type==="transport")a.transports++;else if(u.type==="trade")a.trade++}return out}function incomeMult(p){const diff=p.ai?(DIFFICULTY[p.ai]||
+DIFFICULTY.normal).income:1;return(1+ECON.incomeEcon*p.research.econ)*diff}function maxTroopsOf(p,a){return ECON.troopsBase+p.tiles*ECON.troopsPerTile+a.houseLv*
+ECON.houseTroops}function troopGrowth(p){const T=Math.max(0,p.troops),M=p.maxTroops;if(T>=M)return-Math.min(T-M,T*ECON.overCapDecay/TICKS_PER_SEC);return(ECON.growthBase+
+dpow(T,ECON.growthExp)/ECON.growthDiv)*(1-T/M)*(1+ECON.growthEcon*p.research.econ)}function updateIncome(p,a){const base=p.tiles*ECON.incomePerTile+Math.sqrt(Math.
+max(0,p.troops))*ECON.incomeTroops+a.houseLv*ECON.houseIncome+a.directLv*ECON.factoryDirect;p.incBase=base*incomeMult(p);p.eventIncome=p.eventIncome*(1-ECON.eventIncomeAlpha)+
+p.eventAcc*ECON.eventIncomeAlpha;p.eventAcc=0;p.income=p.incBase+p.eventIncome;p.upkeep=a.warships*SHIPS.warship.upkeep+a.samLv*BUILDINGS.sam.upkeep+a.silos*BUILDINGS.
+silo.upkeep+a.airbases*BUILDINGS.airbase.upkeep}var approach=(v,target,step)=>v<target?Math.min(target,v+step):Math.max(target,v-step);function targetComposition(p,a){
+const r=p.research;const fac=a.factories;const mul=fac>0?1:ARMY.noFactory;const tank=r.armor>=1?Math.min(ARMY.tankMax,ARMY.tankPerArmor*r.armor*mul+ARMY.tankPerFactory*
+fac):0;const art=r.art>=1?Math.min(ARMY.artMax,ARMY.artPerLevel*r.art*mul+ARMY.artPerFactory*fac):0;return{tank,art}}function updateComposition(p,a){const t=targetComposition(
+p,a);const c=p.composition;c.tank=approach(c.tank,t.tank,ARMY.shiftPerSec);c.art=approach(c.art,t.art,ARMY.shiftPerSec);c.inf=1-c.tank-c.art}function tickResearch(game,p){
+const r=p.researching;if(!r)return;r.progress++;if(r.progress<r.total)return;p.research[r.key]=Math.min(RESEARCH[r.key].max,p.research[r.key]+1);p.researching=null;
+game.emit({k:"research",pid:p.id,key:r.key});game.msg(p.id,`\u0418\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E: ${RESEARCH[r.
+key].name}, \u0443\u0440. ${p.research[r.key]}`,"good")}function tickEconomy(game){const s=game.s;if(s.phase==="over")return;const assets=playerAssets(game);const play2=s.
+phase==="play";const second=s.tick%TICKS_PER_SEC===0;for(const p of s.players){if(!p.alive)continue;const a=assets[p.id];p.maxTroops=maxTroopsOf(p,a);if(!play2)
+continue;if(second){updateIncome(p,a);updateComposition(p,a);if(p.tiles>p.stats.peakTiles)p.stats.peakTiles=p.tiles}if(p.spawned)p.troops=Math.max(0,p.troops+troopGrowth(
+p));const net=(p.incBase-p.upkeep)/TICKS_PER_SEC;p.gold=Math.min(ECON.maxGold,p.gold+net);if(p.incBase>0)p.stats.goldEarned+=p.incBase/TICKS_PER_SEC;if(p.gold<0)
+p.troops-=p.troops*ECON.desertion/TICKS_PER_SEC;tickResearch(game,p)}}var victory_exports={};__export(victory_exports,{INTENTS:()=>INTENTS7,coalitionWins:()=>coalitionWins,econStanding:()=>econStanding,eliminate:()=>eliminate,finish:()=>finish,
+territoryGoal:()=>territoryGoal,tickVictory:()=>tickVictory});var INTENTS7={surrender:{phase:"any",check:()=>null,run:runSurrender}};function runSurrender(game,pid){const s=game.s,own=s.owner,me=pid+1,land=game.landList;for(let k=0;k<
 land.length;k++)if(own[land[k]]===me)game.setOwner(land[k],-1);eliminate(game,pid,"surrender")}function eliminate(game,pid,reason=""){const s=game.s,p=s.players[pid];
 if(!p||!p.alive)return;p.alive=false;p.eliminatedAt=s.tick;p.researching=null;p.troops=0;cancelAttacks(game,a=>a.attacker===pid,false);s.requests=s.requests.filter(
 r=>r.from!==pid&&r.to!==pid);if(s.units.some(u=>u.owner===pid))s.units=s.units.filter(u=>u.owner!==pid);for(const b of s.buildings.filter(q=>q.owner===pid))game.
@@ -3391,16 +3476,17 @@ for(const p of game.s.players){if(p.alive&&p.tiles===0&&!hasForcesAfloat(game,p.
 s;if(s.phase==="over")return;s.phase="over";s.winner=pid;s.winReason=reason;game.emit({k:"victory",pid,reason});const p=s.players[pid];game.msg(-1,p?`\u041F\u043E\u0431\u0435\u0434\u0430: ${p.
 name} \u2014 ${WIN_REASONS[reason]}`:"\u0418\u0433\u0440\u0430 \u043E\u043A\u043E\u043D\u0447\u0435\u043D\u0430: \u043F\u043E\u0431\u0435\u0434\u0438\u0442\u0435\u043B\u0435\u0439 \u043D\u0435\u0442",
 "good")}function allAllied(game,alive){for(let i=0;i<alive.length;i++){for(let j=i+1;j<alive.length;j++)if(!game.isAllied(alive[i].id,alive[j].id))return false}
-return true}function leaderByTiles(alive){let best=alive[0];for(const p of alive)if(p.tiles>best.tiles)best=p;return best.id}function territoryGoal(game){return Math.
+return true}function coalitionWins(game,alive=game.s.players.filter(p=>p.alive)){if(alive.length<2||alive.length>=game.s.players.length)return false;return allAllied(
+game,alive)}function leaderByTiles(alive){let best=alive[0];for(const p of alive)if(p.tiles>best.tiles)best=p;return best.id}function territoryGoal(game){return Math.
 ceil(game.map.landCount*game.s.settings.victory.territoryPct/100)}function econStanding(alive){let best=-1,bv=-Infinity,sv=-Infinity;for(const p of alive){const r=p.
 income-p.upkeep;if(r>bv){sv=bv;bv=r;best=p.id}else if(r>sv)sv=r}const lead=best>=0&&bv>0&&bv>=sv*(1+VICTORY.econLead)&&bv>sv;return{leader:lead?best:-1,best,value:bv,
 second:sv}}function checkEconomy(game,alive){const s=game.s,v=s.settings.victory;const st=econStanding(alive);if(st.leader<0){s.econLeader=-1;s.econLeadTicks=0;
 return}if(s.econLeader!==st.leader){s.econLeader=st.leader;s.econLeadTicks=0}s.econLeadTicks+=VICTORY.econCheckEvery;if(s.econLeadTicks>=v.economyMinutes*60*TICKS_PER_SEC)
 finish(game,st.leader,"economy")}function tickVictory(game){const s=game.s;if(s.phase!=="play")return;checkEliminations(game);const alive=s.players.filter(p=>p.
-alive);if(s.players.length>1){if(!alive.length){finish(game,-1,"survivor");return}if(alive.length===1){finish(game,alive[0].id,"survivor");return}if(allAllied(game,
-alive)){finish(game,leaderByTiles(alive),"survivor");return}}const v=s.settings.victory;if(v.territory&&game.map.landCount>0){const need=territoryGoal(game);let best=null;
-for(const p of alive)if(p.tiles>=need&&(!best||p.tiles>best.tiles))best=p;if(best){finish(game,best.id,"territory");return}}if(v.economy&&s.tick%VICTORY.econCheckEvery===
-0)checkEconomy(game,alive)}var PLAN=[["econ",1],["inf",1],["armor",1],["logistics",1],["econ",2],["drone",1],["missile",1],["art",1],["inf",2],["fort",1],["naval",1],["armor",2],["econ",3],
+alive);if(s.players.length>1){if(!alive.length){finish(game,-1,"survivor");return}if(alive.length===1){finish(game,alive[0].id,"survivor");return}if(coalitionWins(
+game,alive)){finish(game,leaderByTiles(alive),"survivor");return}}const v=s.settings.victory;if(v.territory&&game.map.landCount>0){const need=territoryGoal(game);
+let best=null;for(const p of alive)if(p.tiles>=need&&(!best||p.tiles>best.tiles))best=p;if(best){finish(game,best.id,"territory");return}}if(v.economy&&s.tick%VICTORY.
+econCheckEvery===0)checkEconomy(game,alive)}var PLAN=[["econ",1],["inf",1],["armor",1],["logistics",1],["econ",2],["drone",1],["missile",1],["art",1],["inf",2],["fort",1],["naval",1],["armor",2],["econ",3],
 ["nuclear",1],["aa",1],["drone",2],["logistics",2],["art",2],["inf",3],["armor",3],["econ",4],["missile",2],["nuclear",2],["fort",2],["aa",2],["armor",4],["inf",
 4],["art",3],["naval",2],["econ",5],["logistics",3],["drone",3],["nuclear",3],["armor",5],["inf",5],["art",4],["fort",3],["aa",3],["missile",3],["naval",3],["ar\
 t",5]];var AI_PROFILES={easy:{expand:.2,expandMin:.4,attack:.25,warAt:.8,edge:2,capPush:.97,reserve:.45,warGap:300,builds:1,houseEvery:1400,maxHouses:8,maxFactories:3,
@@ -3408,8 +3494,8 @@ maxPorts:2,airbases:1,silos:1,ships:.5,maxShips:3,nukes:0,nukeEvery:0,maxNuclear
 strikeEvery:3},normal:{expand:.28,expandMin:.3,attack:.3,warAt:.6,edge:1.6,capPush:.95,reserve:.35,warGap:150,builds:2,houseEvery:900,maxHouses:16,maxFactories:6,
 maxPorts:4,airbases:1,silos:2,ships:1,maxShips:6,nukes:2,nukeEvery:900,maxNuclear:2,allies:1,betray:0,boatSend:.2,boatLocked:.5,boatRange:220,boatEvery:400,dipEvery:600,
 strikeEvery:1},hard:{expand:.33,expandMin:.25,attack:.45,warAt:.55,edge:1.15,capPush:.9,reserve:.25,warGap:40,builds:3,houseEvery:650,maxHouses:24,maxFactories:8,
-maxPorts:5,airbases:2,silos:2,ships:1.5,maxShips:10,nukes:3,nukeEvery:450,maxNuclear:3,allies:1,betray:1,boatSend:.25,boatLocked:.6,boatRange:300,boatEvery:250,
-dipEvery:400,strikeEvery:1}};var VALUE2={silo:9,sam:6,airbase:6,factory:7,port:6,house:5,fort:3};var SURVEY_MAX=6e3;var COAST_PICK=24;var BAD_TICKS=1200;var OK=r=>!!(r&&
+maxPorts:5,airbases:2,silos:2,ships:1.5,maxShips:10,nukes:3,nukeEvery:600,maxNuclear:3,allies:1,betray:1,boatSend:.25,boatLocked:.6,boatRange:300,boatEvery:250,
+dipEvery:400,strikeEvery:1}};var VALUE={silo:9,sam:6,airbase:6,factory:7,port:6,house:5,fort:3};var SURVEY_MAX=6e3;var COAST_PICK=24;var BAD_TICKS=1200;var OK=r=>!!(r&&
 r.ok);function rnd(st){let t=st.rng=st.rng+1831565813>>>0;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}function brain(game,p){
 let st=p.aiState;if(!st||typeof st!=="object"||st.v!==1){st={v:1,rng:(Math.imul(p.id+1,2654435761)^game.s.rngState^1540483477)>>>0,turn:0,war:-1,warAt:0,bad:[],
 prop:[],dipAt:0,boatAt:0,nukeAt:0,boats:0,ships:0};st.agg=Math.round((.85+rnd(st)*.35)*100)/100;st.sea=Math.round((.7+rnd(st)*.7)*100)/100;p.aiState=st}return st}
@@ -3418,17 +3504,17 @@ alive)continue;const d=DIFFICULTY[p.ai]||DIFFICULTY.normal;if((s.tick+p.id*3)%d.
 const p=game.s.players[pid];if(!p||!p.alive||game.s.phase!=="play")return;const prof=profileOf(p);const st=brain(game,p);st.turn++;if(!p.tiles)return;const v=survey(
 game,p,st);military(game,p,st,v,prof);const phase=st.turn%4;if(phase===0||phase===2)economy(game,p,st,v,prof,phase===2);else if(phase===1){if((st.turn>>2)%2===0||
 !boats(game,p,st,v,prof))navy(game,p,st,v,prof)}else{if((st.turn>>2)%prof.strikeEvery===0)strikes(game,p,st,v,prof);diplomacy(game,p,st,v,prof)}}var hashTile=(i,salt)=>{
-let h=Math.imul(i^salt,2654435761);h^=h>>>15;h=Math.imul(h,2246822507);return(h^h>>>13)>>>0};function survey(game,p,st){const s=game.s,own=s.owner,fo=s.fallout,
-terr=game.map.terrain,oc=game.oceanCoast;const W=game.W,N=game.N,P=s.players.length,me=p.id+1;const border=game.playerBorder(p.id);const L2=border.size;const cnt=new Int32Array(
+let h=Math.imul(i^salt,2654435761);h^=h>>>15;h=Math.imul(h,2246822507);return(h^h>>>13)>>>0};function survey(game,p,st){const s=game.s,own=s.owner,terr=game.map.
+terrain,oc=game.oceanCoast;const W=game.W,N=game.N,P=s.players.length,me=p.id+1;const border=game.playerBorder(p.id);const L2=border.size;const cnt=new Int32Array(
 P+1);const tile=new Int32Array(P+1).fill(-1);const key=new Float64Array(P+1).fill(Infinity);const ck=[],ct=[];let cmax=-1,cmaxK=-1;let minX=W,minY=game.H,maxX=0,
 maxY=0,sx=0,sy=0,n=0,coastN=0;const step=L2>SURVEY_MAX?Math.ceil(L2/SURVEY_MAX):1;const pick=st.turn%step;const salt=Math.imul(st.turn+1,1663821227)^p.id*461845907;
-const look=j=>{if(terr[j]<2)return;const o=own[j];if(o===me||o&&fo[j])return;cnt[o]++;const h=hashTile(j,salt);if(h<key[o]||h===key[o]&&j<tile[o]){key[o]=h;tile[o]=
-j}};for(const i of border){if(step>1&&hashTile(i,5369127)%step!==pick)continue;const x=i%W,y=(i-x)/W;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)
-maxY=y;sx+=x;sy+=y;n++;if(oc[i]){coastN++;const h=hashTile(i,salt^2135587861);if(ck.length<COAST_PICK){ck.push(h);ct.push(i);if(h>cmax||h===cmax&&i>ct[cmaxK]){cmax=
-h;cmaxK=ck.length-1}}else if(h<cmax||h===cmax&&i<ct[cmaxK]){ck[cmaxK]=h;ct[cmaxK]=i;cmax=-1;for(let k=0;k<ck.length;k++)if(ck[k]>cmax||ck[k]===cmax&&ct[k]>ct[cmaxK]){
-cmax=ck[k];cmaxK=k}}}if(x>0)look(i-1);if(x<W-1)look(i+1);if(i>=W)look(i-W);if(i<N-W)look(i+W)}const coast=ct.slice().sort((a,b)=>a-b);const inc=new Float64Array(
-P),out=new Float64Array(P+1);let incoming=0;for(const a of s.attacks){if(a.target===p.id&&a.attacker!==p.id){inc[a.attacker]+=a.troops;incoming+=a.troops}if(a.attacker===
-p.id)out[a.target+1]+=a.troops}for(const u of s.units){if(u.type==="transport"&&u.tp===p.id&&u.owner!==p.id){inc[u.owner]+=u.troops||0;incoming+=u.troops||0}}const lead=leaderOf(
+const look=j=>{if(terr[j]<2)return;const o=own[j];if(o===me)return;cnt[o]++;const h=hashTile(j,salt);if(h<key[o]||h===key[o]&&j<tile[o]){key[o]=h;tile[o]=j}};for(const i of border){
+if(step>1&&hashTile(i,5369127)%step!==pick)continue;const x=i%W,y=(i-x)/W;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;sx+=x;sy+=y;n++;if(oc[i]){
+coastN++;const h=hashTile(i,salt^2135587861);if(ck.length<COAST_PICK){ck.push(h);ct.push(i);if(h>cmax||h===cmax&&i>ct[cmaxK]){cmax=h;cmaxK=ck.length-1}}else if(h<
+cmax||h===cmax&&i<ct[cmaxK]){ck[cmaxK]=h;ct[cmaxK]=i;cmax=-1;for(let k=0;k<ck.length;k++)if(ck[k]>cmax||ck[k]===cmax&&ct[k]>ct[cmaxK]){cmax=ck[k];cmaxK=k}}}if(x>
+0)look(i-1);if(x<W-1)look(i+1);if(i>=W)look(i-W);if(i<N-W)look(i+W)}const coast=ct.slice().sort((a,b)=>a-b);const inc=new Float64Array(P),out=new Float64Array(P+
+1);let incoming=0;for(const a of s.attacks){if(a.target===p.id&&a.attacker!==p.id){inc[a.attacker]+=a.troops;incoming+=a.troops}if(a.attacker===p.id)out[a.target+
+1]+=a.troops}for(const u of s.units){if(u.type==="transport"&&u.tp===p.id&&u.owner!==p.id){inc[u.owner]+=u.troops||0;incoming+=u.troops||0}}const lead=leaderOf(
 s);let landBorder=0,hostileLand=0;for(let q=0;q<=P;q++){landBorder+=cnt[q];if(q>0&&cnt[q]&&q!==me&&s.players[q-1].alive&&game.isHostile(p.id,q-1))hostileLand+=cnt[q]}
 return{cnt,tile,coast,coastN,minX,minY,maxX,maxY,cx:n?sx/n:p.capital>=0?p.capital%W:W/2,cy:n?sy/n:p.capital>=0?Math.floor(p.capital/W):game.H/2,inc,out,incoming,
 landBorder,hostileLand,lead,dom:dominant(game,lead)&&lead.id!==p.id}}function leaderOf(s){let best=null,second=null;for(const q of s.players){if(!q.alive)continue;
@@ -3453,41 +3539,41 @@ own[yy*W+xx]===me)n++}}return n}function tryBuild(game,pid,type,x,y){if(buildErr
 function placeInterior(game,p,st,v,type){const W=game.W,own=game.s.owner,me=p.id+1;const bw=v.maxX-v.minX+1,bh=v.maxY-v.minY+1;const d=Math.max(2,Math.min(10,Math.
 floor(Math.sqrt(p.tiles)/6)));let fb=-1,fd=4;for(let k=0;k<48;k++){const x=v.minX+Math.floor(rnd(st)*bw),y=v.minY+Math.floor(rnd(st)*bh);const i=y*W+x;if(own[i]!==
 me)continue;const dd=depthAt(game,me,x,y,d);if(dd<8){if(dd>fd&&!buildError(game,p.id,type,x,y)){fd=dd;fb=i}continue}if(tryBuild(game,p.id,type,x,y))return true}
-return fb>=0&&tryBuild(game,p.id,type,fb%W,Math.floor(fb/W))}function placeNear(game,p,st,type,x0,y0,r0,r1){const W=game.W,own=game.s.owner,me=p.id+1;for(let k=0;k<
+return fb>=0&&tryBuild(game,p.id,type,fb%W,Math.floor(fb/W))}function placeNear(game,p,st,type,x0,y0,r0,r1,ok){const W=game.W,own=game.s.owner,me=p.id+1;for(let k=0;k<
 24;k++){const r=r0+rnd(st)*(r1-r0);const a=rnd(st)*4-2,b=rnd(st)*4-2;const len=Math.sqrt(a*a+b*b)||1;const x=Math.floor(x0+a/len*r),y=Math.floor(y0+b/len*r);const i=game.
-tileAt(x,y);if(i<0||own[i]!==me)continue;if(tryBuild(game,p.id,type,x,y))return true}return false}function placePort(game,p,st,v,mine){const W=game.W;const ref=mine.
-factory.length?mine.factory:null;const cands=v.coast.map(i=>{const x=i%W,y=(i-x)/W;let d=(x-v.cx)*(x-v.cx)+(y-v.cy)*(y-v.cy);if(ref){d=Infinity;for(const f of ref)
-d=Math.min(d,(f.x-x)*(f.x-x)+(f.y-y)*(f.y-y))}return{i,d:d*(.8+.4*rnd(st))}});cands.sort((a,b)=>a.d-b.d||a.i-b.i);for(let k=0;k<cands.length&&k<10;k++){const i=cands[k].
-i;if(tryBuild(game,p.id,"port",i%W,Math.floor(i/W)))return true}return false}function placeFront(game,p,st,v,type,q){const W=game.W,own=game.s.owner,me=p.id+1;const t=v.
-tile[q+1];if(t<0)return placeInterior(game,p,st,v,type);const tx=t%W,ty=(t-tx)/W;const dx=v.cx-tx,dy=v.cy-ty;const len=Math.sqrt(dx*dx+dy*dy)||1;for(const r of[
-6,9,4,12,15]){const x=Math.floor(tx+dx/len*r),y=Math.floor(ty+dy/len*r);const i=game.tileAt(x,y);if(i<0||own[i]!==me)continue;if(tryBuild(game,p.id,type,x,y))return true;
-if(placeNear(game,p,st,type,x,y,2,6))return true}return false}function samCovered(game,pid,x,y,hostileOnly){let n=0;for(const b of game.s.buildings){if(b.type!==
-"sam"||!game.buildingActive(b))continue;if(hostileOnly?!game.isHostile(pid,b.owner)||b.owner===pid:b.owner!==pid)continue;const R=SAM.radius(b.level);const dx=b.
-x-x,dy=b.y-y;if(dx*dx+dy*dy<=R*R)n++}return n}function routeCover(game,pid,x0,y0,x1,y1){const ex=x1-x0,ey=y1-y0,L2=ex*ex+ey*ey;let n=0;for(const b of game.s.buildings){
-if(b.type!=="sam"||b.owner===pid||!game.buildingActive(b)||!game.isHostile(pid,b.owner))continue;const R=SAM.radius(b.level)+2;let k=L2>0?((b.x-x0)*ex+(b.y-y0)*
-ey)/L2:0;k=k<0?0:k>1?1:k;const dx=x0+ex*k-b.x,dy=y0+ey*k-b.y;if(dx*dx+dy*dy<=R*R)n++}return n}function placeSam(game,p,st,v,mine){let best=null,bs=0;for(const type of[
-"silo","factory","port","airbase","house"]){for(const b of mine[type]){const cover=samCovered(game,p.id,b.x,b.y,false);const sc=VALUE2[type]*b.level/(1+cover*3);
-if(sc>bs){bs=sc;best=b}}}if(!best)return placeInterior(game,p,st,v,"sam");return placeNear(game,p,st,"sam",best.x+.5,best.y+.5,5,12)||placeInterior(game,p,st,v,
-"sam")}function placeFactory(game,p,st,v,mine){const ports=mine.port.filter(b=>game.buildingActive(b));if(ports.length){const b=ports[Math.floor(rnd(st)*ports.length)];
-if(placeNear(game,p,st,"factory",b.x+.5,b.y+.5,8,30))return true}return placeInterior(game,p,st,v,"factory")}function hostileThreats(game,p,v){const s=game.s,P=s.
-players;const mine=defPower(game,p);const out=[];for(let q=0;q<P.length;q++){if(q===p.id||!v.cnt[q+1]||!P[q].alive||!game.isHostile(p.id,q))continue;const r=atkPower(
-game,P[q])/mine;if(r>=.6||v.inc[q]>0)out.push({q,r:r+(v.inc[q]>0?1:0)})}out.sort((a,b)=>b.r-a.r||a.q-b.q);return out}function strikeThreat(game,pid){let t=0;for(const b of game.
-s.buildings){if((b.type==="silo"||b.type==="airbase")&&b.owner!==pid&&game.isHostile(pid,b.owner)){if(b.type==="silo")return 2;t=1}}return t}var NUKE_PLAN=[["mi\
-ssile",1],["nuclear",1],["nuclear",2],["nuclear",3]];function researchOk(p,prof,mine,key,lvl){const R=p.research;if(R[key]>=lvl)return false;if(key==="nuclear"&&
-lvl>prof.maxNuclear)return false;if(key==="naval"&&!mine.port.length)return false;if((key==="armor"||key==="art")&&!mine.factory.length)return false;const req=RESEARCH[key].
+tileAt(x,y);if(i<0||own[i]!==me||ok&&!ok(x,y))continue;if(tryBuild(game,p.id,type,x,y))return true}return false}function placePort(game,p,st,v,mine){const W=game.
+W;const ref=mine.factory.length?mine.factory:null;const cands=v.coast.map(i=>{const x=i%W,y=(i-x)/W;let d=(x-v.cx)*(x-v.cx)+(y-v.cy)*(y-v.cy);if(ref){d=Infinity;
+for(const f of ref)d=Math.min(d,(f.x-x)*(f.x-x)+(f.y-y)*(f.y-y))}return{i,d:d*(.8+.4*rnd(st))}});cands.sort((a,b)=>a.d-b.d||a.i-b.i);for(let k=0;k<cands.length&&
+k<10;k++){const i=cands[k].i;if(tryBuild(game,p.id,"port",i%W,Math.floor(i/W)))return true}return false}function placeFront(game,p,st,v,type,q){const W=game.W,own=game.
+s.owner,me=p.id+1;const t=v.tile[q+1];if(t<0)return placeInterior(game,p,st,v,type);const tx=t%W,ty=(t-tx)/W;const dx=v.cx-tx,dy=v.cy-ty;const len=Math.sqrt(dx*
+dx+dy*dy)||1;for(const r of[6,9,4,12,15]){const x=Math.floor(tx+dx/len*r),y=Math.floor(ty+dy/len*r);const i=game.tileAt(x,y);if(i<0||own[i]!==me)continue;if(tryBuild(
+game,p.id,type,x,y))return true;if(placeNear(game,p,st,type,x,y,2,6))return true}return false}function samCovered(game,pid,x,y,hostileOnly){let n=0;for(const b of game.
+s.buildings){if(b.type!=="sam"||!game.buildingActive(b))continue;if(hostileOnly?!game.isHostile(pid,b.owner)||b.owner===pid:b.owner!==pid)continue;const R=SAM.radius(
+b.level);const dx=b.x-x,dy=b.y-y;if(dx*dx+dy*dy<=R*R)n++}return n}function routeCover(game,pid,x0,y0,x1,y1){const ex=x1-x0,ey=y1-y0,L2=ex*ex+ey*ey;let n=0;for(const b of game.
+s.buildings){if(b.type!=="sam"||b.owner===pid||!game.buildingActive(b)||!game.isHostile(pid,b.owner))continue;const R=SAM.radius(b.level)+2;let k=L2>0?((b.x-x0)*
+ex+(b.y-y0)*ey)/L2:0;k=k<0?0:k>1?1:k;const dx=x0+ex*k-b.x,dy=y0+ey*k-b.y;if(dx*dx+dy*dy<=R*R)n++}return n}function placeSam(game,p,st,v,mine){let best=null,bs=0;
+for(const type of["silo","factory","port","airbase","house"]){for(const b of mine[type]){const cover=samCovered(game,p.id,b.x,b.y,false);const sc=VALUE[type]*b.
+level/(1+cover*3);if(sc>bs){bs=sc;best=b}}}if(!best)return placeInterior(game,p,st,v,"sam");return placeNear(game,p,st,"sam",best.x+.5,best.y+.5,5,12)||placeInterior(
+game,p,st,v,"sam")}function placeFactory(game,p,st,v,mine){const ports=mine.port.filter(b=>game.buildingActive(b));if(ports.length){const b=ports[Math.floor(rnd(
+st)*ports.length)];const road=(x,y)=>landLine(game,p.id,x,y,b.x,b.y)===0;if(placeNear(game,p,st,"factory",b.x+.5,b.y+.5,8,30,road))return true}return placeInterior(
+game,p,st,v,"factory")}function hostileThreats(game,p,v){const s=game.s,P=s.players;const mine=defPower(game,p);const out=[];for(let q=0;q<P.length;q++){if(q===
+p.id||!v.cnt[q+1]||!P[q].alive||!game.isHostile(p.id,q))continue;const r=atkPower(game,P[q])/mine;if(r>=.6||v.inc[q]>0)out.push({q,r:r+(v.inc[q]>0?1:0)})}out.sort(
+(a,b)=>b.r-a.r||a.q-b.q);return out}function strikeThreat(game,pid){let t=0;for(const b of game.s.buildings){if((b.type==="silo"||b.type==="airbase")&&b.owner!==
+pid&&game.isHostile(pid,b.owner)){if(b.type==="silo")return 2;t=1}}return t}var NUKE_PLAN=[["missile",1],["nuclear",1],["nuclear",2],["nuclear",3]];function researchOk(p,prof,mine,key,lvl){
+const R=p.research;if(R[key]>=lvl)return false;if(key==="nuclear"&&lvl>prof.maxNuclear)return false;if(key==="naval"&&!mine.port.length)return false;const req=RESEARCH[key].
 req;return!req||R[req[0]]>=req[1]}function nextResearch(game,p,prof,mine,threat){if(p.researching)return null;if(threat&&researchOk(p,prof,mine,"aa",threat))return{
 key:"aa",pri:72};if(prof.maxNuclear&&p.gold>=6e4){for(const[key,lvl]of NUKE_PLAN){if(lvl>=3&&p.gold<15e4)break;if(researchOk(p,prof,mine,key,lvl))return{key,pri:75}}}
 for(let k=0;k<PLAN.length;k++){const[key,lvl]=PLAN[k];if(researchOk(p,prof,mine,key,lvl))return{key,pri:76-k*.7}}return null}function railWish(game,p,mine){const pid=p.
-id;for(const f of mine.factory){if(!game.buildingActive(f))continue;const port=nearestPort(game,pid,f.x,f.y);if(!port||railRoute(game,pid,f.id,port.id))continue;
-if(!railError(game,pid,f.id,port.id))return{a:f.id,b:port.id,cost:railCost(dist2(f,port))};for(const hub of[...mine.port,...mine.factory,...mine.house]){if(hub===
-f||!game.buildingActive(hub)||!railRoute(game,pid,hub.id,port.id))continue;if(!railError(game,pid,f.id,hub.id))return{a:f.id,b:hub.id,cost:railCost(dist2(f,hub))}}}
-return null}var dist2=(a,b)=>Math.sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y));function cheapestUpgrade(game,pid,list,maxLevel){let best=null,bc=Infinity;for(const b of list){
-if(b.level>=maxLevel||b.build>0)continue;const c=upgradeCost(game,b);if(c<bc){bc=c;best=b}}return best}function economy(game,p,st,v,prof,withRails){const pid=p.
-id,t=p.tiles,R=p.research;const mine=mineByType(game,pid);const rich=Math.min(3,Math.floor(p.gold/4e4));const wishes=[];const wish=(pri,cost,run,save=false)=>{wishes.
-push({pri,cost,run,save})};const threat=strikeThreat(game,pid);const nr=nextResearch(game,p,prof,mine,threat);if(nr)wish(nr.pri,researchCost(nr.key,R[nr.key]),()=>OK(
-game.apply(pid,{c:"research",key:nr.key})),nr.pri>=66);const upgrade=b=>!upgradeError(game,pid,b)&&OK(game.apply(pid,{c:"upgrade",id:b.id}));const wantH=Math.min(
-prof.maxHouses+rich*4,1+Math.floor(t/prof.houseEvery));if(mine.house.length<wantH){wish(mine.house.length?70-mine.house.length:82,buildCost(game,pid,"house"),()=>placeInterior(
-game,p,st,v,"house"),true)}const hu=cheapestUpgrade(game,pid,mine.house,BUILDINGS.house.max);if(hu)wish(64-hu.level*3,upgradeCost(game,hu),()=>upgrade(hu));const wantF=t>=
+id,W=game.W;for(const f of mine.factory){if(!game.buildingActive(f))continue;const plan=factoryRoute(game,f);if(plan&&(plan.type==="train"||plan.straight<12))continue;
+const lm=game.landId[f.y*W+f.x];let best=null,bd=Infinity;for(const port of mine.port){if(!game.buildingActive(port)||game.landId[port.y*W+port.x]!==lm)continue;
+const d=dist2(f,port);if(d<bd&&d>=12&&!railError(game,pid,f.id,port.id)){bd=d;best=port}}if(best)return{a:f.id,b:best.id,cost:railCost(bd)}}return null}var dist2=(a,b)=>Math.
+sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y));function cheapestUpgrade(game,pid,list,maxLevel){let best=null,bc=Infinity;for(const b of list){if(b.level>=maxLevel||
+b.build>0)continue;const c=upgradeCost(game,b);if(c<bc){bc=c;best=b}}return best}function economy(game,p,st,v,prof,withRails){const pid=p.id,t=p.tiles,R=p.research;
+const mine=mineByType(game,pid);const rich=Math.min(3,Math.floor(p.gold/4e4));const wishes=[];const wish=(pri,cost,run,save=false)=>{wishes.push({pri,cost,run,save})};
+const threat=strikeThreat(game,pid);const nr=nextResearch(game,p,prof,mine,threat);if(nr)wish(nr.pri,researchCost(nr.key,R[nr.key]),()=>OK(game.apply(pid,{c:"re\
+search",key:nr.key})),nr.pri>=66);const upgrade=b=>!upgradeError(game,pid,b)&&OK(game.apply(pid,{c:"upgrade",id:b.id}));const wantH=Math.min(prof.maxHouses+rich*
+4,1+Math.floor(t/prof.houseEvery));if(mine.house.length<wantH){wish(mine.house.length?70-mine.house.length:82,buildCost(game,pid,"house"),()=>placeInterior(game,
+p,st,v,"house"),true)}const hu=cheapestUpgrade(game,pid,mine.house,BUILDINGS.house.max);if(hu)wish(64-hu.level*3,upgradeCost(game,hu),()=>upgrade(hu));const wantF=t>=
 300?Math.min(prof.maxFactories+rich,1+Math.floor(t/3500)):0;if(mine.factory.length<wantF){wish(mine.factory.length?54:78,buildCost(game,pid,"factory"),()=>placeFactory(
 game,p,st,v,mine),!mine.factory.length)}if(mine.port.length){const fu=cheapestUpgrade(game,pid,mine.factory,BUILDINGS.factory.max);if(fu)wish(52,upgradeCost(game,
 fu),()=>upgrade(fu))}if(v.coast.length){const wantP=Math.min(prof.maxPorts+rich,1+Math.floor(t/6e3));if(mine.port.length<wantP){wish(mine.port.length?50:77,buildCost(
@@ -3522,8 +3608,8 @@ f*NEUTRAL_TILE*1.4+600}else{const c=per[o];if(c<0)continue;const have=game.lmCou
 if(P[o].traitorUntil>s.tick)mul*=1.2;if(o===v.lead.id&&v.lead.tiles>p.tiles)mul*=1.3;if(!locked)mul*=.6}if(gain<3)continue;const x=t%W,y=(t-x)/W;let d=Infinity;
 for(let j=0;j<cx.length;j++){const dd=(cx[j]-x)*(cx[j]-x)+(cy[j]-y)*(cy[j]-y);if(dd<d)d=dd}if(d>R2)continue;const sc=gain*mul/(Math.sqrt(d)+120);if(sc>bs&&!isBad(
 st,t,s.tick)){bs=sc;best={tile:t,target:o,troops:Math.min(send,need)}}}return best}function boats(game,p,st,v,prof){const s=game.s,pid=p.id;if(!v.coast.length||
-countOwn(game,pid,"transport")>=3)return false;const fill=p.troops/Math.max(1,p.maxTroops);const noNeutral=v.cnt[0]===0;const idle=s.tick-(st.atkAt||0)>150;const locked=noNeutral&&
-(v.hostileLand===0||idle&&fill>=prof.capPush);if(fill<(locked?.4:.55))return false;if(s.tick<st.boatAt)return false;const pick=pickLanding(game,p,st,v,prof,locked,
+countOwn(game,pid,"transport")>=3)return false;const fill=p.troops/Math.max(1,p.maxTroops);const noNeutral=v.cnt[0]===0;const idle2=s.tick-(st.atkAt||0)>150;const locked=noNeutral&&
+(v.hostileLand===0||idle2&&fill>=prof.capPush);if(fill<(locked?.4:.55))return false;if(s.tick<st.boatAt)return false;const pick=pickLanding(game,p,st,v,prof,locked,
 noNeutral);st.boatAt=s.tick+(locked?40:Math.round(prof.boatEvery/(st.sea||1)));if(!pick)return false;const W=game.W,t=pick.tile;const ratio=Math.min(1,Math.max(
 .01,pick.troops/Math.max(1,p.troops)));if(OK(game.apply(pid,{c:"boat",x:t%W,y:Math.floor(t/W),ratio}))){st.boats++;if(pick.target>=0&&st.war<0){st.war=pick.target;
 st.warAt=s.tick}}else{markBad(st,t,s.tick);st.boatAt=s.tick+20}return true}function bodyAt(game,x,y){const i=game.tileAt(x,y);return i>=0?game.map.waterBody[i]:
@@ -3542,61 +3628,71 @@ y:best[1]})}}function warTarget(game,p,st,v){const s=game.s,P=s.players;if(st.wa
 for(let q=0;q<P.length;q++){if(v.inc[q]>bv&&P[q].alive&&game.isHostile(p.id,q)){bv=v.inc[q];best=q}}if(best>=0)return best;for(let q=0;q<P.length;q++){if(q===p.
 id||!P[q].alive||!game.isHostile(p.id,q))continue;if(P[q].tiles>bv){bv=P[q].tiles;best=q}}return best}function enemyBuildingTarget(game,p,from,range,pref,maxCover){
 const s=game.s;let best=null,bs=0;for(const b of s.buildings){if(b.owner===p.id||!game.isHostile(p.id,b.owner)||!s.players[b.owner].alive)continue;if(b.type==="\
-fort"&&b.owner!==pref)continue;const dx=b.x-from.x,dy=b.y-from.y;if(range<Infinity&&dx*dx+dy*dy>range*range)continue;let sc=(VALUE2[b.type]||1)*(1+b.level);if(b.
+fort"&&b.owner!==pref)continue;const dx=b.x-from.x,dy=b.y-from.y;if(range<Infinity&&dx*dx+dy*dy>range*range)continue;let sc=(VALUE[b.type]||1)*(1+b.level);if(b.
 owner===pref)sc*=2;if(b.build>0&&!b.up)sc*=.5;if(sc<=bs)continue;const cover=routeCover(game,p.id,from.x,from.y,b.x,b.y);if(cover>maxCover)continue;sc/=1+2*cover;
 if(sc>bs){bs=sc;best=b}}return best}function droneTile(game,p,v,q,from){const s=game.s,W=game.W;const ok=i=>i>=0&&!routeCover(game,p.id,from.x,from.y,i%W,Math.floor(
 i/W));const t=v.tile[q+1];if(ok(t))return t;const Q=s.players[q];if(Q.capital>=0&&s.owner[Q.capital]===q+1&&ok(Q.capital))return Q.capital;for(const b of s.buildings)
-if(b.owner===q&&ok(b.y*W+b.x))return b.y*W+b.x;return-1}function nukeSpot(game,p,r,pref,from){const s=game.s,own=s.owner,W=game.W,H=game.H,P=s.players;const cands=[];
-for(const b of s.buildings){if(b.owner===p.id||!game.isHostile(p.id,b.owner))continue;if(pref>=0&&b.owner!==pref)continue;cands.push(b.x,b.y);if(cands.length>=60)
-break}if(pref>=0&&P[pref].capital>=0&&own[P[pref].capital]===pref+1){cands.push(P[pref].capital%W,Math.floor(P[pref].capital/W))}const step=Math.max(2,Math.floor(
-r/5));let best=-1,bs=0;for(let k=0;k<cands.length;k+=2){const cx=cands[k],cy=cands[k+1];const cover=routeCover(game,p.id,from.x,from.y,cx,cy);if(cover>1)continue;
-let enemy=0,safe=true;const R=r+3,R2=R*R;for(let dy=-R;dy<=R&&safe;dy+=step){const y=cy+dy;if(y<0||y>=H)continue;for(let dx=-R;dx<=R;dx+=step){if(dx*dx+dy*dy>R2)
-continue;const x=cx+dx;if(x<0||x>=W)continue;const o=own[y*W+x]-1;if(o<0)continue;if(o===p.id||!game.isHostile(p.id,o)){safe=false;break}enemy++}}if(!safe)continue;
-let val=enemy;for(const b of s.buildings){if(b.owner===p.id)continue;const dx=b.x-cx,dy=b.y-cy;if(dx*dx+dy*dy<=r*r)val+=(VALUE2[b.type]||1)*b.level*3}val/=1+2*cover;
-if(val>bs){bs=val;best=cy*W+cx}}return best}function strike(game,pid,kind,from,x,y){if(strikeError(game,pid,kind,from.id,x,y))return false;return OK(game.apply(
-pid,{c:"strike",kind,from:from.id,x,y}))}var MEGA_GAP=3e3;function rivalOf(game,p){let best=null;for(const q of game.s.players){if(q.id===p.id||!q.alive||!q.tiles||
-!game.isHostile(p.id,q.id))continue;if(!best||q.tiles>best.tiles)best=q}return best}function launchNuke(game,p,st,v,prof,sl,war){const s=game.s,R=p.research,W=game.
-W,gold=p.gold;if(s.tick<st.nukeAt||prof.nukes<1)return false;if(prof.nukes>=3&&R.nuclear>=3&&gold>=STRIKES.mega.cost+2e4&&s.tick>=(st.megaAt||0)){const rival=rivalOf(
-game,p);const stuck=v.cnt[0]===0&&v.hostileLand===0&&p.troops>=p.maxTroops*prof.capPush;if(rival&&(rival.tiles*5>=p.tiles*3||stuck)){const tgt=rival.capital>=0&&
-s.owner[rival.capital]===rival.id+1?rival.capital:-1;const x=tgt>=0?tgt%W:void 0,y=tgt>=0?Math.floor(tgt/W):void 0;if(strike(game,p.id,"mega",sl,x,y)){st.nukeAt=
-s.tick+600;st.megaAt=s.tick+MEGA_GAP;return true}}}if(war<0)return false;const kinds=[];if(prof.nukes>=2&&R.nuclear>=2&&gold>=STRIKES.hbomb.cost*1.5+1e4)kinds.push(
-"hbomb");if(R.nuclear>=1&&gold>=STRIKES.atom.cost*1.6+5e3)kinds.push("atom");for(const kind of kinds){const spot=nukeSpot(game,p,STRIKES[kind].r,war,sl);if(spot<
-0||!strike(game,p.id,kind,sl,spot%W,Math.floor(spot/W)))continue;st.nukeAt=s.tick+(gold>4e5?200:prof.nukeEvery);return true}return false}function strikes(game,p,st,v,prof){
-const s=game.s,pid=p.id,R=p.research,W=game.W;const air=[],silos=[];for(const b of s.buildings){if(b.owner!==pid||b.cd>0||!game.buildingActive(b))continue;if(b.
-type==="airbase")air.push(b);else if(b.type==="silo")silos.push(b)}if(!air.length&&!silos.length)return;const war=warTarget(game,p,st,v);for(const a of air){const spare=p.
-gold-1500;if(R.drone>=2&&spare>=STRIKES.kamikaze.cost){const b=enemyBuildingTarget(game,p,a,Infinity,war,0);if(b&&(b.owner===war||VALUE2[b.type]*b.level>=10)&&strike(
-game,pid,"kamikaze",a,b.x,b.y))continue}if(war>=0&&spare>=STRIKES.drone.cost){const t=droneTile(game,p,v,war,a);if(t>=0)strike(game,pid,"drone",a,t%W,Math.floor(
-t/W))}}for(const sl of silos){if(launchNuke(game,p,st,v,prof,sl,war))continue;if(R.missile>=1&&p.gold>=STRIKES.cruise.cost+3e3){const b=enemyBuildingTarget(game,
-p,sl,cruiseRange(R.missile),war,R.missile>=2?1:0);if(b&&(b.owner===war||VALUE2[b.type]*b.level>=12))strike(game,pid,"cruise",sl,b.x,b.y)}}}function attacksBetween(game,a,b){
-let ab=0,ba=0;for(const x of game.s.attacks){if(x.attacker===a&&x.target===b)ab+=x.troops;else if(x.attacker===b&&x.target===a)ba+=x.troops}return{ab,ba}}function alliesOf(game,pid){
-let n=0;for(const q of game.s.players)if(q.id!==pid&&q.alive&&game.isAllied(pid,q.id))n++;return n}function unitesAll(game,a,b){const alive=game.s.players.filter(
-q=>q.alive);for(let i=0;i<alive.length;i++){for(let j=i+1;j<alive.length;j++){const x=alive[i].id,y=alive[j].id;if(x===a&&y===b||x===b&&y===a)continue;if(!game.
-isAllied(x,y))return false}}return true}function dominant(game,lead){return lead.id>=0&&lead.tiles>lead.second*1.5&&lead.tiles*5>game.map.landCount}function propose(game,p,st,q,type){
-const s=game.s;const last2=st.prop[q]||0;if(last2&&s.tick-last2<1800)return false;if(proposeError(game,p.id,q,type))return false;if(!OK(game.apply(p.id,{c:"prop\
-ose",to:q,type})))return false;while(st.prop.length<=q)st.prop.push(0);st.prop[q]=s.tick;return true}function betray(game,p,st,v,prof){const s=game.s,P=s.players;
-if(v.cnt[0]>0||v.hostileLand>0||p.troops<p.maxTroops*prof.capPush)return false;if(p.traitorUntil>s.tick)return false;const me=atkPower(game,p);let best=-1,bs=0;
-for(const q of P){if(q.id===p.id||!q.alive||!v.cnt[q.id+1]||game.isHostile(p.id,q.id))continue;const pow=me/Math.max(1,defPower(game,q));if(pow<2.5)continue;const sc=pow*
-v.cnt[q.id+1];if(sc>bs){bs=sc;best=q.id}}if(best<0||!OK(game.apply(p.id,{c:"break",with:best})))return false;st.war=best;st.warAt=s.tick;return true}function embargoes(game,p,st){
-const s=game.s;for(const q of s.players){if(q.id===p.id||!q.alive)continue;const on=embargoBy(game,p.id,q.id);const hot=st.war===q.id&&s.tick-st.warAt>600&&q.tiles>
-p.tiles*.8&&game.relation(p.id,q.id).type==="none";if(hot===on)continue;if(!hot&&st.war===q.id)continue;return OK(game.apply(p.id,{c:"embargo",with:q.id,on:hot}))}
-return false}function diplomacy(game,p,st,v,prof){const s=game.s,P=s.players,pid=p.id;if(s.tick<st.dipAt)return;st.dipAt=s.tick+prof.dipEvery+Math.floor(rnd(st)*
-200);const lead=v.lead;const me=atkPower(game,p);for(const q of P){if(q.id===pid||!q.alive||!game.isAllied(pid,q.id))continue;if(lead.id===q.id&&q.tiles>p.tiles*
-1.4&&dominant(game,lead)){game.apply(pid,{c:"break",with:q.id});return}}if(prof.betray&&betray(game,p,st,v,prof))return;if(prof.allies&&embargoes(game,p,st))return;
-const myPorts=[];for(const b of s.buildings)if(b.owner===pid&&b.type==="port"&&game.buildingActive(b))myPorts.push(b);if(myPorts.length){for(const b of s.buildings){
-if(b.type!=="port"||b.owner===pid||!game.buildingActive(b))continue;const q=P[b.owner];if(!q.alive||q.traitorUntil>s.tick||game.relation(pid,q.id).type!=="none"||
-embargoBy(game,pid,q.id))continue;if(st.war===q.id||v.inc[q.id]>0)continue;if(!myPorts.some(m=>sharedSea(game,m,b)>=0))continue;if(propose(game,p,st,q.id,"trade"))
-return}}const front=v.dom&&v.cnt[lead.id+1]>0;for(const q of P){if(q.id===pid||!q.alive||q.traitorUntil>s.tick||!v.cnt[q.id+1])continue;if(game.relation(pid,q.id).
-type!=="none"&&game.relation(pid,q.id).type!=="trade")continue;const ratio=atkPower(game,q)/Math.max(1,me);const calm=front&&q.id!==lead.id&&ratio>=.25;if((ratio>=
-1.6||calm||v.inc[q.id]>0&&ratio>=1)&&st.war!==q.id){if(propose(game,p,st,q.id,"pact"))return}}if(prof.allies>alliesOf(game,pid)&&dominant(game,lead)&&lead.id!==
-pid){let best=-1,bs=0;for(const q of P){if(q.id===pid||q.id===lead.id||!q.alive||q.traitorUntil>s.tick)continue;if(st.war===q.id||game.isAllied(pid,q.id)||unitesAll(
-game,pid,q.id))continue;const sc=q.tiles+(v.cnt[q.id+1]?q.tiles:0);if(sc>bs){bs=sc;best=q.id}}if(best>=0)propose(game,p,st,best,"alliance")}}function aiRespond(game,pid,req){
-const s=game.s,me=s.players[pid],from=s.players[req.from];if(!me||!from||!me.alive||!from.alive)return false;if(from.traitorUntil>s.tick)return false;const prof=profileOf(
-me);const st=brain(game,me);const lead=leaderOf(s);const mine=atkPower(game,me),theirs=atkPower(game,from);const ratio=theirs/Math.max(1,mine);const war=attacksBetween(
-game,pid,req.from);const cur=game.relation(pid,req.from).type;if(req.type==="trade"){if(cur==="pact"||cur==="alliance")return false;if(war.ba>0&&ratio<1)return false;
-return st.war!==req.from||ratio>=1.2}if(req.type==="pact"){if(lead.id===req.from&&dominant(game,lead)&&lead.id!==pid&&ratio<2)return false;if(lead.id===pid&&dominant(
-game,lead)&&ratio<1.2)return false;if(war.ab>0&&ratio<.8)return false;if(ratio>=.7)return true;if(dominant(game,lead)&&lead.id!==pid&&lead.id!==req.from)return true;
-return st.war>=0&&st.war!==req.from}if(req.type==="alliance"){if(prof.allies<=alliesOf(game,pid))return false;if(unitesAll(game,pid,req.from)&&lead.id!==pid)return false;
-if(lead.id===req.from&&dominant(game,lead))return false;if(war.ab>0&&ratio<1)return false;return ratio>=.5||dominant(game,lead)&&lead.id!==pid}return false}var HANDLERS=new Map;var SYSTEMS=[];function registerIntents(table){if(!table)return;for(const k of Object.keys(table)){const h=table[k];if(h&&typeof h.check===
+if(b.owner===q&&ok(b.y*W+b.x))return b.y*W+b.x;return-1}var NUKE_MAX_FLIGHT=300;var nukeFlight=(speed,from,cx,cy)=>Math.ceil(Math.sqrt((cx-from.x)*(cx-from.x)+(cy-
+from.y)*(cy-from.y))/speed);var friendPad=ticks=>6+Math.ceil(Math.max(0,ticks)/3);function circleHas(game,cx,cy,R,test){const own=game.s.owner,W=game.W,H=game.H,
+R2=R*R;for(let dy=-R;dy<=R;dy++){const y=cy+dy;if(y<0||y>=H)continue;const span=Math.floor(Math.sqrt(R2-dy*dy));const x0=Math.max(0,cx-span),x1=Math.min(W-1,cx+
+span),row=y*W;for(let x=x0;x<=x1;x++){const o=own[row+x]-1;if(o>=0&&test(o))return true}}return false}function nukeSafe(game,pid,cx,cy,r,R){if(circleHas(game,cx,
+cy,r+1,o=>o===pid))return false;return!circleHas(game,cx,cy,R,o=>o!==pid&&!game.isHostile(pid,o))}function nukeThreatens(game,pid,q){for(const pr of game.s.projectiles){
+if(pr.owner!==pid||pr.type!=="atom"&&pr.type!=="hbomb")continue;const R=STRIKES[pr.type].r+friendPad(pr.dur-pr.t);if(circleHas(game,Math.floor(pr.tx),Math.floor(
+pr.ty),R,o=>o===q))return true}return false}var NUKE_CHECKS=6;function nukeSpot(game,p,kind,pref,from){const s=game.s,own=s.owner,W=game.W,H=game.H,P=s.players;
+const r=STRIKES[kind].r,speed=STRIKES[kind].speed;const cands=[];for(const b of s.buildings){if(b.owner===p.id||!game.isHostile(p.id,b.owner))continue;if(pref>=
+0&&b.owner!==pref)continue;cands.push(b.x,b.y);if(cands.length>=60)break}if(pref>=0&&P[pref].capital>=0&&own[P[pref].capital]===pref+1){cands.push(P[pref].capital%
+W,Math.floor(P[pref].capital/W))}const step=Math.max(2,Math.floor(r/5));const scored=[];for(let k=0;k<cands.length;k+=2){const cx=cands[k],cy=cands[k+1];const dur=nukeFlight(
+speed,from,cx,cy);if(dur>NUKE_MAX_FLIGHT)continue;const cover=routeCover(game,p.id,from.x,from.y,cx,cy);if(cover>1)continue;let enemy=0,safe=true;const R=r+friendPad(
+dur),R2=R*R;for(let dy=-R;dy<=R&&safe;dy+=step){const y=cy+dy;if(y<0||y>=H)continue;for(let dx=-R;dx<=R;dx+=step){if(dx*dx+dy*dy>R2)continue;const x=cx+dx;if(x<
+0||x>=W)continue;const o=own[y*W+x]-1;if(o<0)continue;const d2=dx*dx+dy*dy;if(o===p.id?d2<=(r+1)*(r+1):!game.isHostile(p.id,o)){safe=false;break}if(o!==p.id&&d2<=
+r*r)enemy++}}if(!safe)continue;let val=enemy;for(const b of s.buildings){if(b.owner===p.id)continue;const dx=b.x-cx,dy=b.y-cy;if(dx*dx+dy*dy<=r*r)val+=(VALUE[b.
+type]||1)*b.level*3}val/=1+2*cover;if(val>0)scored.push({i:cy*W+cx,cx,cy,R,val})}scored.sort((a,b)=>b.val-a.val||a.i-b.i);for(let k=0;k<scored.length&&k<NUKE_CHECKS;k++){
+const c=scored[k];if(nukeSafe(game,p.id,c.cx,c.cy,r,c.R))return c.i}return-1}function strike(game,pid,kind,from,x,y){if(strikeError(game,pid,kind,from.id,x,y))return false;
+return OK(game.apply(pid,{c:"strike",kind,from:from.id,x,y}))}var MEGA_GAP=3e3;function rivalOf(game,p){let best=null;for(const q of game.s.players){if(q.id===p.
+id||!q.alive||!q.tiles||!game.isHostile(p.id,q.id))continue;if(!best||q.tiles>best.tiles)best=q}return best}function launchNuke(game,p,st,v,prof,sl,war){const s=game.
+s,R=p.research,W=game.W,gold=p.gold;if(s.tick<st.nukeAt||prof.nukes<1)return false;if(prof.nukes>=3&&R.nuclear>=3&&!megasUsed(p)&&gold>=strikeCost(game,p.id,"me\
+ga")+2e4&&s.tick>=(st.megaAt||0)){const rival=rivalOf(game,p);const stuck=v.cnt[0]===0&&v.hostileLand===0&&p.troops>=p.maxTroops*prof.capPush;if(rival&&(rival.tiles*
+5>=p.tiles*3||stuck)){const tgt=rival.capital>=0&&s.owner[rival.capital]===rival.id+1?rival.capital:-1;const x=tgt>=0?tgt%W:void 0,y=tgt>=0?Math.floor(tgt/W):void 0;
+if(strike(game,p.id,"mega",sl,x,y)){st.nukeAt=s.tick+600;st.megaAt=s.tick+MEGA_GAP;return true}}}if(war<0)return false;const kinds=[];if(prof.nukes>=2&&R.nuclear>=
+2&&gold>=STRIKES.hbomb.cost*1.5+1e4)kinds.push("hbomb");if(R.nuclear>=1&&gold>=STRIKES.atom.cost*1.6+5e3)kinds.push("atom");for(const kind of kinds){const spot=nukeSpot(
+game,p,kind,war,sl);if(spot<0||!strike(game,p.id,kind,sl,spot%W,Math.floor(spot/W)))continue;st.nukeAt=s.tick+Math.round(prof.nukeEvery*(gold>4e5?.75:1));return true}
+return false}function strikes(game,p,st,v,prof){const s=game.s,pid=p.id,R=p.research,W=game.W;const air=[],silos=[];for(const b of s.buildings){if(b.owner!==pid||
+b.cd>0||!game.buildingActive(b))continue;if(b.type==="airbase")air.push(b);else if(b.type==="silo")silos.push(b)}if(!air.length&&!silos.length)return;const war=warTarget(
+game,p,st,v);for(const a of air){const spare=p.gold-1500;if(R.drone>=2&&spare>=STRIKES.kamikaze.cost){const b=enemyBuildingTarget(game,p,a,Infinity,war,0);if(b&&
+(b.owner===war||VALUE[b.type]*b.level>=10)&&strike(game,pid,"kamikaze",a,b.x,b.y))continue}if(war>=0&&spare>=STRIKES.drone.cost){const t=droneTile(game,p,v,war,
+a);if(t>=0)strike(game,pid,"drone",a,t%W,Math.floor(t/W))}}for(const sl of silos){if(launchNuke(game,p,st,v,prof,sl,war))continue;if(R.missile>=1&&p.gold>=STRIKES.
+cruise.cost+3e3){const b=enemyBuildingTarget(game,p,sl,cruiseRange(R.missile),war,R.missile>=2?1:0);if(b&&(b.owner===war||VALUE[b.type]*b.level>=12))strike(game,
+pid,"cruise",sl,b.x,b.y)}}}function attacksBetween(game,a,b){let ab=0,ba=0;for(const x of game.s.attacks){if(x.attacker===a&&x.target===b)ab+=x.troops;else if(x.
+attacker===b&&x.target===a)ba+=x.troops}return{ab,ba}}function alliesOf(game,pid){let n=0;for(const q of game.s.players)if(q.id!==pid&&q.alive&&game.isAllied(pid,
+q.id))n++;return n}function unitesAll(game,a,b){const alive=game.s.players.filter(q=>q.alive);for(let i=0;i<alive.length;i++){for(let j=i+1;j<alive.length;j++){
+const x=alive[i].id,y=alive[j].id;if(x===a&&y===b||x===b&&y===a)continue;if(!game.isAllied(x,y))return false}}return true}function dominant(game,lead){return lead.
+id>=0&&lead.tiles>lead.second*1.5&&lead.tiles*5>game.map.landCount}function propose(game,p,st,q,type){const s=game.s;const last2=st.prop[q]||0;if(last2&&s.tick-
+last2<1800)return false;if(proposeError(game,p.id,q,type))return false;if(!OK(game.apply(p.id,{c:"propose",to:q,type})))return false;while(st.prop.length<=q)st.
+prop.push(0);st.prop[q]=s.tick;return true}function betray(game,p,st,v,prof){const s=game.s,P=s.players;if(v.cnt[0]>0||v.hostileLand>0||p.troops<p.maxTroops*prof.
+capPush)return false;if(p.traitorUntil>s.tick)return false;const me=atkPower(game,p);let best=-1,bs=0;for(const q of P){if(q.id===p.id||!q.alive||!v.cnt[q.id+1]||
+game.isHostile(p.id,q.id))continue;const pow=me/Math.max(1,defPower(game,q));if(pow<2.5)continue;const sc=pow*v.cnt[q.id+1];if(sc>bs){bs=sc;best=q.id}}if(best<0||
+!OK(game.apply(p.id,{c:"break",with:best})))return false;st.war=best;st.warAt=s.tick;return true}function embargoes(game,p,st){const s=game.s;for(const q of s.players){
+if(q.id===p.id||!q.alive)continue;const on=embargoBy(game,p.id,q.id);const rel=game.relation(p.id,q.id);const hot=st.war===q.id&&s.tick-st.warAt>600&&q.tiles>p.
+tiles*.8&&rel.type==="none"&&!rel.trade;if(hot===on)continue;if(!hot&&st.war===q.id)continue;return OK(game.apply(p.id,{c:"embargo",with:q.id,on:hot}))}return false}
+function diplomacy(game,p,st,v,prof){const s=game.s,P=s.players,pid=p.id;if(s.tick<st.dipAt)return;st.dipAt=s.tick+prof.dipEvery+Math.floor(rnd(st)*200);const lead=v.
+lead;const me=atkPower(game,p);for(const q of P){if(q.id===pid||!q.alive||!game.isAllied(pid,q.id))continue;if(lead.id===q.id&&q.tiles>p.tiles*1.4&&dominant(game,
+lead)){game.apply(pid,{c:"break",with:q.id});return}}if(prof.betray&&betray(game,p,st,v,prof))return;if(prof.allies&&embargoes(game,p,st))return;const myPorts=[];
+for(const b of s.buildings)if(b.owner===pid&&b.type==="port"&&game.buildingActive(b))myPorts.push(b);if(myPorts.length){for(const b of s.buildings){if(b.type!==
+"port"||b.owner===pid||!game.buildingActive(b))continue;const q=P[b.owner];const rel=treaties(game,pid,q.id);if(!q.alive||q.traitorUntil>s.tick||rel.trade||rel.
+type==="alliance"||embargoBy(game,pid,q.id))continue;if(st.war===q.id||v.inc[q.id]>0)continue;if(!myPorts.some(m=>sharedSea(game,m,b)>=0))continue;if(propose(game,
+p,st,q.id,"trade"))return}}const front=v.dom&&v.cnt[lead.id+1]>0;for(const q of P){if(q.id===pid||!q.alive||q.traitorUntil>s.tick||!v.cnt[q.id+1])continue;if(game.
+relation(pid,q.id).type!=="none")continue;if(nukeThreatens(game,pid,q.id))continue;const ratio=atkPower(game,q)/Math.max(1,me);const calm=front&&q.id!==lead.id&&
+ratio>=.25;if((ratio>=1.6||calm||v.inc[q.id]>0&&ratio>=1)&&st.war!==q.id){if(propose(game,p,st,q.id,"pact"))return}}if(prof.allies>alliesOf(game,pid)&&dominant(
+game,lead)&&lead.id!==pid){let best=-1,bs=0;for(const q of P){if(q.id===pid||q.id===lead.id||!q.alive||q.traitorUntil>s.tick)continue;if(st.war===q.id||game.isAllied(
+pid,q.id)||unitesAll(game,pid,q.id))continue;const sc=q.tiles+(v.cnt[q.id+1]?q.tiles:0);if(sc>bs){bs=sc;best=q.id}}if(best>=0)propose(game,p,st,best,"alliance")}}
+function aiRespond(game,pid,req){const s=game.s,me=s.players[pid],from=s.players[req.from];if(!me||!from||!me.alive||!from.alive)return false;if(from.traitorUntil>
+s.tick)return false;const prof=profileOf(me);const st=brain(game,me);const lead=leaderOf(s);const mine=atkPower(game,me),theirs=atkPower(game,from);const ratio=theirs/
+Math.max(1,mine);const war=attacksBetween(game,pid,req.from);const rel=treaties(game,pid,req.from);const cur=rel.type;if(req.type==="trade"){if(cur==="alliance"||
+rel.trade)return false;if(war.ba>0&&ratio<1)return false;return st.war!==req.from||ratio>=1.2}if((req.type==="pact"||req.type==="alliance")&&nukeThreatens(game,
+pid,req.from))return false;if(req.type==="pact"){if(lead.id===req.from&&dominant(game,lead)&&lead.id!==pid&&ratio<2)return false;if(lead.id===pid&&dominant(game,
+lead)&&ratio<1.2)return false;if(war.ab>0&&ratio<.8)return false;if(ratio>=.7)return true;if(dominant(game,lead)&&lead.id!==pid&&lead.id!==req.from)return true;
+return st.war>=0&&st.war!==req.from}if(req.type==="alliance"){if(prof.allies<=alliesOf(game,pid))return false;if(unitesAll(game,pid,req.from))return false;if(lead.
+id===req.from&&dominant(game,lead))return false;if(war.ab>0&&ratio<1)return false;return ratio>=.5||dominant(game,lead)&&lead.id!==pid}return false}var HANDLERS=new Map;var SYSTEMS=[];function registerIntents(table){if(!table)return;for(const k of Object.keys(table)){const h=table[k];if(h&&typeof h.check===
 "function"&&typeof h.run==="function")HANDLERS.set(k,h)}}function registerSystem(fn,before){if(typeof fn!=="function"||SYSTEMS.includes(fn))return;const at=before?
 SYSTEMS.indexOf(before):-1;if(at>=0)SYSTEMS.splice(at,0,fn);else SYSTEMS.push(fn)}var CORE_INTENTS={_ai:{phase:"any",anyone:true,check(game,pid,cmd){const t=cmd.pid===void 0?pid:Number(cmd.pid);if(!Number.isInteger(t)||!game.s.players[t])return"\
 \u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0438\u0433\u0440\u043E\u043A";return null},run(game,pid,cmd){const t=cmd.pid===void 0?pid:Number(
@@ -3612,7 +3708,7 @@ n++;const x=i%W;if(x>0&&terrain[i-1]>=2&&landId[i-1]<0){landId[i-1]=id;stack[sp+
 if(i>=W&&terrain[i-W]>=2&&landId[i-W]<0){landId[i-W]=id;stack[sp++]=i-W}if(i<N-W&&terrain[i+W]>=2&&landId[i+W]<0){landId[i+W]=id;stack[sp++]=i+W}}sizes.push(n)}
 const oceanCoast=new Uint8Array(N);const ocean=map.nav&&map.nav.ocean;if(ocean){for(let i=0;i<N;i++){if(!map.coast[i])continue;const x=i%W;if(x>0&&ocean[i-1]||x<
 W-1&&ocean[i+1]||i>=W&&ocean[i-W]||i<N-W&&ocean[i+W])oceanCoast[i]=1}}ex={landId,landSizes:Int32Array.from(sizes),landList,oceanCoast};extrasCache.set(map,ex);return ex}
-var NO_REL=Object.freeze({type:"none",until:0,embargo:false,emb:0});var OK2=Object.freeze({ok:true});var fail=error=>({ok:false,error});var Game=class{constructor(map,state){this.map=map;this.s=state;this.W=map.W;this.H=map.H;this.N=map.W*map.H;this.events=[];this.dirty=[];this.lastError=null;this.
+var NO_REL=Object.freeze({type:"none",until:0,trade:false,embargo:false,emb:0});var OK2=Object.freeze({ok:true});var fail=error=>({ok:false,error});var Game=class{constructor(map,state){this.map=map;this.s=state;this.W=map.W;this.H=map.H;this.N=map.W*map.H;this.events=[];this.dirty=[];this.lastError=null;this.
 rebuild()}rebuild(){const{W,N,s}=this;const ex=mapExtras(this.map);this.landId=ex.landId;this.landSizes=ex.landSizes;this.landList=ex.landList;this.oceanCoast=ex.
 oceanCoast;const P=s.players.length;this.borders=[];this.borderCache=[];this.lmCount=[];for(let p=0;p<P;p++){this.borders.push(new Set);this.borderCache.push(null);
 this.lmCount.push(new Int32Array(this.landSizes.length))}this.isBorder=new Uint8Array(N);this.mark=new Uint32Array(N);this.mark2=new Uint32Array(N);this.stampN=
@@ -3669,27 +3765,40 @@ const err=h.check(this,pid,cmd);return err?fail(err):OK2}apply(pid,cmd){const r=
 this.lastError=e;return fail("\u041E\u0448\u0438\u0431\u043A\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u044B: "+(e&&e.message?e.message:String(e)))}return OK2}tick(intents){
 const s=this.s;this.events=[];this.dirty=[];if(s.phase==="over")return;this.tickCache.clear();if(intents&&intents.length){for(const it of intents){if(!it||!it.cmd)
 continue;const pid=Number(it.pid);const r=this.apply(pid,it.cmd);if(!r.ok&&s.players[pid]&&!s.players[pid].ai)this.msg(pid,r.error,"danger")}}if(typeof runAI===
-"function")runAI(this);for(const fn of SYSTEMS){fn(this);if(s.phase==="over")break}s.tick++}hash(){return hashState(this.s)}get seconds(){return this.s.tick/TICKS_PER_SEC}};var native=()=>typeof window!=="undefined"?window.native:null;var hasNative=()=>!!native();var DEFAULT_PORT=27420;var NET_VERSION=2;var CHUNK_SIZE=192*1024;var MAX_PARTS=4096;
-var MAX_PENDING=4;var chunkSeq=0;function packMessage(obj,limit=CHUNK_SIZE){const data=JSON.stringify(obj);if(data.length<=limit)return[obj];const id=(++chunkSeq).
-toString(36)+"."+data.length.toString(36);const of=Math.ceil(data.length/limit);const out=[];for(let i=0;i<of;i++)out.push({t:"chunk",id,i,of,data:data.slice(i*
-limit,(i+1)*limit)});return out}function sendLarge(transport,peer,obj,limit){const parts=packMessage(obj,limit||transport.chunkSize||CHUNK_SIZE);for(const m of parts)
-transport.send(peer,m);return parts.length}var Reassembler=class{constructor(){this.pending=new Map}accept(peer,msg){if(!msg||typeof msg!=="object")return null;
-if(msg.t!=="chunk")return msg;const{id,i,of,data}=msg;if(typeof id!=="string"||typeof data!=="string"||!Number.isInteger(i)||!Number.isInteger(of)||of<1||of>MAX_PARTS||
-i<0||i>=of)return null;const key=peer+"|"+id;let e=this.pending.get(key);if(!e){e={peer,of,got:0,parts:new Array(of)};this.pending.set(key,e);this.trim(peer,key)}
-if(e.of!==of||e.parts[i]!==void 0)return null;e.parts[i]=data;e.got++;if(e.got<of)return null;this.pending.delete(key);try{return JSON.parse(e.parts.join(""))}catch{
-return null}}trim(peer,keep){const mine=[];for(const[k,e]of this.pending)if(e.peer===peer&&k!==keep)mine.push(k);while(mine.length>=MAX_PENDING)this.pending.delete(
-mine.shift())}drop(peer){for(const[k,e]of this.pending)if(e.peer===peer)this.pending.delete(k)}};var BaseTransport=class{constructor(){this.peers=new Set;this.chunkSize=
-CHUNK_SIZE;this.onMessage=()=>{};this.onPeerJoin=()=>{};this.onPeerLeave=()=>{}}broadcast(obj){for(const p of this.peers)this.send(p,obj)}parse(data){try{return JSON.
-parse(data)}catch{return null}}};var SteamTransport=class _SteamTransport extends BaseTransport{static async init(){const n=native();if(!n||!n.steam)return{ok:false,
-error:"Steam \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0432\u0435\u0440\u0441\u0438\u0438 \u0434\u043B\u044F \u041F\u041A (Electron)"};
-return n.steam.init()}static async list(){const r=await native().steam.listLobbies();if(!r.ok)throw new Error(r.error);return r.list}static async host(maxPlayers,name){
-const r=await native().steam.createLobby(maxPlayers,name);if(!r.ok)throw new Error(r.error);return new _SteamTransport(true,r.selfId,r.selfId,r.lobbyId)}static async join(lobbyId){
-const r=await native().steam.joinLobby(String(lobbyId));if(!r.ok)throw new Error(r.error);return new _SteamTransport(false,r.selfId,r.hostId,r.lobbyId)}constructor(isHost,selfId,hostId,lobbyId){
-super();this.kind="steam";this.isHost=isHost;this.selfId=selfId;this.hostId=hostId;this.lobbyId=lobbyId;this.closed=false;if(!isHost)this.peers.add(hostId);const n=native();
-n.steam.onPacket((from,data)=>{if(this.closed)return;const msg=this.parse(data);if(!msg)return;if(!this.isHost&&from!==this.hostId)return;if(this.isHost&&!this.
-peers.has(from)){this.peers.add(from);this.onPeerJoin(from)}this.onMessage(from,msg)});n.steam.onMemberLeft(id=>{if(this.closed)return;if(this.peers.has(id)){this.
-peers.delete(id);this.onPeerLeave(id)}})}send(peer,obj){if(!this.closed)native().steam.send(peer,JSON.stringify(obj))}invite(){native().steam.invite()}close(){if(this.
-closed)return;this.closed=true;native().steam.leave()}};var LanHostTransport=class _LanHostTransport extends BaseTransport{static async host(port=DEFAULT_PORT){
+"function")runAI(this);for(const fn of SYSTEMS){fn(this);if(s.phase==="over")break}s.tick++}hash(){return hashState(this.s)}get seconds(){return this.s.tick/TICKS_PER_SEC}};var native=()=>typeof window!=="undefined"?window.native:null;var hasNative=()=>!!native();var DEFAULT_PORT=27420;var NET_VERSION=2;var CHUNK_SIZE=192*1024;var MAX_ASSEMBLY=32*
+1024*1024;var CHUNK_TTL=6e4;var MAX_PARTS=4096;var MAX_PENDING=4;var MAX_ID=64;var chunkSeq=0;function packMessage(obj,limit=CHUNK_SIZE){const data=JSON.stringify(
+obj);if(data.length<=limit)return[obj];const id=(++chunkSeq).toString(36)+"."+data.length.toString(36);const of=Math.ceil(data.length/limit);const out=[];for(let i=0;i<
+of;i++)out.push({t:"chunk",id,i,of,data:data.slice(i*limit,(i+1)*limit)});return out}function sendLarge(transport,peer,obj,limit){const parts=packMessage(obj,limit||
+transport.chunkSize||CHUNK_SIZE);for(const m of parts)transport.send(peer,m);return parts.length}var positive=(v,def)=>Number.isFinite(v)&&v>0?v:def;var Reassembler=class{constructor(opts={}){
+this.enabled=opts.chunks!==false;this.maxBytes=positive(opts.maxBytes,MAX_ASSEMBLY);this.maxParts=positive(opts.maxParts,MAX_PARTS);this.maxPending=positive(opts.
+maxPending,MAX_PENDING);this.ttl=positive(opts.ttl,CHUNK_TTL);this.now=typeof opts.now==="function"?opts.now:()=>Date.now();this.pending=new Map;this.bytes=new Map;
+this.rejected=0}accept(peer,msg){if(!msg||typeof msg!=="object"||Array.isArray(msg))return null;if(msg.t!=="chunk")return msg;if(!this.enabled)return this.reject();
+const{id,i,of,data}=msg;if(typeof id!=="string"||!id||id.length>MAX_ID||typeof data!=="string")return this.reject();if(!Number.isInteger(i)||!Number.isInteger(of)||
+of<1||of>this.maxParts||i<0||i>=of)return this.reject();if(i<of-1&&data.length*(of-1)>this.maxBytes)return this.reject();const now2=this.now();this.expire(now2);
+const key=peer+"|"+id;let e=this.pending.get(key);if(!e){e={peer,of,got:0,size:0,start:now2,parts:new Array(of)};this.pending.set(key,e);this.trim(peer,key)}if(e.
+of!==of||e.parts[i]!==void 0)return this.reject();if(e.size+data.length>this.maxBytes||(this.bytes.get(peer)||0)+data.length>this.maxBytes){this.remove(key);return this.
+reject()}e.parts[i]=data;e.got++;e.size+=data.length;this.bytes.set(peer,(this.bytes.get(peer)||0)+data.length);if(e.got<of)return null;this.remove(key);try{return JSON.
+parse(e.parts.join(""))}catch{return this.reject()}}reject(){this.rejected++;return null}held(peer){if(peer===void 0){let n=0;for(const v of this.bytes.values())
+n+=v;return n}return this.bytes.get(peer)||0}remove(key){const e=this.pending.get(key);if(!e)return;this.pending.delete(key);const left=(this.bytes.get(e.peer)||
+0)-e.size;if(left>0)this.bytes.set(e.peer,left);else this.bytes.delete(e.peer)}expire(now2){for(const[k,e]of this.pending)if(now2-e.start>this.ttl)this.remove(k)}trim(peer,keep){
+const mine=[];for(const[k,e]of this.pending)if(e.peer===peer&&k!==keep)mine.push(k);while(mine.length>=this.maxPending)this.remove(mine.shift())}drop(peer){for(const[
+k,e]of this.pending)if(e.peer===peer)this.remove(k)}};var RateLimit=class{constructor(max,window2,now2){this.max=max;this.window=window2;this.now=typeof now2===
+"function"?now2:()=>Date.now()/1e3;this.hits=new Map}slot(key){const t=this.now();let h=this.hits.get(key);if(!h||t-h.start>=this.window||t<h.start){h={start:t,
+used:0,missed:0};this.hits.set(key,h)}return h}take(key){const h=this.slot(key);if(h.used<this.max){h.used++;return true}h.missed++;return false}firstMiss(key){
+const h=this.hits.get(key);return!!h&&h.missed===1}drop(key){this.hits.delete(key)}};var BaseTransport=class{constructor(){this.peers=new Set;this.chunkSize=CHUNK_SIZE;
+this.onMessage=()=>{};this.onPeerJoin=()=>{};this.onPeerLeave=()=>{};this.onTrouble=()=>{}}broadcast(obj){for(const p of this.peers)this.send(p,obj)}parse(data){
+try{return JSON.parse(data)}catch{return null}}};var SteamTransport=class _SteamTransport extends BaseTransport{static async init(){const n=native();if(!n||!n.steam)
+return{ok:false,error:"Steam \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0432\u0435\u0440\u0441\u0438\u0438 \u0434\u043B\u044F \u041F\u041A (Electron)"};
+return n.steam.init()}static async scan(){const n=native();if(!n||!n.steam)throw new Error("Steam \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0432\u0435\u0440\u0441\u0438\u0438 \u0434\u043B\u044F \u041F\u041A (Electron)");
+const r=await n.steam.listLobbies();if(!r.ok)throw new Error(r.error);return{list:r.list||[],scanned:Number(r.scanned)||0,shared:!!r.shared}}static async list(){
+return(await _SteamTransport.scan()).list}static async host(maxPlayers,name){const r=await native().steam.createLobby(maxPlayers,name);if(!r.ok)throw new Error(
+r.error);return new _SteamTransport(true,r.selfId,r.selfId,r.lobbyId)}static async join(lobbyId){const r=await native().steam.joinLobby(String(lobbyId));if(!r.ok)
+throw new Error(r.error);return new _SteamTransport(false,r.selfId,r.hostId,r.lobbyId)}constructor(isHost,selfId,hostId,lobbyId){super();this.kind="steam";this.
+isHost=isHost;this.selfId=selfId;this.hostId=hostId;this.lobbyId=lobbyId;this.closed=false;if(!isHost)this.peers.add(hostId);const n=native();n.steam.onPacket((from,data)=>{
+if(this.closed)return;const msg=this.parse(data);if(!msg)return;if(!this.isHost&&from!==this.hostId)return;if(this.isHost&&!this.peers.has(from)){this.peers.add(
+from);this.onPeerJoin(from)}this.onMessage(from,msg)});n.steam.onMemberLeft(id=>{if(this.closed)return;if(this.peers.has(id)){this.peers.delete(id);this.onPeerLeave(
+id)}});if(n.steam.onLinkFail){n.steam.onLinkFail(id=>{if(!this.closed&&this.peers.has(id))this.onTrouble(id)})}}send(peer,obj){if(!this.closed)native().steam.send(
+peer,JSON.stringify(obj))}invite(){native().steam.invite()}close(){if(this.closed)return;this.closed=true;native().steam.leave()}};var LanHostTransport=class _LanHostTransport extends BaseTransport{static async host(port=DEFAULT_PORT){
 const n=native();if(!n||!n.lan)throw new Error("\u0425\u043E\u0441\u0442\u0438\u043D\u0433 \u043F\u043E \u0441\u0435\u0442\u0438 \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0432\u0435\u0440\u0441\u0438\u0438 \u0434\u043B\u044F \u041F\u041A");
 const r=await n.lan.host(port);if(!r.ok)throw new Error(r.error);return new _LanHostTransport(r)}constructor(info){super();this.kind="lan";this.isHost=true;this.
 selfId="host";this.hostId="host";this.ips=info.ips;this.port=info.port;this.chunkSize=4*1024*1024;this.closed=false;const n=native();n.lan.onConnect(id=>{if(!this.
@@ -3703,15 +3812,16 @@ if(!/:\d+$/.test(addr))addr+=":"+DEFAULT_PORT;return new Promise((resolve,reject
 addr))}})}constructor(ws){super();this.kind="lan";this.isHost=false;this.ws=ws;this.selfId="me";this.hostId="host";this.chunkSize=4*1024*1024;this.peers.add("ho\
 st");ws.onerror=null;ws.onmessage=e=>{const m=this.parse(e.data);if(m)this.onMessage("host",m)};ws.onclose=()=>{if(this.peers.delete("host"))this.onPeerLeave("h\
 ost")}}send(_peer,obj){if(this.ws.readyState===1)this.ws.send(JSON.stringify(obj))}close(){this.ws.onclose=null;this.ws.onmessage=null;this.peers.delete("host");
-this.ws.close()}};var TURN_MS=TICK_MS;var HASH_EVERY=50;var LAG_TURNS=3;var OFFLINE_SPEEDS=[0,1,2,3,5];var NET_SPEEDS=[0,1,2];var READY_TIMEOUT=30;var STATE_RETRY=5;var MAX_STEPS=25;
-var MAX_CATCHUP=20;var MAX_INTENTS=256;var PEER_INTENTS=32;var MAX_CMD=1024;var MAX_QUEUE=4096;var CHAT_MAX=200;var CHAT_KEEP=200;var EPS=1e-9;var OK3=Object.freeze(
-{ok:true});var fail2=error=>({ok:false,error});function plain(v){try{const str=JSON.stringify(v);return str===void 0?null:JSON.parse(str)}catch{return null}}function cleanCmd(cmd){
-if(!cmd||typeof cmd!=="object"||Array.isArray(cmd))return null;if(typeof cmd.c!=="string"||!cmd.c||cmd.c.length>24||cmd.c[0]==="_")return null;let str;try{str=JSON.
-stringify(cmd)}catch{return null}if(!str||str.length>MAX_CMD)return null;return JSON.parse(str)}function matchDesc(mapDesc,seed){const d=plain(mapDesc)||{id:"ra\
-ndom"};if(d.seed===void 0||d.seed===null)d.seed=Number(seed)>>>0;return d}function createMatch({mapDesc,seed,players,settings,map}){const desc=matchDesc(mapDesc,
-seed);const m=map||generateMap(desc);const state=createState(m,{seed:Number(seed)>>>0,players:plain(players)||[],settings:plain(settings)||{}});return{map:m,state}}
-function startOffline(opts){const{map,state}=createMatch(opts);return new Session({map,state,localPid:opts.localPid||0,mode:"offline",speed:opts.speed||1})}function loadOffline(data,map){
-const src=typeof data==="string"?JSON.parse(data):data;if(!src||typeof src!=="object"||!src.state)throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u043E\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435");
+this.ws.close()}};var TURN_MS=TICK_MS;var HASH_EVERY=50;var LAG_TURNS=3;var OFFLINE_SPEEDS=[0,1,2,3,5];var NET_SPEEDS=[0,1,2];var READY_TIMEOUT=30;var STATE_RETRY=5;var STATE_GAP=3;
+var GAP_WAIT=1;var STALL_WAIT=4;var READY_RETRY=2;var PEER_INTENTS=32;var PEER_QUEUE=256;var CHAT_BURST=5;var CHAT_WINDOW=5;var MAX_STEPS=25;var MAX_CATCHUP=20;
+var MAX_INTENTS=256;var MAX_CMD=1024;var MAX_QUEUE=4096;var MAX_BUFFER=2e4;var CHAT_MAX=200;var CHAT_KEEP=200;var EPS=1e-9;var OK3=Object.freeze({ok:true});var fail2=error=>({
+ok:false,error});function plain(v){try{const str=JSON.stringify(v);return str===void 0?null:JSON.parse(str)}catch{return null}}function cleanCmd(cmd){if(!cmd||typeof cmd!==
+"object"||Array.isArray(cmd))return null;if(typeof cmd.c!=="string"||!cmd.c||cmd.c.length>24||cmd.c[0]==="_")return null;let str;try{str=JSON.stringify(cmd)}catch{
+return null}if(!str||str.length>MAX_CMD)return null;return JSON.parse(str)}function matchDesc(mapDesc,seed){const d=plain(mapDesc)||{id:"random"};if(d.seed===void 0||
+d.seed===null)d.seed=Number(seed)>>>0;return d}function createMatch({mapDesc,seed,players,settings,map}){const desc=matchDesc(mapDesc,seed);const m=map||generateMap(
+desc);const state=createState(m,{seed:Number(seed)>>>0,players:plain(players)||[],settings:plain(settings)||{}});return{map:m,state}}function startOffline(opts){
+const{map,state}=createMatch(opts);return new Session({map,state,localPid:opts.localPid||0,mode:"offline",speed:opts.speed||1})}function loadOffline(data,map){const src=typeof data===
+"string"?JSON.parse(data):data;if(!src||typeof src!=="object"||!src.state)throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u043E\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435");
 const raw=src.state;const desc=src.mapDesc||raw.mapDesc;if(!desc)throw new Error("\u0412 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438 \u043D\u0435\u0442 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044F \u043A\u0430\u0440\u0442\u044B");
 const m=map||generateMap(desc);const state=deserializeState(raw,m);return new Session({map:m,state,localPid:Number(src.localPid)||0,mode:"offline",turn:Number(src.
 n)||0})}var Session=class{constructor(opts){const{map,state,game=null,localPid=0,mode="offline",transport=null,peers=null,speed=1,turn=0,hashEvery=HASH_EVERY,waitFor=null}=opts;
@@ -3720,126 +3830,147 @@ Map)for(const[k,v]of peers)this.peers.set(k,v);else if(peers)for(const k of Obje
 mode==="host"?NET_SPEEDS:[];const sp=Number(speed)||0;this.resumeSpeed=sp>0?sp:1;this.speed=sp>0?sp:0;this.n=turn;this.acc=0;this.queue=[];this.buffer=new Map;this.
 listeners=[];this.chat=[];this.ended=false;this.closed=false;this.endReason="";this.hashEvery=hashEvery;this.ready=new Set(mode==="host"&&waitFor?waitFor:[]);this.
 readyWait=0;this.started=this.ready.size===0;this.awaitingState=false;this.stateWait=0;this.desyncs=0;this.resyncs=0;this.lastHash=null;this.errors=0;this.lastError=
-null;this.peerCount=new Map;this.chunks=new Reassembler;if(transport){transport.onMessage=(peer,msg)=>this.onNet(peer,msg);transport.onPeerLeave=peer=>this.onPeerLeave(
-peer);transport.onPeerJoin=()=>{};if(mode==="client")transport.send(transport.hostId,{t:"ready"})}}get isAuthority(){return this.mode!=="client"}get canControl(){
-return this.mode!=="client"}get paused(){return this.speed===0}get player(){return this.s.players[this.localPid]||null}get waiting(){if(this.mode==="host")return this.
-ready.size;if(this.mode==="client")return this.awaitingState||this.n===0&&this.buffer.size===0?1:0;return 0}get lag(){return this.mode==="client"?this.buffer.size:
-0}on(fn){this.listeners.push(fn);return()=>{const k=this.listeners.indexOf(fn);if(k>=0)this.listeners.splice(k,1)}}emit(ev){for(const fn of this.listeners.slice()){
-try{fn(ev)}catch(e){if(typeof console!=="undefined")console.error(e)}}}validate(cmd){if(!cmd||typeof cmd!=="object"||typeof cmd.c!=="string")return fail2("\u041D\u0435\u0432\u0435\u0440\
-\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430");return this.game.validate(this.localPid,cmd)}send(cmd){if(this.ended)return fail2("\u0418\u0433\u0440\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\
-\u0430");if(!cmd||typeof cmd!=="object"||typeof cmd.c!=="string")return fail2("\u041D\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430");
-if(cmd.c[0]==="_"&&this.mode==="client")return fail2("\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430");
-const r=this.game.validate(this.localPid,cmd);if(!r.ok)return r;const c=plain(cmd);if(!c)return fail2("\u041D\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430");
-if(this.mode==="client"){this.transport.send(this.transport.hostId,{t:"intent",cmd:c});return OK3}if(this.queue.length>=MAX_QUEUE)return fail2("\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043A\u043E\
-\u043C\u0430\u043D\u0434");this.queue.push({pid:this.localPid,cmd:c});return OK3}setSpeed(v){if(!this.canControl||this.ended)return false;const want=Number(v)||
-0;if(want<=0)return this.setPaused(true);const list=this.speeds.filter(x=>x>0);let pick=list[0]||1;for(const x of list)if(x<=want)pick=x;const was=this.speed;this.
-speed=pick;this.resumeSpeed=pick;if(this.mode==="host"){this.broadcast({t:"speed",v:pick});if(was===0)this.broadcast({t:"pause",on:false,v:pick})}if(was===0)this.
-emit({type:"pause",on:false});this.emit({type:"speed",speed:pick});return true}setPaused(on){if(!this.canControl||this.ended)return false;on=!!on;if(on===this.paused)
-return true;if(on){this.resumeSpeed=this.speed||this.resumeSpeed||1;this.speed=0}else{this.speed=this.resumeSpeed||1}if(this.mode==="host")this.broadcast({t:"pa\
-use",on,v:this.resumeSpeed});this.emit({type:"pause",on});this.emit({type:"speed",speed:this.speed});return true}togglePause(){return this.setPaused(!this.paused)}stepTime(){
-return TURN_MS/1e3/(this.speed||this.resumeSpeed||1)}alpha(){const a=this.acc/this.stepTime();return a<0?0:a>1?1:a}update(realDt){if(this.ended)return;const dt=Number.
-isFinite(realDt)&&realDt>0?realDt:0;if(this.mode==="client")this.updateClient(dt);else this.updateAuthority(dt)}updateAuthority(dt){if(!this.started){this.readyWait+=
-dt;if(this.ready.size&&this.readyWait<READY_TIMEOUT)return;this.ready.clear();this.started=true;this.emit({type:"ready"})}if(this.speed<=0||this.s.phase==="over")
-return;const step=this.stepTime();this.acc+=Math.min(dt,.5);let k=0;while(this.acc+EPS>=step&&k<MAX_STEPS){this.acc-=step;this.step();k++;if(this.ended||this.s.
-phase==="over")break}if(this.acc<0)this.acc=0;if(this.acc>step)this.acc=step}step(){const intents=this.queue.length>MAX_INTENTS?this.queue.splice(0,MAX_INTENTS):
-this.queue.splice(0);this.peerCount.clear();if(this.mode==="host"){const msg={t:"turn",n:this.n,intents};if(this.hashEvery>0&&this.n>0&&this.n%this.hashEvery===
-0){msg.hash=hashState(this.s);this.lastHash={n:this.n,hash:msg.hash}}for(const peer of this.peers.keys())this.transport.send(peer,msg)}this.runTurn(intents)}runTurn(intents){
-try{this.game.tick(intents)}catch(e){this.errors++;this.lastError=e;this.emit({type:"error",error:"\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0438\u043C\u0443\u043B\u044F\u0446\u0438\u0438: "+
-(e&&e.message?e.message:e)})}this.n++;this.emit({type:"events",events:this.game.events,n:this.n,tick:this.s.tick})}available(limit=64){let k=0;while(k<limit&&this.
-buffer.has(this.n+k))k++;return k}updateClient(dt){if(this.awaitingState){this.stateWait+=dt;if(this.stateWait>=STATE_RETRY){this.stateWait=0;this.requestState()}
-return}const step=this.stepTime();const avail=this.available();if(!avail){this.acc=Math.min(this.acc+dt,step);return}this.acc+=Math.min(dt,.5);let budget=Math.floor(
-(this.acc+EPS)/step);if(avail>LAG_TURNS)budget=Math.max(budget,avail-1);budget=Math.min(budget,avail,MAX_CATCHUP);let done=0;while(done<budget&&!this.ended&&!this.
-awaitingState){if(!this.execBuffered())break;done++}this.acc-=done*step;if(this.acc<0)this.acc=0;if(this.acc>step)this.acc=step}execBuffered(){const t=this.buffer.
-get(this.n);if(!t)return false;if(t.hash!==void 0&&t.hash!==null){const h=hashState(this.s);this.lastHash={n:this.n,hash:h};if(h!==t.hash>>>0){this.onDesync(h);
-return false}}this.buffer.delete(this.n);this.runTurn(Array.isArray(t.intents)?t.intents:[]);return true}catchUp(max=1e9){let k=0;while(k<max&&!this.ended&&!this.
-awaitingState&&this.buffer.has(this.n)){if(!this.execBuffered())break;k++}return k}onDesync(hash2){this.desyncs++;this.awaitingState=true;this.stateWait=0;this.
-emit({type:"desync",n:this.n,hash:hash2});this.requestState(hash2)}requestState(hash2){if(this.transport&&!this.ended)this.transport.send(this.transport.hostId,
-{t:"desync",n:this.n,hash:hash2===void 0?null:hash2})}sendState(peer){const msg={t:"state",n:this.n,speed:this.speed,resume:this.resumeSpeed,state:serializeState(
-this.s)};return sendLarge(this.transport,peer,msg)}loadState(msg){if(!Number.isInteger(msg.n)||!msg.state)return;let s;try{s=deserializeState(msg.state,this.map)}catch(e){
-this.endWith("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0438\u0433\u0440\u0443: "+
+null;this.clock=0;this.idle=0;this.gap=0;this.readyRetry=0;this.lost=0;this.inbox=new Map;this.overflow=new Set;this.stateAt=new Map;this.stateWanted=new Set;this.
+chatLimit=new RateLimit(CHAT_BURST,CHAT_WINDOW,()=>this.clock);this.chunks=new Reassembler({chunks:mode==="client"});if(transport){transport.onMessage=(peer,msg)=>this.
+onNet(peer,msg);transport.onPeerLeave=peer=>this.onPeerLeave(peer);transport.onPeerJoin=()=>{};transport.onTrouble=peer=>this.onTrouble(peer);if(mode==="client")
+transport.send(transport.hostId,{t:"ready"})}}get isAuthority(){return this.mode!=="client"}get canControl(){return this.mode!=="client"}get paused(){return this.
+speed===0}get player(){return this.s.players[this.localPid]||null}get waiting(){if(this.mode==="host")return this.ready.size;if(this.mode==="client")return this.
+awaitingState||this.n===0&&this.buffer.size===0?1:0;return 0}get lag(){return this.mode==="client"?this.buffer.size:0}get backlog(){let n=0;for(const list of this.
+inbox.values())n+=list.length;return n}on(fn){this.listeners.push(fn);return()=>{const k=this.listeners.indexOf(fn);if(k>=0)this.listeners.splice(k,1)}}emit(ev){
+for(const fn of this.listeners.slice()){try{fn(ev)}catch(e){if(typeof console!=="undefined")console.error(e)}}}validate(cmd){if(!cmd||typeof cmd!=="object"||typeof cmd.
+c!=="string")return fail2("\u041D\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430");return this.game.validate(this.localPid,
+cmd)}send(cmd){if(this.ended)return fail2("\u0418\u0433\u0440\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430");if(!cmd||typeof cmd!=="object"||typeof cmd.
+c!=="string")return fail2("\u041D\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430");if(cmd.c[0]==="_"&&this.mode==="client")
+return fail2("\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430");const r=this.game.validate(this.localPid,
+cmd);if(!r.ok)return r;const c=plain(cmd);if(!c)return fail2("\u041D\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430");if(this.
+mode==="client"){this.transport.send(this.transport.hostId,{t:"intent",cmd:c});return OK3}if(this.queue.length>=MAX_QUEUE)return fail2("\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043A\u043E\u043C\u0430\u043D\u0434");
+this.queue.push({pid:this.localPid,cmd:c});return OK3}setSpeed(v){if(!this.canControl||this.ended)return false;const want=Number(v)||0;if(want<=0)return this.setPaused(
+true);const list=this.speeds.filter(x=>x>0);let pick=list[0]||1;for(const x of list)if(x<=want)pick=x;const was=this.speed;this.speed=pick;this.resumeSpeed=pick;
+if(this.mode==="host"){this.broadcast({t:"speed",v:pick});if(was===0)this.broadcast({t:"pause",on:false,v:pick})}if(was===0)this.emit({type:"pause",on:false});this.
+emit({type:"speed",speed:pick});return true}setPaused(on){if(!this.canControl||this.ended)return false;on=!!on;if(on===this.paused)return true;if(on){this.resumeSpeed=
+this.speed||this.resumeSpeed||1;this.speed=0}else{this.speed=this.resumeSpeed||1}if(this.mode==="host")this.broadcast({t:"pause",on,v:this.resumeSpeed});this.emit(
+{type:"pause",on});this.emit({type:"speed",speed:this.speed});return true}togglePause(){return this.setPaused(!this.paused)}stepTime(){return TURN_MS/1e3/(this.
+speed||this.resumeSpeed||1)}alpha(){const a=this.acc/this.stepTime();return a<0?0:a>1?1:a}update(realDt){if(this.ended)return;const dt=Number.isFinite(realDt)&&
+realDt>0?realDt:0;this.clock+=dt;if(this.mode==="client")this.updateClient(dt);else{if(this.stateWanted.size)this.flushStates();this.updateAuthority(dt)}}updateAuthority(dt){
+if(!this.started){this.readyWait+=dt;if(this.ready.size&&this.readyWait<READY_TIMEOUT)return;this.ready.clear();this.started=true;this.emit({type:"ready"})}if(this.
+speed<=0||this.s.phase==="over")return;const step=this.stepTime();this.acc+=Math.min(dt,.5);let k=0;while(this.acc+EPS>=step&&k<MAX_STEPS){this.acc-=step;this.step();
+k++;if(this.ended||this.s.phase==="over")break}if(this.acc<0)this.acc=0;if(this.acc>step)this.acc=step}step(){const intents=this.queue.splice(0,MAX_INTENTS);if(this.
+inbox.size)this.drainInbox(intents);if(this.mode==="host"){const msg={t:"turn",n:this.n,intents};if(this.hashEvery>0&&this.n>0&&this.n%this.hashEvery===0){msg.hash=
+hashState(this.s);this.lastHash={n:this.n,hash:msg.hash}}for(const peer of this.peers.keys())this.transport.send(peer,msg)}this.runTurn(intents)}drainInbox(intents){
+for(const[peer,list]of this.inbox){const k=Math.min(list.length,PEER_INTENTS,MAX_INTENTS-intents.length);for(let j=0;j<k;j++)intents.push(list[j]);if(k>0)list.splice(
+0,k);if(!list.length){this.inbox.delete(peer);this.overflow.delete(peer)}}}runTurn(intents){try{this.game.tick(intents)}catch(e){this.errors++;this.lastError=e;
+this.emit({type:"error",error:"\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0438\u043C\u0443\u043B\u044F\u0446\u0438\u0438: "+(e&&e.message?e.message:e)})}this.
+n++;this.emit({type:"events",events:this.game.events,n:this.n,tick:this.s.tick})}available(limit=64){let k=0;while(k<limit&&this.buffer.has(this.n+k))k++;return k}updateClient(dt){
+this.idle+=dt;if(this.awaitingState){this.stateWait+=dt;if(this.stateWait>=STATE_RETRY){this.stateWait=0;this.requestState()}return}const step=this.stepTime();const avail=this.
+available();if(!avail){this.acc=Math.min(this.acc+dt,step);this.watch(dt);return}this.gap=0;this.acc+=Math.min(dt,.5);let budget=Math.floor((this.acc+EPS)/step);
+if(avail>LAG_TURNS)budget=Math.max(budget,avail-1);budget=Math.min(budget,avail,MAX_CATCHUP);let done=0;while(done<budget&&!this.ended&&!this.awaitingState){if(!this.
+execBuffered())break;done++}this.acc-=done*step;if(this.acc<0)this.acc=0;if(this.acc>step)this.acc=step}execBuffered(){const t=this.buffer.get(this.n);if(!t)return false;
+if(t.hash!==void 0&&t.hash!==null){const h=hashState(this.s);this.lastHash={n:this.n,hash:h};if(h!==t.hash>>>0){this.onDesync(h);return false}}this.buffer.delete(
+this.n);this.runTurn(Array.isArray(t.intents)?t.intents:[]);return true}watch(dt){if(this.buffer.size){this.gap+=dt;if(this.gap>=GAP_WAIT)this.resync("lost");return}
+this.gap=0;if(this.n===0){this.readyRetry+=dt;if(this.readyRetry>=READY_RETRY&&this.transport){this.readyRetry=0;this.transport.send(this.transport.hostId,{t:"r\
+eady"})}return}if(this.speed>0&&this.s.phase!=="over"&&this.idle>=STALL_WAIT)this.resync("stall")}resync(reason){if(this.mode!=="client"||this.awaitingState||this.
+ended)return false;this.lost++;this.gap=0;this.idle=0;this.awaitingState=true;this.stateWait=0;this.emit({type:"desync",n:this.n,hash:null,reason});this.requestState();
+return true}onTrouble(peer){if(this.ended||this.mode!=="client"||!this.transport||peer!==this.transport.hostId)return;if(this.n>0||this.buffer.size)this.resync(
+"link")}catchUp(max=1e9){let k=0;while(k<max&&!this.ended&&!this.awaitingState&&this.buffer.has(this.n)){if(!this.execBuffered())break;k++}return k}onDesync(hash2){
+this.desyncs++;this.awaitingState=true;this.stateWait=0;this.emit({type:"desync",n:this.n,hash:hash2});this.requestState(hash2)}requestState(hash2){if(this.transport&&
+!this.ended)this.transport.send(this.transport.hostId,{t:"desync",n:this.n,hash:hash2===void 0?null:hash2})}sendState(peer){const msg={t:"state",n:this.n,speed:this.
+speed,resume:this.resumeSpeed,state:serializeState(this.s)};return sendLarge(this.transport,peer,msg)}queueState(peer){const last2=this.stateAt.get(peer);if(last2===
+void 0||this.clock-last2>=STATE_GAP)this.pushState(peer);else this.stateWanted.add(peer)}pushState(peer){this.stateWanted.delete(peer);if(!this.peers.has(peer))
+return;this.stateAt.set(peer,this.clock);this.desyncs++;this.emit({type:"desync",pid:this.peers.get(peer),n:this.n});this.sendState(peer)}flushStates(){for(const peer of this.
+stateWanted){if(this.clock-(this.stateAt.get(peer)||0)>=STATE_GAP)this.pushState(peer)}}loadState(msg){if(!Number.isInteger(msg.n)||!msg.state)return;let s;try{
+s=deserializeState(msg.state,this.map)}catch(e){this.endWith("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0438\u0433\u0440\u0443: "+
 (e&&e.message?e.message:e));return}this.game=new Game(this.map,s);this.s=s;this.n=msg.n;for(const k of[...this.buffer.keys()])if(k<this.n)this.buffer.delete(k);
-this.awaitingState=false;this.stateWait=0;this.resyncs++;this.acc=0;if(Number(msg.resume)>0)this.resumeSpeed=Number(msg.resume);if(msg.speed!==void 0)this.speed=
-Number(msg.speed)>0?Number(msg.speed):0;this.emit({type:"resync",n:this.n})}broadcast(msg){if(!this.transport)return;for(const peer of this.peers.keys())this.transport.
-send(peer,msg)}onNet(peer,raw){if(this.closed)return;const msg=this.chunks.accept(peer,raw);if(!msg||typeof msg.t!=="string")return;if(this.mode==="host")this.onHostMsg(
-peer,msg);else if(this.mode==="client")this.onClientMsg(peer,msg)}onHostMsg(peer,msg){const pid=this.peers.get(peer);if(pid===void 0){if(msg.t==="hello")this.transport.
-send(peer,{t:"reject",reason:"\u0418\u0433\u0440\u0430 \u0443\u0436\u0435 \u043D\u0430\u0447\u0430\u043B\u0430\u0441\u044C"});return}switch(msg.t){case"intent":{
-const cmd=cleanCmd(msg.cmd);if(!cmd)return;const c=this.peerCount.get(peer)||0;if(c>=PEER_INTENTS||this.queue.length>=MAX_QUEUE)return;this.peerCount.set(peer,c+
-1);this.queue.push({pid,cmd});return}case"chat":this.postChat(pid,msg.text);return;case"desync":this.desyncs++;this.emit({type:"desync",pid,n:Number(msg.n)||0});
-this.sendState(peer);return;case"ready":if(this.ready.delete(peer)&&!this.ready.size&&!this.started){this.started=true;this.emit({type:"ready"})}return;case"bye":
-this.onPeerLeave(peer);return;default:}}onClientMsg(peer,msg){if(this.transport&&peer!==this.transport.hostId)return;switch(msg.t){case"turn":if(Number.isInteger(
-msg.n)&&msg.n>=this.n&&!this.buffer.has(msg.n))this.buffer.set(msg.n,msg);return;case"state":this.loadState(msg);return;case"speed":if(Number(msg.v)>0){this.resumeSpeed=
-Number(msg.v);if(this.speed>0)this.speed=this.resumeSpeed;this.emit({type:"speed",speed:this.speed})}return;case"pause":{const on=!!msg.on;if(Number(msg.v)>0)this.
-resumeSpeed=Number(msg.v);if(on===this.paused)return;this.speed=on?0:this.resumeSpeed||1;this.emit({type:"pause",on});this.emit({type:"speed",speed:this.speed});
-return}case"chat":this.pushChat(msg);return;case"closed":this.endWith("\u0425\u043E\u0441\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043B \u0438\u0433\u0440\u0443");
-return;case"kick":this.endWith("\u0425\u043E\u0441\u0442 \u0438\u0441\u043A\u043B\u044E\u0447\u0438\u043B \u0432\u0430\u0441 \u0438\u0437 \u0438\u0433\u0440\u044B");
-return;case"err":this.emit({type:"error",error:String(msg.error||"")});return;default:}}onPeerLeave(peer){if(this.ended)return;if(this.mode==="host"){const pid=this.
-peers.get(peer);if(pid===void 0)return;this.peers.delete(peer);this.chunks.drop(peer);if(this.ready.delete(peer)&&!this.ready.size&&!this.started){this.started=
-true;this.emit({type:"ready"})}const p=this.s.players[pid];this.queue.push({pid,cmd:{c:"_ai",pid,level:"normal"}});this.emit({type:"peerLeft",pid,name:p?p.name:
-""})}else if(this.mode==="client"){this.endWith("\u0421\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0441 \u0445\u043E\u0441\u0442\u043E\u043C \u043F\u043E\u0442\u0435\u0440\u044F\u043D\u043E")}}sendChat(text){
-const t=String(text===void 0||text===null?"":text).trim().slice(0,CHAT_MAX);if(!t||this.ended)return false;if(this.mode==="client"){this.transport.send(this.transport.
-hostId,{t:"chat",text:t});return true}this.postChat(this.localPid,t);return true}postChat(pid,text){const t=String(text===void 0||text===null?"":text).trim().slice(
-0,CHAT_MAX);if(!t)return;const p=this.s.players[pid];const c={t:"chat",from:pid,name:p?p.name:"\u0418\u0433\u0440\u043E\u043A",color:p?p.color:"#ffffff",text:t};
-this.broadcast(c);this.pushChat(c)}pushChat(m){const c={from:Number.isInteger(m.from)?m.from:-1,name:String(m.name||"").slice(0,32),color:typeof m.color==="stri\
-ng"?m.color:"#ffffff",text:String(m.text||"").slice(0,CHAT_MAX),tick:this.s.tick};this.chat.push(c);if(this.chat.length>CHAT_KEEP)this.chat.splice(0,this.chat.length-
-CHAT_KEEP);this.emit({type:"chat",chat:c})}hash(){return hashState(this.s)}snapshot(){return{version:this.s.version,mapDesc:plain(this.s.mapDesc),localPid:this.
-localPid,n:this.n,state:serializeState(this.s)}}endWith(reason){if(this.ended)return;this.ended=true;this.endReason=reason;this.emit({type:"disconnected",reason})}close(delay=100){
-if(this.closed)return;this.closed=true;this.ended=true;const t=this.transport;if(!t)return;if(this.mode==="host")this.broadcast({t:"closed"});else if(this.mode===
-"client")t.send(t.hostId,{t:"bye"});if(delay>0&&typeof setTimeout==="function")setTimeout(()=>t.close(),delay);else t.close()}};var MAX_SLOTS=12;var HEX=/^#[0-9a-fA-F]{6}$/;var CHAT_MAX2=200;var randomSeed=()=>Math.floor(Math.random()*2147483647)>>>0;function cleanName(v,def="\u0418\u0433\u0440\u043E\u043A"){
-const s=String(v===void 0||v===null?"":v).replace(/[\u0000-\u001f\u007f]/g,"").trim().slice(0,20);return s||def}var isColor=c=>typeof c==="string"&&HEX.test(c);
-function defaultLobbySettings(){return{map:"world",custom:null,seed:randomSeed(),victory:{...DEFAULT_SETTINGS.victory},spawnSeconds:DEFAULT_SETTINGS.spawnSeconds,
-difficulty:DEFAULT_SETTINGS.difficulty}}function customOf(v){if(!v)return null;const d=v.id==="custom"&&Array.isArray(v.rows)?v:parseCustomMap(v);const out={id:"\
-custom",name:String(d.name||"\u0421\u0432\u043E\u044F \u043A\u0430\u0440\u0442\u0430").slice(0,40),rows:d.rows.slice()};if(Number.isFinite(Number(d.scale))&&Number(
-d.scale)>=1)out.scale=Math.min(16,Math.floor(Number(d.scale)));return out}function mergeSettings(cur,patch){const next={...cur,victory:{...cur.victory}};if(!patch||
-typeof patch!=="object")return next;if(patch.map!==void 0&&patch.map!=="custom"&&MAPS.some(m=>m.id===patch.map)){next.map=patch.map;next.custom=null}if(patch.custom!==
-void 0){next.custom=customOf(patch.custom);if(next.custom)next.map="custom";else if(next.map==="custom")next.map=MAPS[0].id}if(patch.seed!==void 0&&Number.isFinite(
-Number(patch.seed)))next.seed=Math.floor(Math.abs(Number(patch.seed)))>>>0;const merged=normalizeSettings({victory:{...next.victory,...patch.victory&&typeof patch.
-victory==="object"?patch.victory:{}},spawnSeconds:patch.spawnSeconds!==void 0?patch.spawnSeconds:next.spawnSeconds,difficulty:patch.difficulty!==void 0?patch.difficulty:
-next.difficulty});next.victory=merged.victory;next.spawnSeconds=merged.spawnSeconds;next.difficulty=merged.difficulty;return next}function mapLimit(settings){if(settings.
-custom)return MAX_SLOTS;const m=MAPS.find(x=>x.id===settings.map);return Math.min(MAX_SLOTS,m&&m.maxPlayers?m.maxPlayers:MAX_SLOTS)}function lobbyMapDesc(settings){
-return settings.custom?{...settings.custom,seed:settings.seed}:{id:settings.map,seed:settings.seed}}function gameSettings(settings){return normalizeSettings({victory:settings.
-victory,spawnSeconds:settings.spawnSeconds,difficulty:settings.difficulty})}var HostLobby=class{constructor(transport,name,opts={}){this.transport=transport;this.
-uid=1;this.slots=[{id:this.uid++,peer:null,name:cleanName(name),ai:null,color:isColor(opts.color)?opts.color:PLAYER_COLORS[0]}];this.settings=mergeSettings(defaultLobbySettings(),
-opts.settings);this.customRev=this.settings.custom?1:0;this.chat=[];this.started=false;this.closed=false;this.onChange=()=>{};this.onChat=()=>{};this.chunks=new Reassembler;
-transport.onMessage=(peer,msg)=>this.onMsg(peer,msg);transport.onPeerLeave=peer=>this.onLeave(peer);transport.onPeerJoin=()=>{}}get maxPlayers(){return mapLimit(
-this.settings)}mapName(){if(this.settings.custom)return this.settings.custom.name;const m=MAPS.find(x=>x.id===this.settings.map);return m?m.name:this.settings.map}mapDesc(){
-return lobbyMapDesc(this.settings)}freeColor(){const used=new Set(this.slots.map(s=>s.color.toLowerCase()));for(const c of PLAYER_COLORS)if(!used.has(c.toLowerCase()))
-return c;return PLAYER_COLORS[this.slots.length%PLAYER_COLORS.length]}colorTaken(color,except){const c=color.toLowerCase();return this.slots.some((s,i)=>i!==except&&
-s.color.toLowerCase()===c)}slotOf(peer){return this.slots.findIndex(s=>s.peer!==null&&s.peer===peer)}canStart(){if(this.started)return"\u0418\u0433\u0440\u0430 \u0443\u0436\u0435 \u043D\u0430\u0447\u0430\u043B\u0430\u0441\u044C";
-if(this.slots.length<2)return"\u041D\u0443\u0436\u043D\u043E \u043C\u0438\u043D\u0438\u043C\u0443\u043C 2 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0430 \u2014 \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0431\u043E\u0442\u0430 \u0438\u043B\u0438 \u0434\u043E\u0436\u0434\u0438\u0442\u0435\u0441\u044C \u0434\u0440\u0443\u0433\u0430";
-if(this.slots.length>this.maxPlayers)return`\u041D\u0430 \u044D\u0442\u043E\u0439 \u043A\u0430\u0440\u0442\u0435 \u043D\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 ${this.
-maxPlayers} \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432`;return null}publicView(you=0){const s=this.settings;return{t:"lobby",v:NET_VERSION,you,
-slots:this.slots.map((sl,i)=>({id:sl.id,name:sl.name,ai:sl.ai,color:sl.color,host:i===0,human:!sl.ai})),settings:{map:s.map,mapName:this.mapName(),custom:s.custom?
-{name:s.custom.name,rev:this.customRev,w:s.custom.rows[0].length,h:s.custom.rows.length}:null,seed:s.seed,victory:{...s.victory},spawnSeconds:s.spawnSeconds,difficulty:s.
-difficulty},maxPlayers:this.maxPlayers,canStart:this.canStart(),lobbyId:this.transport.lobbyId||null,kind:this.transport.kind||null}}sync(){if(this.closed)return null;
-this.slots.forEach((sl,i)=>{if(sl.peer!==null)this.transport.send(sl.peer,this.publicView(i))});const view=this.publicView(0);this.onChange(view);return view}sendCustom(peer){
-if(!this.settings.custom)return;sendLarge(this.transport,peer,{t:"custom",rev:this.customRev,desc:this.settings.custom})}onMsg(peer,raw){if(this.closed||this.started)
-return;const msg=this.chunks.accept(peer,raw);if(!msg||typeof msg.t!=="string")return;if(msg.t==="hello"){this.onHello(peer,msg);return}const i=this.slotOf(peer);
-if(i<0)return;if(msg.t==="color"){if(!this.setColor(i,msg.color))this.transport.send(peer,{t:"err",error:"\u042D\u0442\u043E\u0442 \u0446\u0432\u0435\u0442 \u0443\u0436\u0435 \u0437\u0430\u043D\u044F\u0442"})}else if(msg.
-t==="name"){this.slots[i].name=cleanName(msg.name,this.slots[i].name);this.sync()}else if(msg.t==="chat"){this.postChat(i,msg.text)}else if(msg.t==="bye"){this.
-onLeave(peer)}}onHello(peer,msg){const known=this.slotOf(peer);if(known>=0){this.sendCustom(peer);this.transport.send(peer,this.publicView(known));return}if(msg.
-v!==NET_VERSION){this.transport.send(peer,{t:"reject",reason:"\u0423 \u0445\u043E\u0441\u0442\u0430 \u0434\u0440\u0443\u0433\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0438\u0433\u0440\u044B"});
+this.awaitingState=false;this.stateWait=0;this.idle=0;this.gap=0;this.resyncs++;this.acc=0;if(Number(msg.resume)>0)this.resumeSpeed=Number(msg.resume);if(msg.speed!==
+void 0)this.speed=Number(msg.speed)>0?Number(msg.speed):0;this.emit({type:"resync",n:this.n})}broadcast(msg){if(!this.transport)return;for(const peer of this.peers.
+keys())this.transport.send(peer,msg)}onNet(peer,raw){if(this.closed)return;const msg=this.chunks.accept(peer,raw);if(!msg||typeof msg.t!=="string")return;if(this.
+mode==="host")this.onHostMsg(peer,msg);else if(this.mode==="client")this.onClientMsg(peer,msg)}onHostMsg(peer,msg){const pid=this.peers.get(peer);if(pid===void 0){
+if(msg.t==="hello")this.transport.send(peer,{t:"reject",reason:"\u0418\u0433\u0440\u0430 \u0443\u0436\u0435 \u043D\u0430\u0447\u0430\u043B\u0430\u0441\u044C"});
+return}switch(msg.t){case"intent":this.takeIntent(peer,pid,msg.cmd);return;case"chat":if(this.chatLimit.take(peer))this.postChat(pid,msg.text);else if(this.chatLimit.
+firstMiss(peer))this.transport.send(peer,{t:"err",error:"\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0432 \u0447\u0430\u0442\u0435 \u2014 \u043F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u0435\u043A\u0443\u043D\u0434"});
+return;case"desync":this.queueState(peer);return;case"ready":if(this.ready.delete(peer)&&!this.ready.size&&!this.started){this.started=true;this.emit({type:"rea\
+dy"})}return;case"bye":this.onPeerLeave(peer);return;default:}}takeIntent(peer,pid,raw){const cmd=cleanCmd(raw);if(!cmd)return false;let list=this.inbox.get(peer);
+if(!list){list=[];this.inbox.set(peer,list)}if(list.length>=PEER_QUEUE){if(!this.overflow.has(peer)){this.overflow.add(peer);this.transport.send(peer,{t:"err",error:"\
+\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u043A\u043E\u043C\u0430\u043D\u0434 \u043F\u043E\u0434\u0440\u044F\u0434 \u2014 \u0447\u0430\u0441\u0442\u044C \u0438\u0437 \u043D\u0438\u0445 \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0430"})}
+return false}list.push({pid,cmd});return true}onClientMsg(peer,msg){if(this.transport&&peer!==this.transport.hostId)return;switch(msg.t){case"turn":if(!Number.isInteger(
+msg.n)||msg.n<this.n||this.buffer.has(msg.n))return;if(this.buffer.size>=MAX_BUFFER){this.resync("lost");return}this.buffer.set(msg.n,msg);this.idle=0;return;case"\
+state":this.loadState(msg);return;case"speed":this.idle=0;if(Number(msg.v)>0){this.resumeSpeed=Number(msg.v);if(this.speed>0)this.speed=this.resumeSpeed;this.emit(
+{type:"speed",speed:this.speed})}return;case"pause":{this.idle=0;const on=!!msg.on;if(Number(msg.v)>0)this.resumeSpeed=Number(msg.v);if(on===this.paused)return;
+this.speed=on?0:this.resumeSpeed||1;this.emit({type:"pause",on});this.emit({type:"speed",speed:this.speed});return}case"chat":this.pushChat(msg);return;case"clo\
+sed":this.endWith("\u0425\u043E\u0441\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043B \u0438\u0433\u0440\u0443");return;case"kick":this.endWith("\u0425\u043E\u0441\u0442 \u0438\u0441\u043A\
+\u043B\u044E\u0447\u0438\u043B \u0432\u0430\u0441 \u0438\u0437 \u0438\u0433\u0440\u044B");return;case"err":this.emit({type:"error",error:String(msg.error||"")});
+return;default:}}onPeerLeave(peer){if(this.ended)return;if(this.mode==="host"){const pid=this.peers.get(peer);if(pid===void 0)return;this.peers.delete(peer);this.
+forget(peer);if(this.ready.delete(peer)&&!this.ready.size&&!this.started){this.started=true;this.emit({type:"ready"})}const p=this.s.players[pid];this.queue.push(
+{pid,cmd:{c:"_ai",pid,level:"normal"}});this.emit({type:"peerLeft",pid,name:p?p.name:""})}else if(this.mode==="client"){this.endWith("\u0421\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0441 \u0445\u043E\u0441\u0442\u043E\u043C \u043F\u043E\u0442\u0435\u0440\u044F\
+\u043D\u043E")}}forget(peer){this.chunks.drop(peer);this.inbox.delete(peer);this.overflow.delete(peer);this.stateAt.delete(peer);this.stateWanted.delete(peer);this.
+chatLimit.drop(peer)}sendChat(text){const t=String(text===void 0||text===null?"":text).trim().slice(0,CHAT_MAX);if(!t||this.ended)return false;if(this.mode==="c\
+lient"){this.transport.send(this.transport.hostId,{t:"chat",text:t});return true}this.postChat(this.localPid,t);return true}postChat(pid,text){const t=String(text===
+void 0||text===null?"":text).trim().slice(0,CHAT_MAX);if(!t)return;const p=this.s.players[pid];const c={t:"chat",from:pid,name:p?p.name:"\u0418\u0433\u0440\u043E\u043A",
+color:p?p.color:"#ffffff",text:t};this.broadcast(c);this.pushChat(c)}pushChat(m){const c={from:Number.isInteger(m.from)?m.from:-1,name:String(m.name||"").slice(
+0,32),color:typeof m.color==="string"?m.color:"#ffffff",text:String(m.text||"").slice(0,CHAT_MAX),tick:this.s.tick};this.chat.push(c);if(this.chat.length>CHAT_KEEP)
+this.chat.splice(0,this.chat.length-CHAT_KEEP);this.emit({type:"chat",chat:c})}hash(){return hashState(this.s)}snapshot(){return{version:this.s.version,mapDesc:plain(
+this.s.mapDesc),localPid:this.localPid,n:this.n,state:serializeState(this.s)}}endWith(reason){if(this.ended)return;this.ended=true;this.endReason=reason;this.emit(
+{type:"disconnected",reason})}close(delay=100){if(this.closed)return;this.closed=true;this.ended=true;const t=this.transport;if(!t)return;if(this.mode==="host")
+this.broadcast({t:"closed"});else if(this.mode==="client")t.send(t.hostId,{t:"bye"});if(delay>0&&typeof setTimeout==="function")setTimeout(()=>t.close(),delay);else
+t.close()}};var MAX_SLOTS=12;var LOBBY_BURST=20;var LOBBY_WINDOW=5;var LOBBY_CHAT_BURST=5;var HEX=/^#[0-9a-fA-F]{6}$/;var CHAT_MAX2=200;var randomSeed=()=>Math.floor(Math.random()*
+2147483647)>>>0;function cleanName(v,def="\u0418\u0433\u0440\u043E\u043A"){const s=String(v===void 0||v===null?"":v).replace(/[\u0000-\u001f\u007f]/g,"").trim().
+slice(0,20);return s||def}var isColor=c=>typeof c==="string"&&HEX.test(c);function defaultLobbySettings(){return{map:"world",custom:null,seed:randomSeed(),victory:{
+...DEFAULT_SETTINGS.victory},spawnSeconds:DEFAULT_SETTINGS.spawnSeconds,difficulty:DEFAULT_SETTINGS.difficulty}}function customOf(v){if(!v)return null;const d=v.
+id==="custom"&&Array.isArray(v.rows)?v:parseCustomMap(v);const out={id:"custom",name:String(d.name||"\u0421\u0432\u043E\u044F \u043A\u0430\u0440\u0442\u0430").slice(
+0,40),rows:d.rows.slice()};if(Number.isFinite(Number(d.scale))&&Number(d.scale)>=1)out.scale=Math.min(16,Math.floor(Number(d.scale)));return out}function mergeSettings(cur,patch){
+const next={...cur,victory:{...cur.victory}};if(!patch||typeof patch!=="object")return next;if(patch.map!==void 0&&patch.map!=="custom"&&MAPS.some(m=>m.id===patch.
+map)){next.map=patch.map;next.custom=null}if(patch.custom!==void 0){next.custom=customOf(patch.custom);if(next.custom)next.map="custom";else if(next.map==="cust\
+om")next.map=MAPS[0].id}if(patch.seed!==void 0&&Number.isFinite(Number(patch.seed)))next.seed=Math.floor(Math.abs(Number(patch.seed)))>>>0;const merged=normalizeSettings(
+{victory:{...next.victory,...patch.victory&&typeof patch.victory==="object"?patch.victory:{}},spawnSeconds:patch.spawnSeconds!==void 0?patch.spawnSeconds:next.spawnSeconds,
+difficulty:patch.difficulty!==void 0?patch.difficulty:next.difficulty});next.victory=merged.victory;next.spawnSeconds=merged.spawnSeconds;next.difficulty=merged.
+difficulty;return next}function mapLimit(settings){if(settings.custom)return MAX_SLOTS;const m=MAPS.find(x=>x.id===settings.map);return Math.min(MAX_SLOTS,m&&m.
+maxPlayers?m.maxPlayers:MAX_SLOTS)}function lobbyMapDesc(settings){return settings.custom?{...settings.custom,seed:settings.seed}:{id:settings.map,seed:settings.
+seed}}function gameSettings(settings){return normalizeSettings({victory:settings.victory,spawnSeconds:settings.spawnSeconds,difficulty:settings.difficulty})}var HostLobby=class{constructor(transport,name,opts={}){
+this.transport=transport;this.uid=1;this.slots=[{id:this.uid++,peer:null,name:cleanName(name),ai:null,color:isColor(opts.color)?opts.color:PLAYER_COLORS[0]}];this.
+settings=mergeSettings(defaultLobbySettings(),opts.settings);this.customRev=this.settings.custom?1:0;this.chat=[];this.started=false;this.closed=false;this.onChange=
+()=>{};this.onChat=()=>{};this.chunks=new Reassembler({chunks:false});this.limit=new RateLimit(LOBBY_BURST,LOBBY_WINDOW,opts.now);this.chatLimit=new RateLimit(LOBBY_CHAT_BURST,
+LOBBY_WINDOW,opts.now);transport.onMessage=(peer,msg)=>this.onMsg(peer,msg);transport.onPeerLeave=peer=>this.onLeave(peer);transport.onPeerJoin=()=>{}}get maxPlayers(){
+return mapLimit(this.settings)}mapName(){if(this.settings.custom)return this.settings.custom.name;const m=MAPS.find(x=>x.id===this.settings.map);return m?m.name:
+this.settings.map}mapDesc(){return lobbyMapDesc(this.settings)}freeColor(){const used=new Set(this.slots.map(s=>s.color.toLowerCase()));for(const c of PLAYER_COLORS)
+if(!used.has(c.toLowerCase()))return c;return PLAYER_COLORS[this.slots.length%PLAYER_COLORS.length]}colorTaken(color,except){const c=color.toLowerCase();return this.
+slots.some((s,i)=>i!==except&&s.color.toLowerCase()===c)}slotOf(peer){return this.slots.findIndex(s=>s.peer!==null&&s.peer===peer)}canStart(){if(this.started)return"\
+\u0418\u0433\u0440\u0430 \u0443\u0436\u0435 \u043D\u0430\u0447\u0430\u043B\u0430\u0441\u044C";if(this.slots.length<2)return"\u041D\u0443\u0436\u043D\u043E \u043C\u0438\u043D\u0438\u043C\u0443\u043C 2 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0430 \u2014 \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435\
+ \u0431\u043E\u0442\u0430 \u0438\u043B\u0438 \u0434\u043E\u0436\u0434\u0438\u0442\u0435\u0441\u044C \u0434\u0440\u0443\u0433\u0430";if(this.slots.length>this.maxPlayers)
+return`\u041D\u0430 \u044D\u0442\u043E\u0439 \u043A\u0430\u0440\u0442\u0435 \u043D\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 ${this.maxPlayers} \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432`;
+return null}publicView(you=0){const s=this.settings;return{t:"lobby",v:NET_VERSION,you,slots:this.slots.map((sl,i)=>({id:sl.id,name:sl.name,ai:sl.ai,color:sl.color,
+host:i===0,human:!sl.ai})),settings:{map:s.map,mapName:this.mapName(),custom:s.custom?{name:s.custom.name,rev:this.customRev,w:s.custom.rows[0].length,h:s.custom.
+rows.length}:null,seed:s.seed,victory:{...s.victory},spawnSeconds:s.spawnSeconds,difficulty:s.difficulty},maxPlayers:this.maxPlayers,canStart:this.canStart(),lobbyId:this.
+transport.lobbyId||null,kind:this.transport.kind||null}}sync(){if(this.closed)return null;this.slots.forEach((sl,i)=>{if(sl.peer!==null)this.transport.send(sl.peer,
+this.publicView(i))});const view=this.publicView(0);this.onChange(view);return view}sendCustom(peer){if(!this.settings.custom)return;sendLarge(this.transport,peer,
+{t:"custom",rev:this.customRev,desc:this.settings.custom})}onMsg(peer,raw){if(this.closed||this.started)return;const msg=this.chunks.accept(peer,raw);if(!msg||typeof msg.
+t!=="string")return;if(msg.t==="bye"){this.onLeave(peer);return}if(!this.limit.take(peer))return;if(msg.t==="hello"){this.onHello(peer,msg);return}const i=this.
+slotOf(peer);if(i<0)return;if(msg.t==="color"){if(!this.setColor(i,msg.color))this.transport.send(peer,{t:"err",error:"\u042D\u0442\u043E\u0442 \u0446\u0432\u0435\u0442 \u0443\u0436\u0435 \u0437\u0430\u043D\u044F\u0442"})}else if(msg.
+t==="name"){const name=cleanName(msg.name,this.slots[i].name);if(name===this.slots[i].name)return;this.slots[i].name=name;this.sync()}else if(msg.t==="chat"){if(this.
+chatLimit.take(peer))this.postChat(i,msg.text);else if(this.chatLimit.firstMiss(peer))this.transport.send(peer,{t:"err",error:"\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0432 \u0447\u0430\u0442\u0435 \u2014 \
+\u043F\u043E\u0434\u043E\u0436\u0434\u0438\u0442\u0435 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u0435\u043A\u0443\u043D\u0434"})}}onHello(peer,msg){
+const known=this.slotOf(peer);if(known>=0){this.sendCustom(peer);this.transport.send(peer,this.publicView(known));return}if(msg.v!==NET_VERSION){this.transport.
+send(peer,{t:"reject",reason:"\u0423 \u0445\u043E\u0441\u0442\u0430 \u0434\u0440\u0443\u0433\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0438\u0433\u0440\u044B"});
 return}if(this.slots.length>=Math.min(MAX_SLOTS,this.maxPlayers)){this.transport.send(peer,{t:"reject",reason:"\u041B\u043E\u0431\u0431\u0438 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u043E"});
 return}const color=isColor(msg.color)&&!this.colorTaken(msg.color,-1)?msg.color:this.freeColor();this.slots.push({id:this.uid++,peer,name:cleanName(msg.name),ai:null,
-color});this.sendCustom(peer);this.sync()}onLeave(peer){if(this.started)return;const i=this.slotOf(peer);this.chunks.drop(peer);if(i>0){this.slots.splice(i,1);this.
-sync()}}addAI(level){if(this.started||this.slots.length>=Math.min(MAX_SLOTS,this.maxPlayers))return-1;const lvl=DIFFICULTY[level]?level:this.settings.difficulty;
-const used=new Set(this.slots.map(s=>s.name));let k=1;while(used.has(`\u0411\u043E\u0442 ${k}`))k++;this.slots.push({id:this.uid++,peer:null,name:`\u0411\u043E\u0442 ${k}`,
-ai:lvl,color:this.freeColor()});this.sync();return this.slots.length-1}setAI(i,level){const sl=this.slots[i];if(!sl||!sl.ai||!DIFFICULTY[level])return false;sl.
-ai=level;this.sync();return true}setColor(i,color){const sl=this.slots[i];if(!sl||!isColor(color)||this.colorTaken(color,i))return false;sl.color=color;this.sync();
-return true}rename(i,name){const sl=this.slots[i];if(!sl||sl.peer!==null&&i!==0)return false;sl.name=cleanName(name,sl.name);this.sync();return true}remove(i){if(this.
-started||i<=0||i>=this.slots.length)return false;const[sl]=this.slots.splice(i,1);if(sl.peer!==null)this.transport.send(sl.peer,{t:"kick"});this.sync();return true}set(patch){
-if(this.started)return this.publicView(0);const prev=this.settings.custom;this.settings=mergeSettings(this.settings,patch);if(this.settings.custom&&this.settings.
-custom!==prev){this.customRev++;for(const sl of this.slots)if(sl.peer!==null)this.sendCustom(sl.peer)}return this.sync()}postChat(i,text){const t=String(text===
-void 0||text===null?"":text).trim().slice(0,CHAT_MAX2);const sl=this.slots[i];if(!t||!sl)return;const c={t:"chat",from:i,name:sl.name,color:sl.color,text:t};for(const s of this.
-slots)if(s.peer!==null)this.transport.send(s.peer,c);this.chat.push(c);this.onChat(c)}sendChat(text){this.postChat(0,text)}start(opts={}){const err=this.canStart();
-if(err)throw new Error(err);this.started=true;const mapDesc=this.mapDesc();const seed=this.settings.seed;const settings=gameSettings(this.settings);const players=this.
-slots.map(sl=>({name:sl.name,color:sl.color,ai:sl.ai,netId:sl.peer}));const peers=new Map;this.slots.forEach((sl,i)=>{if(sl.peer!==null)peers.set(sl.peer,i)});for(const[
-peer,you]of peers)sendLarge(this.transport,peer,{t:"start",v:NET_VERSION,you,mapDesc,seed,players,settings,speed:1});const{map,state}=createMatch({mapDesc,seed,
-players,settings,map:opts.map});return new Session({map,state,localPid:0,mode:"host",transport:this.transport,peers,waitFor:[...peers.keys()],hashEvery:opts.hashEvery})}close(delay=100){
-if(this.closed)return;this.closed=true;if(!this.started)this.transport.broadcast({t:"closed"});const t=this.transport;if(delay>0&&typeof setTimeout==="function")
-setTimeout(()=>t.close(),delay);else t.close()}};var ClientLobby=class{constructor(transport,name,opts={}){this.transport=transport;this.name=cleanName(name);this.
-color=isColor(opts.color)?opts.color:null;this.view=null;this.custom=null;this.session=null;this.chat=[];this.started=false;this.closed=false;this.onChange=()=>{};
-this.onStart=()=>{};this.onClosed=()=>{};this.onChat=()=>{};this.onError=()=>{};this.onCustom=()=>{};this.chunks=new Reassembler;transport.onMessage=(peer,msg)=>this.
-onMsg(peer,msg);transport.onPeerLeave=()=>this.fail("\u0421\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0441 \u0445\u043E\u0441\u0442\u043E\u043C \u043F\u043E\u0442\u0435\u0440\u044F\u043D\u043E");
+color});this.sendCustom(peer);this.sync()}onLeave(peer){if(this.started)return;const i=this.slotOf(peer);this.chunks.drop(peer);this.limit.drop(peer);this.chatLimit.
+drop(peer);if(i>0){this.slots.splice(i,1);this.sync()}}addAI(level){if(this.started||this.slots.length>=Math.min(MAX_SLOTS,this.maxPlayers))return-1;const lvl=DIFFICULTY[level]?
+level:this.settings.difficulty;const used=new Set(this.slots.map(s=>s.name));let k=1;while(used.has(`\u0411\u043E\u0442 ${k}`))k++;this.slots.push({id:this.uid++,
+peer:null,name:`\u0411\u043E\u0442 ${k}`,ai:lvl,color:this.freeColor()});this.sync();return this.slots.length-1}setAI(i,level){const sl=this.slots[i];if(!sl||!sl.
+ai||!DIFFICULTY[level])return false;sl.ai=level;this.sync();return true}setColor(i,color){const sl=this.slots[i];if(!sl||!isColor(color)||this.colorTaken(color,
+i))return false;sl.color=color;this.sync();return true}rename(i,name){const sl=this.slots[i];if(!sl||sl.peer!==null&&i!==0)return false;sl.name=cleanName(name,sl.
+name);this.sync();return true}remove(i){if(this.started||i<=0||i>=this.slots.length)return false;const[sl]=this.slots.splice(i,1);if(sl.peer!==null)this.transport.
+send(sl.peer,{t:"kick"});this.sync();return true}set(patch){if(this.started)return this.publicView(0);const prev=this.settings.custom;this.settings=mergeSettings(
+this.settings,patch);if(this.settings.custom&&this.settings.custom!==prev){this.customRev++;for(const sl of this.slots)if(sl.peer!==null)this.sendCustom(sl.peer)}
+return this.sync()}postChat(i,text){const t=String(text===void 0||text===null?"":text).trim().slice(0,CHAT_MAX2);const sl=this.slots[i];if(!t||!sl)return;const c={
+t:"chat",from:i,name:sl.name,color:sl.color,text:t};for(const s of this.slots)if(s.peer!==null)this.transport.send(s.peer,c);this.chat.push(c);this.onChat(c)}sendChat(text){
+this.postChat(0,text)}start(opts={}){const err=this.canStart();if(err)throw new Error(err);this.started=true;const mapDesc=this.mapDesc();const seed=this.settings.
+seed;const settings=gameSettings(this.settings);const players=this.slots.map(sl=>({name:sl.name,color:sl.color,ai:sl.ai,netId:sl.peer}));const peers=new Map;this.
+slots.forEach((sl,i)=>{if(sl.peer!==null)peers.set(sl.peer,i)});for(const[peer,you]of peers)sendLarge(this.transport,peer,{t:"start",v:NET_VERSION,you,mapDesc,seed,
+players,settings,speed:1});const{map,state}=createMatch({mapDesc,seed,players,settings,map:opts.map});return new Session({map,state,localPid:0,mode:"host",transport:this.
+transport,peers,waitFor:[...peers.keys()],hashEvery:opts.hashEvery})}close(delay=100){if(this.closed)return;this.closed=true;if(!this.started)this.transport.broadcast(
+{t:"closed"});const t=this.transport;if(delay>0&&typeof setTimeout==="function")setTimeout(()=>t.close(),delay);else t.close()}};var ClientLobby=class{constructor(transport,name,opts={}){
+this.transport=transport;this.name=cleanName(name);this.color=isColor(opts.color)?opts.color:null;this.view=null;this.custom=null;this.session=null;this.chat=[];
+this.started=false;this.closed=false;this.onChange=()=>{};this.onStart=()=>{};this.onClosed=()=>{};this.onChat=()=>{};this.onError=()=>{};this.onCustom=()=>{};this.
+chunks=new Reassembler;transport.onMessage=(peer,msg)=>this.onMsg(peer,msg);transport.onPeerLeave=()=>this.fail("\u0421\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u0435 \u0441 \u0445\u043E\u0441\u0442\u043E\u043C \u043F\u043E\u0442\u0435\u0440\u044F\u043D\u043E");
 transport.onPeerJoin=()=>{};this.hello();this.retry=null;if(typeof setInterval==="function"){this.retry=setInterval(()=>{if(!this.view&&!this.closed&&!this.started)
 this.hello()},opts.retryMs||2e3);if(this.retry&&typeof this.retry.unref==="function")this.retry.unref()}}get you(){return this.view?this.view.you:-1}get customDesc(){
 const c=this.view&&this.view.settings.custom;return c&&this.custom&&this.custom.rev===c.rev?this.custom.desc:null}hello(){const m={t:"hello",v:NET_VERSION,name:this.

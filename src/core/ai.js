@@ -2,7 +2,7 @@ import {
   BUILDINGS, RESEARCH, STRIKES, DIFFICULTY, ECON, SAM, researchCost, cruiseRange,
 } from './config.js';
 import {
-  buildError, buildCost, upgradeCost, upgradeError, railError, railRoute, railCost, nearestPort,
+  buildError, buildCost, upgradeCost, upgradeError, railError, railCost, factoryRoute, landLine,
 } from './buildings.js';
 import { proposeError, embargoBy, treaties } from './diplomacy.js';
 import { shipCost, portShips, portShipCap, canEngage, sharedSea } from './units.js';
@@ -109,7 +109,7 @@ const hashTile = (i, salt) => {
 };
 
 function survey(game, p, st) {
-  const s = game.s, own = s.owner, fo = s.fallout, terr = game.map.terrain, oc = game.oceanCoast;
+  const s = game.s, own = s.owner, terr = game.map.terrain, oc = game.oceanCoast;
   const W = game.W, N = game.N, P = s.players.length, me = p.id + 1;
   const border = game.playerBorder(p.id);
   const L = border.size;
@@ -125,7 +125,7 @@ function survey(game, p, st) {
   const look = (j) => {
     if (terr[j] < 2) return;
     const o = own[j];
-    if (o === me || (o && fo[j])) return;
+    if (o === me) return;
     cnt[o]++;
     const h = hashTile(j, salt);
     if (h < key[o] || (h === key[o] && j < tile[o])) { key[o] = h; tile[o] = j; }
@@ -300,7 +300,7 @@ function placeInterior(game, p, st, v, type) {
   return fb >= 0 && tryBuild(game, p.id, type, fb % W, Math.floor(fb / W));
 }
 
-function placeNear(game, p, st, type, x0, y0, r0, r1) {
+function placeNear(game, p, st, type, x0, y0, r0, r1, ok) {
   const W = game.W, own = game.s.owner, me = p.id + 1;
   for (let k = 0; k < 24; k++) {
     const r = r0 + rnd(st) * (r1 - r0);
@@ -308,7 +308,7 @@ function placeNear(game, p, st, type, x0, y0, r0, r1) {
     const len = Math.sqrt(a * a + b * b) || 1;
     const x = Math.floor(x0 + (a / len) * r), y = Math.floor(y0 + (b / len) * r);
     const i = game.tileAt(x, y);
-    if (i < 0 || own[i] !== me) continue;
+    if (i < 0 || own[i] !== me || (ok && !ok(x, y))) continue;
     if (tryBuild(game, p.id, type, x, y)) return true;
   }
   return false;
@@ -394,7 +394,8 @@ function placeFactory(game, p, st, v, mine) {
   const ports = mine.port.filter((b) => game.buildingActive(b));
   if (ports.length) {
     const b = ports[Math.floor(rnd(st) * ports.length)];
-    if (placeNear(game, p, st, 'factory', b.x + 0.5, b.y + 0.5, 8, 30)) return true;
+    const road = (x, y) => landLine(game, p.id, x, y, b.x, b.y) === 0;
+    if (placeNear(game, p, st, 'factory', b.x + 0.5, b.y + 0.5, 8, 30, road)) return true;
   }
   return placeInterior(game, p, st, v, 'factory');
 }
@@ -431,7 +432,6 @@ function researchOk(p, prof, mine, key, lvl) {
   if (R[key] >= lvl) return false;
   if (key === 'nuclear' && lvl > prof.maxNuclear) return false;
   if (key === 'naval' && !mine.port.length) return false;
-  if ((key === 'armor' || key === 'art') && !mine.factory.length) return false;
   const req = RESEARCH[key].req;
   return !req || R[req[0]] >= req[1];
 }
@@ -453,16 +453,19 @@ function nextResearch(game, p, prof, mine, threat) {
 }
 
 function railWish(game, p, mine) {
-  const pid = p.id;
+  const pid = p.id, W = game.W;
   for (const f of mine.factory) {
     if (!game.buildingActive(f)) continue;
-    const port = nearestPort(game, pid, f.x, f.y);
-    if (!port || railRoute(game, pid, f.id, port.id)) continue;
-    if (!railError(game, pid, f.id, port.id)) return { a: f.id, b: port.id, cost: railCost(dist(f, port)) };
-    for (const hub of [...mine.port, ...mine.factory, ...mine.house]) {
-      if (hub === f || !game.buildingActive(hub) || !railRoute(game, pid, hub.id, port.id)) continue;
-      if (!railError(game, pid, f.id, hub.id)) return { a: f.id, b: hub.id, cost: railCost(dist(f, hub)) };
+    const plan = factoryRoute(game, f);
+    if (plan && (plan.type === 'train' || plan.straight < 12)) continue;
+    const lm = game.landId[f.y * W + f.x];
+    let best = null, bd = Infinity;
+    for (const port of mine.port) {
+      if (!game.buildingActive(port) || game.landId[port.y * W + port.x] !== lm) continue;
+      const d = dist(f, port);
+      if (d < bd && d >= 12 && !railError(game, pid, f.id, port.id)) { bd = d; best = port; }
     }
+    if (best) return { a: f.id, b: best.id, cost: railCost(bd) };
   }
   return null;
 }
@@ -817,11 +820,42 @@ function droneTile(game, p, v, q, from) {
   return -1;
 }
 
-function nukePad(r, speed, from, cx, cy) {
-  const dx = cx - from.x, dy = cy - from.y;
-  const dur = Math.sqrt(dx * dx + dy * dy) / speed;
-  return 3 + Math.min(r, Math.ceil(dur / 8));
+const NUKE_MAX_FLIGHT = 300;
+
+const nukeFlight = (speed, from, cx, cy) => Math.ceil(Math.sqrt((cx - from.x) * (cx - from.x) + (cy - from.y) * (cy - from.y)) / speed);
+
+const friendPad = (ticks) => 6 + Math.ceil(Math.max(0, ticks) / 3);
+
+function circleHas(game, cx, cy, R, test) {
+  const own = game.s.owner, W = game.W, H = game.H, R2 = R * R;
+  for (let dy = -R; dy <= R; dy++) {
+    const y = cy + dy;
+    if (y < 0 || y >= H) continue;
+    const span = Math.floor(Math.sqrt(R2 - dy * dy));
+    const x0 = Math.max(0, cx - span), x1 = Math.min(W - 1, cx + span), row = y * W;
+    for (let x = x0; x <= x1; x++) {
+      const o = own[row + x] - 1;
+      if (o >= 0 && test(o)) return true;
+    }
+  }
+  return false;
 }
+
+export function nukeSafe(game, pid, cx, cy, r, R) {
+  if (circleHas(game, cx, cy, r + 1, (o) => o === pid)) return false;
+  return !circleHas(game, cx, cy, R, (o) => o !== pid && !game.isHostile(pid, o));
+}
+
+function nukeThreatens(game, pid, q) {
+  for (const pr of game.s.projectiles) {
+    if (pr.owner !== pid || (pr.type !== 'atom' && pr.type !== 'hbomb')) continue;
+    const R = STRIKES[pr.type].r + friendPad(pr.dur - pr.t);
+    if (circleHas(game, Math.floor(pr.tx), Math.floor(pr.ty), R, (o) => o === q)) return true;
+  }
+  return false;
+}
+
+const NUKE_CHECKS = 6;
 
 function nukeSpot(game, p, kind, pref, from) {
   const s = game.s, own = s.owner, W = game.W, H = game.H, P = s.players;
@@ -837,13 +871,15 @@ function nukeSpot(game, p, kind, pref, from) {
     cands.push(P[pref].capital % W, Math.floor(P[pref].capital / W));
   }
   const step = Math.max(2, Math.floor(r / 5));
-  let best = -1, bs = 0;
+  const scored = [];
   for (let k = 0; k < cands.length; k += 2) {
     const cx = cands[k], cy = cands[k + 1];
+    const dur = nukeFlight(speed, from, cx, cy);
+    if (dur > NUKE_MAX_FLIGHT) continue;
     const cover = routeCover(game, p.id, from.x, from.y, cx, cy);
     if (cover > 1) continue;
     let enemy = 0, safe = true;
-    const R = r + nukePad(r, speed, from, cx, cy), R2 = R * R;
+    const R = r + friendPad(dur), R2 = R * R;
     for (let dy = -R; dy <= R && safe; dy += step) {
       const y = cy + dy;
       if (y < 0 || y >= H) continue;
@@ -853,8 +889,9 @@ function nukeSpot(game, p, kind, pref, from) {
         if (x < 0 || x >= W) continue;
         const o = own[y * W + x] - 1;
         if (o < 0) continue;
-        if (o === p.id || !game.isHostile(p.id, o)) { safe = false; break; }
-        if (dx * dx + dy * dy <= r * r) enemy++;
+        const d2 = dx * dx + dy * dy;
+        if (o === p.id ? d2 <= (r + 1) * (r + 1) : !game.isHostile(p.id, o)) { safe = false; break; }
+        if (o !== p.id && d2 <= r * r) enemy++;
       }
     }
     if (!safe) continue;
@@ -865,9 +902,14 @@ function nukeSpot(game, p, kind, pref, from) {
       if (dx * dx + dy * dy <= r * r) val += (VALUE[b.type] || 1) * b.level * 3;
     }
     val /= 1 + 2 * cover;
-    if (val > bs) { bs = val; best = cy * W + cx; }
+    if (val > 0) scored.push({ i: cy * W + cx, cx, cy, R, val });
   }
-  return best;
+  scored.sort((a, b) => b.val - a.val || a.i - b.i);
+  for (let k = 0; k < scored.length && k < NUKE_CHECKS; k++) {
+    const c = scored[k];
+    if (nukeSafe(game, p.id, c.cx, c.cy, r, c.R)) return c.i;
+  }
+  return -1;
 }
 
 function strike(game, pid, kind, from, x, y) {
@@ -954,16 +996,6 @@ function attacksBetween(game, a, b) {
   return { ab, ba };
 }
 
-function nukingNow(game, pid, q) {
-  const s = game.s, own = s.owner, W = game.W;
-  for (const pr of s.projectiles) {
-    if (pr.owner !== pid || (pr.type !== 'atom' && pr.type !== 'hbomb')) continue;
-    const i = Math.floor(pr.ty) * W + Math.floor(pr.tx);
-    if (own[i] === q + 1) return true;
-  }
-  return false;
-}
-
 function alliesOf(game, pid) {
   let n = 0;
   for (const q of game.s.players) if (q.id !== pid && q.alive && game.isAllied(pid, q.id)) n++;
@@ -1021,7 +1053,8 @@ function embargoes(game, p, st) {
   for (const q of s.players) {
     if (q.id === p.id || !q.alive) continue;
     const on = embargoBy(game, p.id, q.id);
-    const hot = st.war === q.id && s.tick - st.warAt > 600 && q.tiles > p.tiles * 0.8 && game.relation(p.id, q.id).type === 'none';
+    const rel = game.relation(p.id, q.id);
+    const hot = st.war === q.id && s.tick - st.warAt > 600 && q.tiles > p.tiles * 0.8 && rel.type === 'none' && !rel.trade;
     if (hot === on) continue;
     if (!hot && st.war === q.id) continue;
     return OK(game.apply(p.id, { c: 'embargo', with: q.id, on: hot }));
@@ -1060,8 +1093,8 @@ function diplomacy(game, p, st, v, prof) {
   const front = v.dom && v.cnt[lead.id + 1] > 0;
   for (const q of P) {
     if (q.id === pid || !q.alive || q.traitorUntil > s.tick || !v.cnt[q.id + 1]) continue;
-    if (game.relation(pid, q.id).type !== 'none' && game.relation(pid, q.id).type !== 'trade') continue;
-    if (nukingNow(game, pid, q.id)) continue;
+    if (game.relation(pid, q.id).type !== 'none') continue;
+    if (nukeThreatens(game, pid, q.id)) continue;
     const ratio = atkPower(game, q) / Math.max(1, me);
     const calm = front && q.id !== lead.id && ratio >= 0.25;
     if ((ratio >= 1.6 || calm || (v.inc[q.id] > 0 && ratio >= 1)) && st.war !== q.id) {
@@ -1097,7 +1130,7 @@ export function aiRespond(game, pid, req) {
     if (war.ba > 0 && ratio < 1) return false;
     return st.war !== req.from || ratio >= 1.2;
   }
-  if ((req.type === 'pact' || req.type === 'alliance') && nukingNow(game, pid, req.from)) return false;
+  if ((req.type === 'pact' || req.type === 'alliance') && nukeThreatens(game, pid, req.from)) return false;
   if (req.type === 'pact') {
     if (lead.id === req.from && dominant(game, lead) && lead.id !== pid && ratio < 2) return false;
     if (lead.id === pid && dominant(game, lead) && ratio < 1.2) return false;

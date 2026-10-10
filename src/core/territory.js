@@ -125,8 +125,7 @@ export function bordersByLand(game, pid, i) {
   if (!game.ownsOnLandmass(pid, lm)) return false;
   const tOwner = own[i];
   if (tOwner === pid + 1) return false;
-  const fo = s.fallout;
-  const okTile = (j) => own[j] === tOwner && game.landId[j] === lm && (tOwner === 0 || fo[j] === 0);
+  const okTile = (j) => own[j] === tOwner && game.landId[j] === lm;
   for (const j of game.borders[pid]) {
     if (game.landId[j] !== lm) continue;
     const x = j % W;
@@ -178,13 +177,12 @@ export function startAttack(game, pid, target, troops, landing = -1) {
 }
 
 function rescan(game, a) {
-  const s = game.s, own = s.owner, fo = s.fallout, terrain = game.map.terrain, W = game.W, N = game.N;
+  const s = game.s, own = s.owner, terrain = game.map.terrain, W = game.W, N = game.N;
   const tOwner = a.target + 1;
   const mark = game.mark, st = game.nextStamp();
   const out = [];
   const add = (j) => {
     if (own[j] !== tOwner || terrain[j] < 2 || mark[j] === st) return;
-    if (tOwner && fo[j]) return;
     mark[j] = st;
     out.push(j);
   };
@@ -214,11 +212,11 @@ function nbCount(own, W, N, i, v) {
 }
 
 function gather(game, a, k, out) {
-  const s = game.s, own = s.owner, fo = s.fallout, terrain = game.map.terrain, W = game.W, N = game.N;
+  const s = game.s, own = s.owner, terrain = game.map.terrain, W = game.W, N = game.N;
   const tOwner = a.target + 1, me = a.attacker + 1;
   const F = a.front;
   const mark = game.mark, st = game.nextStamp();
-  const valid = (i) => own[i] === tOwner && terrain[i] >= 2 && (tOwner === 0 || fo[i] === 0) && nbCount(own, W, N, i, me) > 0;
+  const valid = (i) => own[i] === tOwner && terrain[i] >= 2 && nbCount(own, W, N, i, me) > 0;
   out.length = 0;
   if (F.length <= k) {
     let w = 0;
@@ -264,12 +262,13 @@ function fortBonus(game, pid, i) {
 
 export function tileCost(game, attacker, target, i, atkMul, defMul) {
   const t = game.map.terrain[i];
-  if (target < 0) return ECON.neutralCost * TERRAIN_COST[t] * (game.s.fallout[i] ? ECON.falloutCostMul : 1);
+  const hot = game.s.fallout[i] ? ECON.falloutCostMul : 1;
+  if (target < 0) return ECON.neutralCost * TERRAIN_COST[t] * hot;
   const d = game.s.players[target];
   const density = d.troops / Math.max(1, d.tiles);
   const am = atkMul === undefined ? game.attackMult(attacker) : atkMul;
   const dm = defMul === undefined ? game.defenseMult(target) : defMul;
-  return ((ECON.tileCost + density * ECON.densityCost) * TERRAIN_COST[t] * TERRAIN_DEF[t] * fortBonus(game, target, i) * dm) / am;
+  return ((ECON.tileCost + density * ECON.densityCost) * TERRAIN_COST[t] * TERRAIN_DEF[t] * fortBonus(game, target, i) * dm * hot) / am;
 }
 
 function capture(game, a, i, cost) {
@@ -289,11 +288,11 @@ function capture(game, a, i, cost) {
 }
 
 function pushNeighbors(game, a, i) {
-  const s = game.s, own = s.owner, fo = s.fallout, terrain = game.map.terrain, W = game.W, N = game.N;
+  const s = game.s, own = s.owner, terrain = game.map.terrain, W = game.W, N = game.N;
   const tOwner = a.target + 1, F = a.front;
   const x = i % W;
   const add = (j) => {
-    if (own[j] === tOwner && terrain[j] >= 2 && (tOwner === 0 || fo[j] === 0)) F.push(j);
+    if (own[j] === tOwner && terrain[j] >= 2) F.push(j);
   };
   if (x > 0) add(i - 1);
   if (x < W - 1) add(i + 1);

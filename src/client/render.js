@@ -16,6 +16,7 @@ const GRAIN = 512;
 const TAU = Math.PI * 2;
 const FONT = 'Inter, "Segoe UI", system-ui, -apple-system, sans-serif';
 const NUKES = { atom: true, hbomb: true, mega: true, warhead: true };
+const TEX_AMP = [0, 0, 14, 30, 16, 22, 30, 10];
 const UNIT_LEN = { warship: 3.8, transport: 3, trade: 3.4, train: 3.4, truck: 1.7 };
 const UNIT_MIN = { warship: 19, transport: 15, trade: 16, train: 15, truck: 10 };
 const UNIT_MAX = { warship: 84, transport: 64, trade: 74, train: 76, truck: 40 };
@@ -221,6 +222,54 @@ function blurMasked3(R, G, B, mask, W, H) {
   }
 }
 
+let T2A = 0, T2B = 0;
+const MIX = new Float32Array(3);
+
+function top2(q0, w0, q1, w1, q2, w2, q3, w3) {
+  const s0 = q0 ? w0 + (q1 === q0 ? w1 : 0) + (q2 === q0 ? w2 : 0) + (q3 === q0 ? w3 : 0) : -1;
+  const s1 = q1 && q1 !== q0 ? w1 + (q2 === q1 ? w2 : 0) + (q3 === q1 ? w3 : 0) : -1;
+  const s2 = q2 && q2 !== q0 && q2 !== q1 ? w2 + (q3 === q2 ? w3 : 0) : -1;
+  const s3 = q3 && q3 !== q0 && q3 !== q1 && q3 !== q2 ? w3 : -1;
+  let a = 0, sa = 0, b = 0, sb = 0;
+  if (s0 > sa) { b = a; sb = sa; a = q0; sa = s0; } else if (s0 > sb) { b = q0; sb = s0; }
+  if (s1 > sa) { b = a; sb = sa; a = q1; sa = s1; } else if (s1 > sb) { b = q1; sb = s1; }
+  if (s2 > sa) { b = a; sb = sa; a = q2; sa = s2; } else if (s2 > sb) { b = q2; sb = s2; }
+  if (s3 > sa) { b = a; sb = sa; a = q3; sa = s3; } else if (s3 > sb) { b = q3; sb = s3; }
+  T2A = a;
+  T2B = b;
+}
+
+function maskMix(c, q0, w0, q1, w1, q2, w2, q3, w3, k) {
+  const m0 = !k || !q0 || q0 === k ? w0 : 0, m1 = !k || !q1 || q1 === k ? w1 : 0;
+  const m2 = !k || !q2 || q2 === k ? w2 : 0, m3 = !k || !q3 || q3 === k ? w3 : 0;
+  const n = m0 + m1 + m2 + m3;
+  const iv = n > 1e-6 ? 1 / n : 0;
+  MIX[0] = (c[0] * m0 + c[1] * m1 + c[2] * m2 + c[3] * m3) * iv;
+  MIX[1] = (c[4] * m0 + c[5] * m1 + c[6] * m2 + c[7] * m3) * iv;
+  MIX[2] = (c[8] * m0 + c[9] * m1 + c[10] * m2 + c[11] * m3) * iv;
+}
+
+const SPX = new Float32Array(8), SPY = new Float32Array(8);
+
+function splineW(t, out) {
+  const t2 = t * t, t3 = t2 * t, u = 1 - t;
+  out[0] = 0.25 * (-t3 + 2 * t2 - t) + (u * u * u) / 12;
+  out[1] = 0.25 * (3 * t3 - 5 * t2 + 2) + (3 * t3 - 6 * t2 + 4) / 12;
+  out[2] = 0.25 * (-3 * t3 + 4 * t2 + t) + (-3 * t3 + 3 * t2 + 3 * t + 1) / 12;
+  out[3] = 0.25 * (t3 - t2) + t3 / 12;
+  out[4] = 0.25 * (-3 * t2 + 4 * t - 1) - (u * u) / 4;
+  out[5] = 0.25 * (9 * t2 - 10 * t) + (3 * t2 - 4 * t) / 4;
+  out[6] = 0.25 * (-9 * t2 + 8 * t + 1) + (-3 * t2 + 2 * t + 1) / 4;
+  out[7] = 0.25 * (3 * t2 - 2 * t) + t2 / 4;
+}
+
+function crMix(c, o, a0, a1, a2, a3, e0, e1, e2, e3) {
+  return e0 * (a0 * c[o] + a1 * c[o + 1] + a2 * c[o + 2] + a3 * c[o + 3])
+    + e1 * (a0 * c[o + 4] + a1 * c[o + 5] + a2 * c[o + 6] + a3 * c[o + 7])
+    + e2 * (a0 * c[o + 8] + a1 * c[o + 9] + a2 * c[o + 10] + a3 * c[o + 11])
+    + e3 * (a0 * c[o + 12] + a1 * c[o + 13] + a2 * c[o + 14] + a3 * c[o + 15]);
+}
+
 function makeCanvas(w, h) {
   const c = document.createElement('canvas');
   c.width = Math.max(1, w);
@@ -292,6 +341,11 @@ export class Renderer {
     this.map = null;
     this.game = null;
     this.selection = null;
+    this.selKey = null;
+    this.selSet = new Set();
+    this.box = null;
+    this.orders = null;
+    this.insets = null;
     this.hoverTile = -1;
     this.mode = null;
     this.showAA = false;
@@ -377,7 +431,7 @@ export class Renderer {
     const e = new Float32Array(N);
     const el = map.elev;
     for (let i = 0; i < N; i++) e[i] = land[i] ? (el ? el[i] / 255 : 0.3) : 0.14;
-    const eb = blur3(blur3(e, W, H), W, H);
+    const eb = blur3(e, W, H);
     const grad = new Float32Array(N);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
@@ -471,57 +525,75 @@ export class Renderer {
       G[i] = g * k;
       B[i] = b * k;
     }
+    const R0 = R.slice(), G0 = G.slice(), B0 = B.slice();
     blurMasked3(R, G, B, land, W, H);
-    blurMasked3(R, G, B, land, W, H);
-    const R2 = R, G2 = G, B2 = B;
+    const tamp = new Uint8Array(N);
+    for (let i = 0; i < N; i++) tamp[i] = land[i] ? TEX_AMP[t[i]] || 0 : 0;
+    this.tamp = tamp;
     const grad = this.grad, eb = this.elevB, sdf = this.sdf;
-    const lc = new Uint32Array(N);
     const lk = new Float32Array(N).fill(1);
     const gain = th.landGain;
     for (let i = 0; i < N; i++) {
       if (!land[i]) continue;
       const lit = clamp(grad[i] * th.shade, -0.3, 0.3);
       lk[i] = gain * (1 + lit) * (0.93 + eb[i] * 0.16);
-      const sd = sdf[i];
-      let r = R2[i], g = G2[i], b = B2[i];
-      if (sd < 1.6 && t[i] !== 7 && t[i] !== 6) {
-        const bt = (1 - smooth(0.4, 1.6, sd)) * 0.35;
-        r += (th.beach[0] - r) * bt;
-        g += (th.beach[1] - g) * bt;
-        b += (th.beach[2] - b) * bt;
-      }
-      r = clamp(r, 0, 255);
-      g = clamp(g, 0, 255);
-      b = clamp(b, 0, 255);
-      lc[i] = (r | 0) | ((g | 0) << 8) | ((b | 0) << 16);
     }
+    const shore = [];
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const i = y * W + x;
         if (land[i] || sdf[i] < -2.2) continue;
-        let r = 0, g = 0, b = 0, n = 0, kk = 0;
+        const nb = [];
         for (let dy = -1; dy <= 1; dy++) {
           const yy = y + dy;
           if (yy < 0 || yy >= H) continue;
           for (let dx = -1; dx <= 1; dx++) {
             const xx = x + dx;
-            if (xx < 0 || xx >= W) continue;
-            const j = yy * W + xx;
-            if (!land[j]) continue;
-            const c = lc[j];
-            r += c & 255;
-            g += (c >> 8) & 255;
-            b += (c >> 16) & 255;
-            kk += lk[j];
-            n++;
+            if (xx >= 0 && xx < W && land[yy * W + xx]) nb.push(yy * W + xx);
           }
         }
-        if (n) {
-          lc[i] = ((r / n) | 0) | (((g / n) | 0) << 8) | (((b / n) | 0) << 16);
-          lk[i] = kk / n;
-        }
+        if (nb.length) shore.push(i, nb);
       }
     }
+    for (let k = 0; k < shore.length; k += 2) {
+      const nb = shore[k + 1];
+      let kk = 0;
+      for (const j of nb) kk += lk[j];
+      lk[shore[k]] = kk / nb.length;
+    }
+    const pack = (R2, G2, B2) => {
+      const lc = new Uint32Array(N);
+      for (let i = 0; i < N; i++) {
+        if (!land[i]) continue;
+        const sd = sdf[i];
+        let r = R2[i], g = G2[i], b = B2[i];
+        if (sd < 1.6 && t[i] !== 7 && t[i] !== 6) {
+          const bt = (1 - smooth(0.4, 1.6, sd)) * 0.35;
+          r += (th.beach[0] - r) * bt;
+          g += (th.beach[1] - g) * bt;
+          b += (th.beach[2] - b) * bt;
+        }
+        r = clamp(r, 0, 255);
+        g = clamp(g, 0, 255);
+        b = clamp(b, 0, 255);
+        lc[i] = (r | 0) | ((g | 0) << 8) | ((b | 0) << 16);
+      }
+      for (let k = 0; k < shore.length; k += 2) {
+        const nb = shore[k + 1];
+        let r = 0, g = 0, b = 0;
+        for (const j of nb) {
+          const c = lc[j];
+          r += c & 255;
+          g += (c >> 8) & 255;
+          b += (c >> 16) & 255;
+        }
+        const n = nb.length;
+        lc[shore[k]] = ((r / n) | 0) | (((g / n) | 0) << 8) | (((b / n) | 0) << 16);
+      }
+      return lc;
+    };
+    const lc = pack(R, G, B);
+    this.lc0 = pack(R0, G0, B0);
     this.lc = lc;
     this.lk = lk;
     const img = this.baseCtx.createImageData(W, H);
@@ -586,15 +658,30 @@ export class Renderer {
 
   get viewH() { return this.canvas.height; }
 
-  fit() {
+  fit(insets) {
     if (!this.map) return;
     this.resize();
     const { W, H } = this.map;
-    const z = clamp(Math.min(this.viewW / W, this.viewH / H) * 0.98, this.minZoom, this.maxZoom);
-    this.cam.z = z;
-    this.cam.x = W / 2 - this.viewW / z / 2;
-    this.cam.y = H / 2 - this.viewH / z / 2;
+    const d = this.dpr, vw = this.viewW, vh = this.viewH;
+    const ins = insets || { t: 0, b: 0, l: 0, r: 0, bh: 0 };
+    const t = (ins.t || 0) * d, b = (ins.b || 0) * d, r = (ins.r || 0) * d, l = (ins.l || 0) * d, bh = (ins.bh || 0) * d;
+    const place = (x0, y0, x1, y1) => {
+      const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+      const z = clamp(Math.min(w / W, h / H) * 0.98, this.minZoom, this.maxZoom);
+      const mx = x0 + (w - W * z) / 2, my = y0 + (h - H * z) / 2;
+      return { z, mx, my };
+    };
+    let p = place(0, t, vw - r, vh - b);
+    if (l > 0 && bh > 0 && p.mx < l && p.my < bh) {
+      const side = place(l, t, vw - r, vh - b);
+      const below = place(0, bh, vw - r, vh - b);
+      p = below.z > side.z ? below : side;
+    }
+    this.cam.z = p.z;
+    this.cam.x = -p.mx / p.z;
+    this.cam.y = -p.my / p.z;
     this.anim = null;
+    this.clampCam();
   }
 
   get zoom() { return this.cam.z / this.dpr; }
@@ -954,9 +1041,14 @@ export class Renderer {
     const fPer = Math.max(6, Math.round(S * 0.7)), fRim = 2 + S * 0.12;
     const shoreW = clamp(S * 0.12, 1, 3);
     const foam = th.foam, foamW = clamp(S * 0.3, 1.4, 5), foamA = th.foamA;
-    const det = this.detail, detA = (th.detail / 127) * smooth(4, 20, S);
-    const sharpK = 1.25, warpK = 0.3 / 127, useCR = S >= 8, useDet = S >= 8;
+    const det = this.detail, detA = (th.detail / 127) * (0.35 + 0.65 * smooth(3, 14, S));
+    const sharpK = 1.25, warpK = (S >= 4 ? 0.34 : 0.3) / 127, warpH = S >= 4 ? 0.42 / 127 : 0;
+    const useCR = S >= 8, useBio = S >= 4, useDet = S >= 4, useHf = S >= 8, texK = smooth(3, 12, S) / 127, tamp = this.tamp;
     const cc = this.ccBuf || (this.ccBuf = new Int32Array(16));
+    const k16 = this.k16Buf || (this.k16Buf = new Int8Array(16));
+    const s16 = this.s16Buf || (this.s16Buf = new Float32Array(16));
+    const c12 = this.c12Buf || (this.c12Buf = new Float32Array(12));
+    const lc0 = this.lc0, terr = map.terrain, bwT = Math.max(0.7, 0.2 * S);
     const sc = this.scBuf || (this.scBuf = new Float32Array(16));
     const cy = this.cyBuf || (this.cyBuf = new Float32Array(8));
     const gyA = Math.floor(oy + (py0 + 0.5) * inv - 0.5), gyB = Math.floor(oy + (py0 + BLK - 0.5) * inv - 0.5);
@@ -1004,7 +1096,7 @@ export class Renderer {
           f11 = l11 && fo[i11] ? 1 : 0;
           anyF = f00 + f10 + f01 + f11 > 0;
         }
-        let ccOk = false, pk = -1;
+        let ccOk = false, pk = -1, colOk = false, pkc = -1, uniK = true;
         for (let py = pyS; py < pyE; py++) {
           const wy = oy + (py0 + py + 0.5) * inv;
           const rowO = py * BLK;
@@ -1047,7 +1139,7 @@ export class Renderer {
               }
             }
             if (cov > 0) {
-              let nd = gn * 3;
+              let nd = gn * 3, nh = 0, hr = 0;
               if (useDet) {
                 const u = wx * 3, v = wy * 3;
                 const iu = u | 0, iv = v | 0;
@@ -1058,18 +1150,102 @@ export class Renderer {
                 const n1 = det[a1 + b0] + (det[a1 + b1] - det[a1 + b0]) * fu;
                 nd = n0 + (n1 - n0) * fv;
               }
-              const dn = gn + nd * detA;
-              const wn = nd * warpK;
-              let qx = (fx - 0.5) * sharpK + 0.5 + wn;
-              qx = qx < 0 ? 0 : qx > 1 ? 1 : qx;
-              let qy = (fy - 0.5) * sharpK + 0.5 - wn;
-              qy = qy < 0 ? 0 : qy > 1 ? 1 : qy;
-              const ex = 1 - qx, ey = 1 - qy;
-              const v00 = ex * ey, v10 = qx * ey, v01 = ex * qy, v11 = qx * qy;
+              if (useHf) {
+                const u = wx * 11 + 97, v = wy * 11 + 131;
+                const iu = u | 0, iv = v | 0;
+                const fu = u - iu, fv = v - iv;
+                const a0 = (iv & 255) << 8, a1 = ((iv + 1) & 255) << 8;
+                const b0 = iu & 255, b1 = (iu + 1) & 255;
+                const n0 = det[a0 + b0] + (det[a0 + b1] - det[a0 + b0]) * fu;
+                const n1 = det[a1 + b0] + (det[a1 + b1] - det[a1 + b0]) * fu;
+                hr = n0 + (n1 - n0) * fv;
+                const slope = (det[a0 + b1] - det[a0 + b0]) + (det[a1 + b0] - det[a0 + b0]);
+                nh = (hr * 0.6 - slope * 0.5) * texK * (tamp[i00] * w00 + tamp[i10] * w10 + tamp[i01] * w01 + tamp[i11] * w11);
+              }
+              const dn = gn + nd * detA + nh;
+              const wn = nd * warpK + hr * warpH;
               const kk = k00 * w00 + k10 * w10 + k01 * w01 + k11 * w11;
-              let lr = (r00 * v00 + r10 * v10 + r01 * v01 + r11 * v11) * kk + dn;
-              let lg = (g00 * v00 + g10 * v10 + g01 * v01 + g11 * v11) * kk + dn;
-              let lb = (b00 * v00 + b10 * v10 + b01 * v01 + b11 * v11) * kk + dn;
+              let lr, lg, lb;
+              if (useBio) {
+                if (!colOk) {
+                  colOk = true;
+                  const c0 = cl(gx - 1, W - 1), c3 = cl(gx + 2, W - 1);
+                  let q = 0;
+                  for (let j = 0; j < 4; j++) {
+                    const rr = j === 0 ? r0 : j === 1 ? ra : j === 2 ? rb : r3;
+                    for (let k = 0; k < 4; k++) {
+                      const id = rr + (k === 0 ? c0 : k === 1 ? xa : k === 2 ? xb : c3);
+                      k16[q++] = land[id] ? terr[id] : 0;
+                    }
+                  }
+                  pkc = -1;
+                  const p0 = k16[5], p1 = k16[6], p2 = k16[9], p3 = k16[10];
+                  const base = p0 || p1 || p2 || p3;
+                  uniK = (!p0 || p0 === base) && (!p1 || p1 === base) && (!p2 || p2 === base) && (!p3 || p3 === base);
+                  for (let k = 0; k < 4; k++) {
+                    const cv = lc0[k === 0 ? i00 : k === 1 ? i10 : k === 2 ? i01 : i11];
+                    c12[k] = cv & 255;
+                    c12[k + 4] = (cv >> 8) & 255;
+                    c12[k + 8] = (cv >> 16) & 255;
+                  }
+                }
+                let tx = fx + wn, ty = fy - wn;
+                tx = tx < 0 ? 0 : tx > 1 ? 1 : tx;
+                ty = ty < 0 ? 0 : ty > 1 ? 1 : ty;
+                const bx = 1 - tx, by = 1 - ty;
+                const u00 = bx * by, u10 = tx * by, u01 = bx * ty, u11 = tx * ty;
+                let B = 0;
+                if (uniK) {
+                  lr = c12[0] * u00 + c12[1] * u10 + c12[2] * u01 + c12[3] * u11;
+                  lg = c12[4] * u00 + c12[5] * u10 + c12[6] * u01 + c12[7] * u11;
+                  lb = c12[8] * u00 + c12[9] * u10 + c12[10] * u01 + c12[11] * u11;
+                } else {
+                  top2(k16[5], u00, k16[6], u10, k16[9], u01, k16[10], u11);
+                  B = T2B;
+                  maskMix(c12, k16[5], u00, k16[6], u10, k16[9], u01, k16[10], u11, T2A);
+                  lr = MIX[0]; lg = MIX[1]; lb = MIX[2];
+                }
+                if (B) {
+                  const A = T2A;
+                  const key = A * 16 + B;
+                  if (key !== pkc) {
+                    pkc = key;
+                    for (let q = 0; q < 16; q++) s16[q] = k16[q] === A ? 1 : k16[q] === B ? -1 : 0;
+                  }
+                  splineW(tx, SPX);
+                  splineW(ty, SPY);
+                  const a0 = SPX[0], a1 = SPX[1], a2 = SPX[2], a3 = SPX[3], d0 = SPX[4], d1 = SPX[5], d2 = SPX[6], d3 = SPX[7];
+                  const e0 = SPY[0], e1 = SPY[1], e2 = SPY[2], e3 = SPY[3], h0 = SPY[4], h1 = SPY[5], h2 = SPY[6], h3 = SPY[7];
+                  const f = crMix(s16, 0, a0, a1, a2, a3, e0, e1, e2, e3);
+                  const gxv = crMix(s16, 0, d0, d1, d2, d3, e0, e1, e2, e3);
+                  const gyv = crMix(s16, 0, a0, a1, a2, a3, h0, h1, h2, h3);
+                  const gl = Math.sqrt(gxv * gxv + gyv * gyv);
+                  const dpx = gl > 1e-6 ? (f / gl) * S : f > 0 ? 1e9 : -1e9;
+                  let m = (dpx + bwT) / (2 * bwT);
+                  m = m < 0 ? 0 : m > 1 ? 1 : m;
+                  m = m * m * (3 - 2 * m);
+                  if (m < 1) {
+                    const ar = lr, ag = lg, ab = lb;
+                    maskMix(c12, k16[5], u00, k16[6], u10, k16[9], u01, k16[10], u11, B);
+                    lr = MIX[0] + (ar - MIX[0]) * m;
+                    lg = MIX[1] + (ag - MIX[1]) * m;
+                    lb = MIX[2] + (ab - MIX[2]) * m;
+                  }
+                }
+                lr = lr * kk + dn;
+                lg = lg * kk + dn;
+                lb = lb * kk + dn;
+              } else {
+                let qx = (fx - 0.5) * sharpK + 0.5 + wn;
+                qx = qx < 0 ? 0 : qx > 1 ? 1 : qx;
+                let qy = (fy - 0.5) * sharpK + 0.5 - wn;
+                qy = qy < 0 ? 0 : qy > 1 ? 1 : qy;
+                const ex = 1 - qx, ey = 1 - qy;
+                const v00 = ex * ey, v10 = qx * ey, v01 = ex * qy, v11 = qx * qy;
+                lr = (r00 * v00 + r10 * v10 + r01 * v01 + r11 * v11) * kk + dn;
+                lg = (g00 * v00 + g10 * v10 + g01 * v01 + g11 * v11) * kk + dn;
+                lb = (b00 * v00 + b10 * v10 + b01 * v01 + b11 * v11) * kk + dn;
+              }
               if (anyW) {
                 const ds = d * S;
                 if (ds < shoreW) {
@@ -1391,12 +1567,14 @@ export class Renderer {
       this.drawUnits(ctx, s);
       this.drawHover(ctx, s);
       this.drawSelection(ctx, s);
+      this.drawOrders(ctx);
       if (this.showLabels) this.drawLabels(ctx, s, dt);
       this.drawMode(ctx, s);
       this.drawProjectiles(ctx, s);
     }
     this.drawFx(ctx, dt);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.drawBox(ctx);
     if (this.flash > 0.001) {
       ctx.fillStyle = `rgba(255,248,230,${Math.min(0.6, this.flash)})`;
       ctx.fillRect(0, 0, this.viewW, this.viewH);
@@ -1683,7 +1861,7 @@ export class Renderer {
   drawUnits(ctx, s) {
     if (!s.units.length) return;
     const th = this.theme, dpr = this.dpr, z = this.cam.z;
-    const sel = this.selection && this.selection.kind === 'ship' ? this.selection.id : -1;
+    const sel = this.selectedShips();
     const opts = { hull: th.hull, deck: th.deck };
     ctx.save();
     for (const u of s.units) {
@@ -1717,7 +1895,7 @@ export class Renderer {
       ctx.rotate(h);
       ctx.drawImage(uc.c, -uc.ox, -uc.oy);
       ctx.restore();
-      if (u.id === sel) {
+      if (sel.has(u.id)) {
         ctx.strokeStyle = th.select;
         ctx.lineWidth = 2 * dpr;
         ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.time * 6);
@@ -1814,25 +1992,82 @@ export class Renderer {
         }
       }
     } else if (sel.kind === 'ship') {
-      const u = this.game.unitById(sel.id);
-      if (u && u.path && u.pi < u.path.length) {
+      ctx.strokeStyle = rgba(th.aaOwn, 0.85);
+      ctx.lineWidth = 1.8 * dpr;
+      const ends = [];
+      for (const id of this.selectedShips()) {
+        const u = this.game.unitById(id);
+        if (!u || !u.path || u.pi >= u.path.length) continue;
         const [x, y] = this.unitPos(u);
-        ctx.strokeStyle = rgba(th.aaOwn, 0.85);
-        ctx.lineWidth = 1.8 * dpr;
         ctx.setLineDash([6 * dpr, 6 * dpr]);
         ctx.lineDashOffset = -this.time * 18 * dpr;
         ctx.beginPath();
         this.tracePath(ctx, x, y, u.path, u.pi);
         ctx.stroke();
-        const e = u.path[u.path.length - 1];
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.arc(this.sx(e[0]), this.sy(e[1]), 5 * dpr, 0, TAU);
-        ctx.stroke();
+        ends.push(u.path[u.path.length - 1]);
       }
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (const e of ends) {
+        const ex = this.sx(e[0]), ey = this.sy(e[1]);
+        ctx.moveTo(ex + 5 * dpr, ey);
+        ctx.arc(ex, ey, 5 * dpr, 0, TAU);
+      }
+      ctx.stroke();
     }
     ctx.restore();
     void s;
+  }
+
+  selectedShips() {
+    const sel = this.selection;
+    if (!sel || sel.kind !== 'ship') return new Set();
+    if (this.selKey !== sel) {
+      this.selKey = sel;
+      this.selSet = new Set(sel.ids || [sel.id]);
+    } else if (this.selSet.size !== (sel.ids || [sel.id]).length) this.selSet = new Set(sel.ids || [sel.id]);
+    return this.selSet;
+  }
+
+  markOrders(points) {
+    this.orders = { pts: (points || []).slice(0, 64), t: this.time };
+  }
+
+  drawOrders(ctx) {
+    const o = this.orders;
+    if (!o) return;
+    const k = (this.time - o.t) / 0.9;
+    if (k >= 1) {
+      this.orders = null;
+      return;
+    }
+    const dpr = this.dpr, th = this.theme;
+    ctx.save();
+    ctx.strokeStyle = rgba(th.aaOwn, 0.9 * (1 - k));
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    for (const [x, y] of o.pts) {
+      const sx = this.sx(x), sy = this.sy(y), r = (4 + 9 * easeOut(k)) * dpr;
+      ctx.moveTo(sx + r, sy);
+      ctx.arc(sx, sy, r, 0, TAU);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawBox(ctx) {
+    const b = this.box;
+    if (!b) return;
+    const dpr = this.dpr, th = this.theme;
+    ctx.save();
+    ctx.fillStyle = rgba(th.aaOwn, 0.1);
+    ctx.strokeStyle = rgba(th.aaOwn, 0.95);
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.setLineDash([6 * dpr, 4 * dpr]);
+    ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    ctx.strokeRect(b.x0 + 0.5, b.y0 + 0.5, b.x1 - b.x0, b.y1 - b.y0);
+    if (b.n > 0) this.tag(ctx, String(b.n), b.x1, b.y0, Math.round(12 * dpr), rgbStr(th.aaOwn));
+    ctx.restore();
   }
 
   hoverXY() {

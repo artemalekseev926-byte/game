@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { buildMapFromLand, generateMap } from '../src/core/map.js';
 import { Game } from '../src/core/game.js';
 import { createState, serializeState, deserializeState, hashState } from '../src/core/state.js';
-import { BUILDINGS, ECON, LAND_UNITS, TICKS_PER_SEC, researchCost, researchTicks } from '../src/core/config.js';
+import { ARMY, BUILDINGS, ECON, LAND_UNITS, TICKS_PER_SEC, TERRAIN_COST, researchCost, researchTicks } from '../src/core/config.js';
 import { factoryInterval, factoryOutlook } from '../src/core/buildings.js';
+import { tileCost } from '../src/core/territory.js';
 import { makeRng } from '../src/core/rng.js';
 
 function rectMap(rects, w = 200, h = 100, seed = 1) {
@@ -135,6 +136,34 @@ test('атака на игрока: захват клеток и потери з
   assert.ok(d.stats.kills > 0, 'атакующий теряет войска');
 });
 
+test('заражённые клетки: одно правило для всех — их можно брать, но втрое дороже, кто бы ими ни владел', () => {
+  const g = newGame(MAP1, 2, { victory: { territory: false } });
+  begin(g, [[40, 50], [160, 50]]);
+  claim(g, 0, 20, 20, 90, 80);
+  claim(g, 1, 110, 20, 180, 80);
+  for (let y = 20; y < 80; y++) for (let x = 90; x < 110; x++) { const i = y * g.W + x; g.setOwner(i, -1); g.setFallout(i, 600); }
+  const P = g.s.players;
+  P[0].troops = 200000;
+  P[1].troops = 200000;
+  g.tick(cmd(1, { c: 'attack', x: 109, y: 50, ratio: 0.5 }));
+  run(g, 60);
+  let strip = 0;
+  for (let y = 20; y < 80; y++) for (let x = 90; x < 110; x++) if (g.s.owner[y * g.W + x] === 2) strip++;
+  assert.ok(strip > 600, `B занял заражённую полосу: ${strip}`);
+  const [x, y] = frontier(g, 0, 1);
+  const i = y * g.W + x;
+  assert.ok(g.s.fallout[i] > 0, 'на границе заражённая клетка B');
+  const v = g.validate(0, { c: 'attack', x, y, ratio: 0.5 });
+  assert.ok(v.ok, v.error);
+  const plain = (() => { const f = g.s.fallout[i]; g.s.fallout[i] = 0; const c = tileCost(g, 0, 1, i); g.s.fallout[i] = f; return c; })();
+  assert.ok(Math.abs(tileCost(g, 0, 1, i) - plain * ECON.falloutCostMul) < 1e-9, 'заражённая клетка втрое дороже и для чужой');
+  assert.ok(Math.abs(tileCost(g, 0, -1, i) - ECON.neutralCost * TERRAIN_COST[g.map.terrain[i]] * ECON.falloutCostMul) < 1e-9, 'и для ничьей');
+  const b0 = P[1].tiles;
+  g.tick(cmd(0, { c: 'attack', x, y, ratio: 0.5 }));
+  run(g, 100);
+  assert.ok(P[1].tiles < b0, `A отбивает заражённую полосу: ${b0} -> ${P[1].tiles}`);
+});
+
 test('союз запрещает атаку, разрыв делает предателем', () => {
   const g = newGame(MAP1, 3);
   begin(g, [[40, 50], [160, 50], [100, 30]]);
@@ -187,7 +216,8 @@ test('пакт, торговый договор, истечение запрос
   assert.equal(g.s.requests.length, 0, 'запрос живёт 30 с');
   g.tick(cmd(0, { c: 'propose', to: 1, type: 'trade' }));
   g.tick(cmd(1, { c: 'respond', id: g.s.requests[0].id, accept: true }));
-  assert.equal(g.relation(0, 1).type, 'trade');
+  assert.equal(g.relation(0, 1).type, 'none');
+  assert.equal(g.relation(0, 1).trade, true);
   assert.ok(g.hasTradeTreaty(0, 1));
   assert.equal(g.isHostile(0, 1), true);
   g.tick(cmd(0, { c: 'embargo', with: 1, on: true }));
@@ -199,7 +229,77 @@ test('пакт, торговый договор, истечение запрос
   assert.equal(g.relation(0, 1).embargo, false);
   g.tick(cmd(1, { c: 'break', with: 0 }));
   assert.equal(g.relation(0, 1).type, 'none');
+  assert.equal(g.relation(0, 1).trade, false);
   assert.equal(g.s.players[1].traitorUntil, 0, 'разрыв торговли — не предательство');
+});
+
+test('торговый договор не отменяет пакт; выйти из пакта можно только разрывом', () => {
+  const g = newGame(MAP1);
+  begin(g, [[40, 50], [160, 50]]);
+  claim(g, 0, 20, 20, 100, 80);
+  claim(g, 1, 100, 20, 180, 80);
+  g.tick(cmd(0, { c: 'propose', to: 1, type: 'pact' }));
+  g.tick(cmd(1, { c: 'respond', id: g.s.requests[0].id, accept: true }));
+  assert.equal(g.relation(0, 1).type, 'pact');
+  const until = g.relation(0, 1).until;
+  assert.ok(g.validate(0, { c: 'propose', to: 1, type: 'trade' }).ok, 'торговлю можно добавить к пакту');
+  g.tick(cmd(0, { c: 'propose', to: 1, type: 'trade' }));
+  g.tick(cmd(1, { c: 'respond', id: g.s.requests[0].id, accept: true }));
+  const rel = g.relation(0, 1);
+  assert.equal(rel.type, 'pact', 'пакт сохранился');
+  assert.equal(rel.until, until);
+  assert.equal(rel.trade, true);
+  assert.equal(g.isHostile(0, 1), false);
+  assert.ok(g.hasTradeTreaty(0, 1));
+  const [x, y] = frontier(g, 0, 1);
+  assert.match(g.validate(0, { c: 'attack', x, y, ratio: 0.2 }).error, /пакт/);
+  assert.match(g.validate(0, { c: 'propose', to: 1, type: 'trade' }).error, /уже действует/);
+  assert.match(g.validate(1, { c: 'propose', to: 0, type: 'pact' }).error, /уже действует/);
+  g.tick(cmd(0, { c: 'propose', to: 1, type: 'alliance' }));
+  g.tick(cmd(1, { c: 'respond', id: g.s.requests[0].id, accept: true }));
+  assert.equal(g.relation(0, 1).type, 'alliance');
+  assert.match(g.validate(0, { c: 'propose', to: 1, type: 'trade' }).error, /Союз/);
+  g.tick(cmd(0, { c: 'break', with: 1 }));
+  assert.equal(g.relation(0, 1).type, 'none');
+  assert.equal(g.relation(0, 1).trade, false, 'разрыв отменяет все договоры');
+  assert.ok(g.s.players[0].traitorUntil > g.s.tick, 'разрыв союза — предательство');
+
+  g.s.players[0].traitorUntil = 0;
+  g.tick(cmd(1, { c: 'propose', to: 0, type: 'trade' }));
+  g.tick(cmd(0, { c: 'respond', id: g.s.requests[0].id, accept: true }));
+  g.tick(cmd(1, { c: 'propose', to: 0, type: 'pact' }));
+  g.tick(cmd(0, { c: 'respond', id: g.s.requests[0].id, accept: true }));
+  assert.deepEqual([g.relation(0, 1).type, g.relation(0, 1).trade], ['pact', true], 'пакт поверх торговли');
+  g.relation(0, 1).until = g.s.tick + 2;
+  run(g, 15);
+  assert.deepEqual([g.relation(0, 1).type, g.relation(0, 1).trade], ['none', true], 'после пакта торговля остаётся');
+  assert.equal(g.s.players[1].traitorUntil, 0);
+  g.tick(cmd(1, { c: 'propose', to: 0, type: 'pact' }));
+  g.tick(cmd(0, { c: 'respond', id: g.s.requests[0].id, accept: true }));
+  g.tick(cmd(1, { c: 'break', with: 0 }));
+  assert.ok(g.s.players[1].traitorUntil > g.s.tick, 'разрыв действующего пакта — предательство');
+});
+
+test('тип договора проверяется по белому списку, старые сохранения переводятся', () => {
+  const g = newGame(MAP1);
+  begin(g, [[40, 50], [160, 50]]);
+  for (const type of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'isPrototypeOf', 'none', 7, null]) {
+    const r = g.validate(0, { c: 'propose', to: 1, type });
+    assert.equal(r.ok, false, String(type));
+    assert.equal(r.error, 'Неизвестный тип договора');
+  }
+  g.tick(cmd(0, { c: 'propose', to: 1, type: 'constructor' }));
+  assert.equal(g.s.requests.length, 0);
+  assert.deepEqual(g.s.relations, {});
+  const obj = serializeState(g.s);
+  obj.relations = { '0:1': { type: 'trade', until: 0, embargo: false, emb: 0 }, '1:0': { type: 'pact' }, 'x': { type: 'alliance' } };
+  obj.requests = [{ id: 99, from: 0, to: 1, type: 'constructor', expires: 1e9, at: 0 }];
+  const back = deserializeState(JSON.parse(JSON.stringify(obj)), MAP1);
+  assert.deepEqual(back.relations, { '0:1': { type: 'none', until: 0, trade: true, embargo: false, emb: 0 } });
+  assert.equal(back.requests.length, 0);
+  const h = new Game(MAP1, back);
+  assert.ok(h.hasTradeTreaty(0, 1));
+  assert.equal(h.isHostile(0, 1), true);
 });
 
 test('постройка, улучшение и снос зданий', () => {
@@ -263,82 +363,137 @@ function readyBuilding(g, pid, type, x, y) {
   return b;
 }
 
-test('ж/д: поезд ровно в 2 раза быстрее грузовика, груз приносит золото', () => {
+function westCoast(g, y0 = 50) {
+  for (let d = 0; d < 30; d++) {
+    for (const y of [y0 + d, y0 - d]) {
+      for (let x = 20; x < 30; x++) if (g.oceanCoast[y * g.W + x]) return [x, y];
+    }
+  }
+  return null;
+}
+
+function vehiclesOf(g, f) {
+  return g.s.units.filter((u) => (u.type === 'truck' || u.type === 'train') && u.from === f.id).length;
+}
+
+test('ж/д: поезд ровно в 2 раза быстрее грузовика и привозит с фабрики вдвое больше', () => {
   const g = newGame(MAP1);
   begin(g, [[40, 50], [160, 50]]);
   claim(g, 0, 20, 20, 100, 80);
-  let coast = -1;
-  for (let x = 20; x < 30 && coast < 0; x++) if (g.oceanCoast[50 * g.W + x]) coast = 50 * g.W + x;
-  for (let y = 21; y < 79 && coast < 0; y++) if (g.oceanCoast[y * g.W + 20]) coast = y * g.W + 20;
-  assert.ok(coast >= 0);
-  const px = coast % g.W, py = Math.floor(coast / g.W);
+  const [px, py] = westCoast(g);
   const port = readyBuilding(g, 0, 'port', px, py);
-  const fac = readyBuilding(g, 0, 'factory', px + 60, py);
-  const fac2 = readyBuilding(g, 0, 'factory', px + 60, py + 12);
-  fac.cd = 1;
-  fac2.cd = 50;
-  g.tick([]);
-  const truck = g.s.units.find((u) => u.type === 'truck');
-  assert.ok(truck, 'без ж/д едет грузовик');
-  assert.equal(truck.cargo, ECON.cargoPerLevel);
-  assert.equal(fac.cd, factoryInterval(1));
+  const fac = readyBuilding(g, 0, 'factory', px + 64, py - 6);
+  const fac2 = readyBuilding(g, 0, 'factory', px + 64, py + 6);
   g.s.players[0].gold = 100000;
+  assert.ok(Math.hypot(fac.x - px, fac.y - py) >= 60);
   assert.ok(g.apply(0, { c: 'rail', a: fac2.id, b: port.id }).ok);
   assert.equal(g.validate(0, { c: 'rail', a: port.id, b: fac2.id }).ok, false, 'уже соединены');
-  fac2.cd = 1;
   g.tick([]);
+  const truck = g.s.units.find((u) => u.type === 'truck');
   const train = g.s.units.find((u) => u.type === 'train');
-  assert.ok(train, 'по ж/д едет поезд');
-  assert.equal(train.from, fac2.id);
+  assert.ok(truck && truck.from === fac.id, 'без ж/д едет грузовик');
+  assert.ok(train && train.from === fac2.id, 'по ж/д едет поезд');
+  assert.equal(truck.cargo, ECON.cargoPerLevel);
+  assert.equal(fac.cd, factoryInterval());
   const t0 = [truck.x, truck.y], r0 = [train.x, train.y];
   run(g, 10);
   const dt = Math.hypot(truck.x - t0[0], truck.y - t0[1]);
   const dr = Math.hypot(train.x - r0[0], train.y - r0[1]);
   assert.ok(Math.abs(dr - 2 * dt) < 1e-9, `поезд ${dr}, грузовик ${dt}`);
   assert.equal(LAND_UNITS.train.speed, 2 * LAND_UNITS.truck.speed);
-  const gold = g.s.players[0].gold;
-  const stock = port.stock;
-  const got = [];
-  for (let t = 0; t < 120; t++) { g.tick([]); got.push(...g.events); }
-  const cargo = got.filter((e) => e.k === 'cargo');
-  assert.equal(cargo.length, 2, 'оба доехали');
-  assert.equal(port.stock, stock + 2);
-  assert.ok(g.s.players[0].gold > gold + 2 * ECON.cargoPerLevel - 1);
-  assert.ok(g.s.units.some((u) => u.type === 'truck' && u.back), 'грузовик возвращается на фабрику');
-  fac.level = 3;
-  fac2.level = 3;
-  const n = { truck: 0, train: 0 };
-  for (let t = 0; t < 3000; t++) {
-    g.tick([]);
-    for (const e of g.events) if (e.k === 'cargo') n[e.by]++;
+  const income = (level) => {
+    fac.level = level;
+    fac2.level = level;
+    const gold = { [fac.id]: 0, [fac2.id]: 0 }, n = { [fac.id]: 0, [fac2.id]: 0 };
+    const stock = port.stock;
+    for (let t = 0; t < 3000; t++) {
+      port.stock = stock;
+      g.tick([]);
+      assert.ok(vehiclesOf(g, fac) <= 1 && vehiclesOf(g, fac2) <= 1, 'в пути не больше одной партии на фабрику');
+      for (const e of g.events) if (e.k === 'cargo') { gold[e.from] += e.gold; n[e.from]++; }
+    }
+    return { truck: gold[fac.id], train: gold[fac2.id], n };
+  };
+  for (const level of [1, 3]) {
+    const r = income(level);
+    assert.ok(r.truck > 0 && r.train >= r.truck * 1.7, `ур. ${level}: доход с ж/д ${r.train}, без ж/д ${r.truck}`);
+    const a = factoryOutlook(g, fac), b = factoryOutlook(g, fac2);
+    assert.equal(a.type, 'truck');
+    assert.equal(b.type, 'train');
+    assert.ok(Math.abs(r.truck / 300 - a.perSec) / a.perSec < 0.05, `прогноз панели: ${a.perSec}/с, факт ${r.truck / 300}/с`);
+    assert.ok(a.railPerSec > 0 && Math.abs(a.perSec + a.railPerSec - b.perSec) / b.perSec < 0.05, 'панель покажет выгоду ж/д');
   }
-  assert.ok(n.train >= n.truck * 1.8, `ж/д возит больше: поезд ${n.train}, грузовик ${n.truck}`);
-  const truckPlan = factoryOutlook(g, fac), trainPlan = factoryOutlook(g, fac2);
-  assert.equal(truckPlan.type, 'truck');
-  assert.equal(trainPlan.type, 'train');
-  assert.ok(truckPlan.railPerMin > 0, 'панель покажет выгоду ж/д');
-  assert.ok(Math.abs(trainPlan.perMin / truckPlan.perMin - 2) < 0.1, `на 3 уровне ж/д даёт вдвое больше: ${trainPlan.perMin} / ${truckPlan.perMin}`);
+  const gold0 = g.s.players[0].gold;
+  run(g, 200);
+  assert.ok(g.s.players[0].gold > gold0, 'груз приносит золото');
+  assert.equal(g.s.players[0].incBase, (g.s.players[0].tiles * ECON.incomePerTile + Math.sqrt(g.s.players[0].troops) * ECON.incomeTroops), 'фабрики с портом не дают прямой доход');
   const hx = px + 30;
   const house = readyBuilding(g, 0, 'house', hx, py);
   assert.ok(g.apply(0, { c: 'rail', a: port.id, b: house.id }).ok);
   g.setOwner(py * g.W + hx, -1);
   assert.equal(g.s.rails.filter((r) => r.a === house.id || r.b === house.id).length, 0, 'рельс удалён вместе с концом');
-  let coast2 = -1;
-  for (let k = 0; k < g.N && coast2 < 0; k++) {
-    if (!g.oceanCoast[k] || g.tileOwner(k) !== 0) continue;
-    const x = k % g.W, y = Math.floor(k / g.W);
-    if (Math.abs(x - px) >= 5 || Math.abs(y - py) >= 5) {
-      if (Math.hypot(x - fac.x, y - fac.y) < Math.hypot(px - fac.x, py - fac.y) - 3 && !g.validate(0, { c: 'build', type: 'port', x, y }).error) coast2 = k;
-    }
-  }
-  assert.ok(coast2 >= 0, 'есть место для второго порта');
-  const near = readyBuilding(g, 0, 'port', coast2 % g.W, Math.floor(coast2 / g.W));
-  assert.equal(factoryOutlook(g, fac).port.id, near.id, 'без ж/д — ближайший порт');
-  g.s.players[0].gold = 1e6;
+});
+
+test('доставка с фабрики: только по своей или союзной суше; поезд — только если вдвое быстрее грузовика', () => {
+  const g = newGame(MAP1, 3, { victory: { territory: false } });
+  begin(g, [[40, 50], [160, 60], [150, 25]]);
+  claim(g, 0, 20, 20, 120, 80);
+  claim(g, 1, 120, 40, 180, 80);
+  claim(g, 2, 120, 20, 180, 40);
+  const P = g.s.players;
+  const [px, py] = westCoast(g);
+  const port = readyBuilding(g, 0, 'port', px, py);
+  const fac = readyBuilding(g, 0, 'factory', px + 70, py);
+  P[0].gold = 1e6;
+  assert.equal(factoryOutlook(g, fac).type, 'truck');
+  claim(g, 1, px + 30, 20, px + 33, 80);
+  assert.equal(factoryOutlook(g, fac).type, 'direct', 'путь через чужую землю закрыт');
+  assert.match(g.validate(0, { c: 'rail', a: fac.id, b: port.id }).error, /территории/);
+  g.tick([]);
+  assert.equal(g.s.units.filter((u) => u.type === 'truck').length, 0, 'грузовик не поехал');
+  assert.equal(fac.direct, 1);
+  run(g, 10);
+  const base = P[0].tiles * ECON.incomePerTile + Math.sqrt(P[0].troops) * ECON.incomeTroops;
+  assert.ok(Math.abs(P[0].incBase - base - ECON.factoryDirect) < 0.5, 'без доступного порта — прямой доход');
+  g.tick([{ pid: 0, cmd: { c: 'propose', to: 1, type: 'alliance' } }]);
+  g.tick([{ pid: 1, cmd: { c: 'respond', id: g.s.requests[0].id, accept: true } }]);
+  assert.equal(factoryOutlook(g, fac).type, 'truck', 'по союзной земле можно');
+  g.tick([{ pid: 0, cmd: { c: 'break', with: 1 } }]);
+  claim(g, 0, px + 30, 20, px + 33, 80);
+  const hub = readyBuilding(g, 0, 'house', px + 35, py + 20);
+  assert.ok(g.apply(0, { c: 'rail', a: fac.id, b: hub.id }).ok);
+  assert.ok(g.apply(0, { c: 'rail', a: hub.id, b: port.id }).ok);
+  const viaHub = factoryOutlook(g, fac);
+  assert.equal(viaHub.type, 'truck', 'кружной путь по рельсам медленнее половины времени грузовика — едет грузовик');
   assert.ok(g.apply(0, { c: 'rail', a: fac.id, b: port.id }).ok);
-  const plan = factoryOutlook(g, fac);
-  assert.equal(plan.type, 'train');
-  assert.equal(plan.port.id, port.id, 'груз идёт в порт, связанный рельсами');
+  const direct = factoryOutlook(g, fac);
+  assert.equal(direct.type, 'train');
+  assert.ok(direct.trip * 2 <= viaHub.trip + 1, `поезд ${direct.trip} тиков, грузовик ${viaHub.trip}`);
+  const fac3 = readyBuilding(g, 0, 'factory', px + 90, py + 25);
+  let south = -1;
+  for (let x = px + 80; x < px + 100 && south < 0; x++) if (g.oceanCoast[79 * g.W + x] && !g.validate(0, { c: 'build', type: 'port', x, y: 79 }).error) south = x;
+  assert.ok(south >= 0);
+  const near = readyBuilding(g, 0, 'port', south, 79);
+  const plan3 = factoryOutlook(g, fac3);
+  assert.equal(plan3.port.id, near.id, 'грузовик едет в ближайший доступный порт');
+  assert.ok(g.apply(0, { c: 'rail', a: fac3.id, b: port.id }).ok);
+  const plan4 = factoryOutlook(g, fac3);
+  const viaTrain = Math.ceil(Math.hypot(fac3.x - port.x, fac3.y - port.y) / LAND_UNITS.train.speed);
+  assert.equal(plan4.trip, Math.min(plan3.trip, viaTrain), 'выбирается самый быстрый способ');
+
+  const h = newGame(MAP2, 2);
+  begin(h, [[50, 50], [150, 50]]);
+  claim(h, 0, 20, 20, 180, 80);
+  h.s.players[0].gold = 1e6;
+  let east = -1;
+  for (let y = 30; y < 70 && east < 0; y++) if (h.oceanCoast[y * h.W + 110]) east = y;
+  const farPort = readyBuilding(h, 0, 'port', 110, east);
+  const lonely = readyBuilding(h, 0, 'factory', 85, east);
+  assert.equal(factoryOutlook(h, lonely).type, 'direct', 'порт за морем — грузовик не плывёт');
+  assert.match(h.validate(0, { c: 'rail', a: lonely.id, b: farPort.id }).error, /воду/);
+  run(h, 30);
+  assert.equal(h.s.units.filter((u) => u.type === 'truck' || u.type === 'train').length, 0);
+  assert.equal(lonely.direct, 1);
 });
 
 test('захват зданий: дома переходят, шахты уничтожаются', () => {
@@ -398,12 +553,12 @@ test('экономика: доход, прирост войск, исследо�
   run(g, researchTicks(0));
   assert.equal(p.research.armor, 1);
   assert.equal(p.researching, null);
-  assert.equal(p.composition.tank, 0, 'без фабрики танков нет');
-  readyBuilding(g, 0, 'factory', 60, 50);
-  run(g, 50);
-  assert.ok(p.composition.tank > 0, 'танки появляются');
   run(g, 300);
-  assert.ok(Math.abs(p.composition.tank - 0.08) < 1e-9, 'доля растёт до целевой');
+  assert.ok(Math.abs(p.composition.tank - ARMY.tankPerArmor * ARMY.noFactory) < 1e-9, `танки появляются и без фабрики: ${p.composition.tank}`);
+  readyBuilding(g, 0, 'factory', 60, 50);
+  run(g, 300);
+  assert.ok(Math.abs(p.composition.tank - 0.08) < 1e-9, 'фабрика увеличивает долю танков');
+  assert.equal(p.composition.art, 0, 'артиллерия — только после исследования');
   assert.ok(Math.abs(p.composition.inf + p.composition.tank + p.composition.art - 1) < 1e-12);
   assert.ok(g.attackMult(0) > 1.1);
   p.gold = -1000;
@@ -560,6 +715,41 @@ test('serialize -> deserialize -> hash совпадает (RLE)', () => {
   run(g2, 50);
   assert.equal(hashState(g2.s), hashState(g.s));
   assert.throws(() => deserializeState(obj, rectMap([[10, 10, 50, 50]], 60, 60)));
+});
+
+test('hashState замечает расхождение в отношениях, запросах, исследованиях, состоянии ИИ и фронте атаки', () => {
+  const g = newGame(MAP1, 3);
+  g.s.players[2].ai = 'normal';
+  begin(g, [[40, 50], [160, 50], [100, 30]]);
+  const [x, y] = frontier(g, 0, -1);
+  g.tick(cmd(0, { c: 'attack', x, y, ratio: 0.5 }));
+  g.tick(cmd(1, { c: 'propose', to: 0, type: 'pact' }));
+  g.s.players[1].gold = 1e5;
+  g.tick(cmd(1, { c: 'research', key: 'econ' }));
+  run(g, 30);
+  assert.ok(g.s.attacks.length && g.s.attacks[0].front.length > 2);
+  assert.ok(g.s.requests.length === 1 && g.s.players[1].researching && g.s.players[2].aiState.v);
+  const base = hashState(g.s);
+  const mutate = [
+    (s) => { s.relations['1:2'] = { type: 'alliance', until: 0, trade: false, embargo: false, emb: 0 }; },
+    (s) => { s.relations['0:2'] = { type: 'none', until: 0, trade: true, embargo: false, emb: 0 }; },
+    (s) => { s.requests[0].type = 'trade'; },
+    (s) => { s.requests[0].expires++; },
+    (s) => { s.players[1].researching.progress++; },
+    (s) => { s.players[1].researching.key = 'inf'; },
+    (s) => { s.players[2].aiState.rng ^= 1; },
+    (s) => { s.players[2].aiState.turn++; },
+    (s) => { s.players[0].composition.tank = 0.01; },
+    (s) => { s.players[0].traitorUntil = 5; },
+    (s) => { const F = s.attacks[0].front; [F[0], F[1]] = [F[1], F[0]]; },
+    (s) => { s.econLeadTicks = 10; },
+  ];
+  for (const [k, fn] of mutate.entries()) {
+    const copy = deserializeState(JSON.parse(JSON.stringify(serializeState(g.s))), MAP1);
+    assert.equal(hashState(copy), base, `копия ${k}`);
+    fn(copy);
+    assert.notEqual(hashState(copy), base, `изменение ${k} не попало в hash`);
+  }
 });
 
 test('производительность и темп захвата: world, 12 игроков, ручные атаки', () => {

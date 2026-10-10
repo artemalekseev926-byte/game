@@ -4,8 +4,11 @@ export const hasNative = () => !!native();
 export const DEFAULT_PORT = 27420;
 export const NET_VERSION = 2;
 export const CHUNK_SIZE = 192 * 1024;
+export const MAX_ASSEMBLY = 32 * 1024 * 1024;
+export const CHUNK_TTL = 60000;
 const MAX_PARTS = 4096;
 const MAX_PENDING = 4;
+const MAX_ID = 64;
 
 let chunkSeq = 0;
 
@@ -25,40 +28,124 @@ export function sendLarge(transport, peer, obj, limit) {
   return parts.length;
 }
 
+const positive = (v, def) => (Number.isFinite(v) && v > 0 ? v : def);
+
 export class Reassembler {
-  constructor() {
+  constructor(opts = {}) {
+    this.enabled = opts.chunks !== false;
+    this.maxBytes = positive(opts.maxBytes, MAX_ASSEMBLY);
+    this.maxParts = positive(opts.maxParts, MAX_PARTS);
+    this.maxPending = positive(opts.maxPending, MAX_PENDING);
+    this.ttl = positive(opts.ttl, CHUNK_TTL);
+    this.now = typeof opts.now === 'function' ? opts.now : () => Date.now();
     this.pending = new Map();
+    this.bytes = new Map();
+    this.rejected = 0;
   }
 
   accept(peer, msg) {
-    if (!msg || typeof msg !== 'object') return null;
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return null;
     if (msg.t !== 'chunk') return msg;
+    if (!this.enabled) return this.reject();
     const { id, i, of, data } = msg;
-    if (typeof id !== 'string' || typeof data !== 'string' || !Number.isInteger(i) || !Number.isInteger(of) || of < 1 || of > MAX_PARTS || i < 0 || i >= of) return null;
+    if (typeof id !== 'string' || !id || id.length > MAX_ID || typeof data !== 'string') return this.reject();
+    if (!Number.isInteger(i) || !Number.isInteger(of) || of < 1 || of > this.maxParts || i < 0 || i >= of) return this.reject();
+    if (i < of - 1 && data.length * (of - 1) > this.maxBytes) return this.reject();
+    const now = this.now();
+    this.expire(now);
     const key = peer + '|' + id;
     let e = this.pending.get(key);
     if (!e) {
-      e = { peer, of, got: 0, parts: new Array(of) };
+      e = { peer, of, got: 0, size: 0, start: now, parts: new Array(of) };
       this.pending.set(key, e);
       this.trim(peer, key);
     }
-    if (e.of !== of || e.parts[i] !== undefined) return null;
+    if (e.of !== of || e.parts[i] !== undefined) return this.reject();
+    if (e.size + data.length > this.maxBytes || (this.bytes.get(peer) || 0) + data.length > this.maxBytes) {
+      this.remove(key);
+      return this.reject();
+    }
     e.parts[i] = data;
     e.got++;
+    e.size += data.length;
+    this.bytes.set(peer, (this.bytes.get(peer) || 0) + data.length);
     if (e.got < of) return null;
+    this.remove(key);
+    try { return JSON.parse(e.parts.join('')); } catch { return this.reject(); }
+  }
+
+  reject() {
+    this.rejected++;
+    return null;
+  }
+
+  held(peer) {
+    if (peer === undefined) {
+      let n = 0;
+      for (const v of this.bytes.values()) n += v;
+      return n;
+    }
+    return this.bytes.get(peer) || 0;
+  }
+
+  remove(key) {
+    const e = this.pending.get(key);
+    if (!e) return;
     this.pending.delete(key);
-    try { return JSON.parse(e.parts.join('')); } catch { return null; }
+    const left = (this.bytes.get(e.peer) || 0) - e.size;
+    if (left > 0) this.bytes.set(e.peer, left);
+    else this.bytes.delete(e.peer);
+  }
+
+  expire(now) {
+    for (const [k, e] of this.pending) if (now - e.start > this.ttl) this.remove(k);
   }
 
   trim(peer, keep) {
     const mine = [];
     for (const [k, e] of this.pending) if (e.peer === peer && k !== keep) mine.push(k);
-    while (mine.length >= MAX_PENDING) this.pending.delete(mine.shift());
+    while (mine.length >= this.maxPending) this.remove(mine.shift());
   }
 
   drop(peer) {
-    for (const [k, e] of this.pending) if (e.peer === peer) this.pending.delete(k);
+    for (const [k, e] of this.pending) if (e.peer === peer) this.remove(k);
   }
+}
+
+export class RateLimit {
+  constructor(max, window, now) {
+    this.max = max;
+    this.window = window;
+    this.now = typeof now === 'function' ? now : () => Date.now() / 1000;
+    this.hits = new Map();
+  }
+
+  slot(key) {
+    const t = this.now();
+    let h = this.hits.get(key);
+    if (!h || t - h.start >= this.window || t < h.start) {
+      h = { start: t, used: 0, missed: 0 };
+      this.hits.set(key, h);
+    }
+    return h;
+  }
+
+  take(key) {
+    const h = this.slot(key);
+    if (h.used < this.max) {
+      h.used++;
+      return true;
+    }
+    h.missed++;
+    return false;
+  }
+
+  firstMiss(key) {
+    const h = this.hits.get(key);
+    return !!h && h.missed === 1;
+  }
+
+  drop(key) { this.hits.delete(key); }
 }
 
 class BaseTransport {
@@ -68,6 +155,7 @@ class BaseTransport {
     this.onMessage = () => {};
     this.onPeerJoin = () => {};
     this.onPeerLeave = () => {};
+    this.onTrouble = () => {};
   }
   broadcast(obj) { for (const p of this.peers) this.send(p, obj); }
   parse(data) {
@@ -81,10 +169,15 @@ export class SteamTransport extends BaseTransport {
     if (!n || !n.steam) return { ok: false, error: 'Steam доступен только в версии для ПК (Electron)' };
     return n.steam.init();
   }
-  static async list() {
-    const r = await native().steam.listLobbies();
+  static async scan() {
+    const n = native();
+    if (!n || !n.steam) throw new Error('Steam доступен только в версии для ПК (Electron)');
+    const r = await n.steam.listLobbies();
     if (!r.ok) throw new Error(r.error);
-    return r.list;
+    return { list: r.list || [], scanned: Number(r.scanned) || 0, shared: !!r.shared };
+  }
+  static async list() {
+    return (await SteamTransport.scan()).list;
   }
   static async host(maxPlayers, name) {
     const r = await native().steam.createLobby(maxPlayers, name);
@@ -118,6 +211,11 @@ export class SteamTransport extends BaseTransport {
       if (this.closed) return;
       if (this.peers.has(id)) { this.peers.delete(id); this.onPeerLeave(id); }
     });
+    if (n.steam.onLinkFail) {
+      n.steam.onLinkFail((id) => {
+        if (!this.closed && this.peers.has(id)) this.onTrouble(id);
+      });
+    }
   }
   send(peer, obj) { if (!this.closed) native().steam.send(peer, JSON.stringify(obj)); }
   invite() { native().steam.invite(); }

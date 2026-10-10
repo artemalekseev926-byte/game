@@ -2,11 +2,12 @@ import {
   BUILDINGS, BUILDING_KEYS, RESEARCH, RESEARCH_KEYS, STRIKES, SHIPS, TERRAIN, TICKS_PER_SEC, WIN_REASONS, TRADE,
   ECON, SAM, DIPLO, RAIL_TYPES, researchCost, researchTicks, siloReload, airbaseReload, interceptChance,
 } from '../core/config.js';
-import { buildCost, upgradeCost, demolishRefund, factoryInterval, nearestPort, railRoute } from '../core/buildings.js';
-import { shipCost, portShips, portShipCap, countUnits, warshipDamage, buildShipError } from '../core/units.js';
-import { strikeTarget, strikeRange } from '../core/strikes.js';
+import { buildCost, upgradeCost, demolishRefund, factoryOutlook } from '../core/buildings.js';
+import { shipCost, portShips, portShipCap, countUnits, warshipDamage, buildShipError, clearWater } from '../core/units.js';
+import { strikeTarget, strikeRange, strikeCost, megasUsed } from '../core/strikes.js';
 import { proposeError, embargoBy } from '../core/diplomacy.js';
 import { spawnTicks } from '../core/territory.js';
+import { NAV_SCALE, NAV_SEARCH, nearestOceanTile } from '../core/nav.js';
 import { fmtNum } from './render.js';
 import { play } from './audio.js';
 
@@ -88,13 +89,112 @@ const DIP_TYPES = { alliance: 'Союз', pact: 'Пакт', trade: 'Торгов
 const DIP_TEXT = {
   alliance: 'Предлагает союз: вы не сможете нападать друг на друга.',
   pact: 'Предлагает пакт о ненападении на 10 минут.',
-  trade: 'Предлагает торговый договор: +50% к доходу от торговли.',
+  trade: 'Предлагает торговый договор: +50% к доходу от торговли. Пакт о ненападении, если он есть, сохранится.',
 };
-const BREAK_TEXT = { alliance: 'Разорвать союз', pact: 'Разорвать пакт', trade: 'Разорвать торговлю' };
+const PROPOSE_TITLE = { alliance: 'Предложить союз', pact: 'Предложить пакт о ненападении на 10 минут', trade: 'Предложить торговый договор: +50% к торговле, пакт сохранится' };
 const STRIKE_SHORT = { drone: 'Дрон', kamikaze: 'Камикадзе', cruise: 'Крылатая ракета', atom: 'Атомная бомба', hbomb: 'Водородная бомба', mega: 'Мегабомба' };
 const SRC_NEED = { airbase: 'Постройте аэродром БПЛА (клавиша 6)', silo: 'Постройте ракетную шахту (клавиша 7)' };
+const SRC_NAME = { airbase: 'аэродром БПЛА', silo: 'ракетная шахта' };
 const PANEL_STRIKES = { silo: ['cruise', 'atom', 'hbomb', 'mega'], airbase: ['drone', 'kamikaze'] };
 const RATIO_STEP = 5;
+const ECON_MARKS = [0.5, 0.75, 0.9];
+const FLEET_GAP = 4;
+const FLEET_RINGS = 9;
+const SHIP_FORMS = ['корабль', 'корабля', 'кораблей'];
+const PENDING_TICKS = 40;
+
+export function breakLabel(rel) {
+  if (!rel) return 'Разорвать договор';
+  if (rel.type === 'alliance') return 'Разорвать союз';
+  if (rel.type === 'pact') return rel.trade ? 'Разорвать пакт и торговлю' : 'Разорвать пакт';
+  return rel.trade ? 'Разорвать торговлю' : 'Разорвать договор';
+}
+
+export function econGoalText(leader, isMe, leadSec, needSec) {
+  if (leader < 0) return { text: `цель ${fmtSec(needSec)}`, done: false };
+  return { text: `${fmtSec(leadSec)} / ${fmtSec(needSec)}`, done: isMe };
+}
+
+export function econMarkStage(progress) {
+  let k = 0;
+  while (k < ECON_MARKS.length && progress >= ECON_MARKS[k]) k++;
+  return k;
+}
+
+export function fleetSlots(map, x, y, n, gap = FLEET_GAP) {
+  const W = map.W, H = map.H, ocean = map.nav.ocean, wb = map.waterBody;
+  const c0 = nearestOceanTile(map, x, y, NAV_SCALE * NAV_SEARCH);
+  if (c0 < 0 || n <= 0) return [];
+  const body = wb[c0];
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const exact = ix >= 0 && iy >= 0 && ix < W && iy < H && ocean[iy * W + ix] && wb[iy * W + ix] === body;
+  const cx = exact ? x : (c0 % W) + 0.5, cy = exact ? y : Math.floor(c0 / W) + 0.5;
+  const pts = [];
+  for (let b = -FLEET_RINGS; b <= FLEET_RINGS; b++) {
+    for (let a = -FLEET_RINGS; a <= FLEET_RINGS; a++) {
+      if (Math.abs(a + b) > FLEET_RINGS) continue;
+      const px = cx + gap * (a + b / 2), py = cy + gap * b * 0.8660254;
+      pts.push([(px - cx) ** 2 + (py - cy) ** 2, Math.atan2(py - cy, px - cx), px, py]);
+    }
+  }
+  pts.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const out = [];
+  const used = new Set();
+  for (const [, , px, py] of pts) {
+    if (out.length >= n) break;
+    const tx = Math.floor(px), ty = Math.floor(py);
+    if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue;
+    const i = ty * W + tx;
+    if (used.has(i) || !ocean[i] || wb[i] !== body) continue;
+    if (out.length && !clearWater(map, cx, cy, px, py)) continue;
+    used.add(i);
+    out.push([px, py]);
+  }
+  return out;
+}
+
+export function fleetOrders(game, pid, ids, x, y) {
+  const ships = [];
+  for (const id of ids) {
+    const u = game.unitById(id);
+    if (u && u.owner === pid && u.type === 'warship' && u.hp > 0 && !ships.includes(u)) ships.push(u);
+  }
+  const cmds = [], failed = [], points = [];
+  if (!ships.length) return { cmds, failed, points };
+  const slots = ships.length > 1 ? fleetSlots(game.map, x, y, ships.length) : [];
+  const assign = new Map();
+  if (slots.length) {
+    let mx = 0, my = 0;
+    for (const u of ships) { mx += u.x; my += u.y; }
+    mx /= ships.length;
+    my /= ships.length;
+    const [sx0, sy0] = slots[0];
+    const pairs = [];
+    ships.forEach((u, k) => slots.forEach(([px, py], j) => {
+      pairs.push([((u.x - mx) - (px - sx0)) ** 2 + ((u.y - my) - (py - sy0)) ** 2, k, j]);
+    }));
+    pairs.sort((p, q) => p[0] - q[0] || p[1] - q[1] || p[2] - q[2]);
+    const takenS = new Set();
+    for (const [, k, j] of pairs) {
+      if (assign.has(k) || takenS.has(j)) continue;
+      assign.set(k, slots[j]);
+      takenS.add(j);
+    }
+  }
+  ships.forEach((u, k) => {
+    const tries = assign.has(k) ? [assign.get(k), [x, y]] : [[x, y]];
+    for (const [px, py] of tries) {
+      const cmd = { c: 'moveShip', id: u.id, x: px, y: py };
+      if (game.validate(pid, cmd).ok) {
+        cmds.push(cmd);
+        points.push([px, py]);
+        return;
+      }
+    }
+    failed.push(u.id);
+  });
+  return { cmds, failed, points };
+}
 
 const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, k) => `<i${k < n ? ' class="on"' : ''}></i>`).join('')}</span>`;
 const kv = (rows) => `<div class="kv">${rows.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('')}</div>`;
@@ -103,7 +203,7 @@ const btn = (act, label, extra = {}) => {
   const attrs = Object.entries(extra.data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   const cls = ['btn', 'sm', extra.cls || '', extra.full ? 'full' : ''].filter(Boolean).join(' ');
   const cost = extra.cost !== undefined ? `<span class="cost">${extra.cost}</span>` : '';
-  return `<button class="${cls}" data-act="${act}"${attrs}${extra.disabled ? ' disabled' : ''}${extra.title ? ` title="${esc(extra.title)}"` : ''}>${extra.icon ? icon(extra.icon) : ''}${label}${cost}</button>`;
+  return `<button class="${cls}" data-act="${act}"${attrs}${extra.disabled ? ' disabled' : ''}${extra.title ? ` title="${esc(extra.title)}"` : ''}>${extra.icon ? icon(extra.icon) : ''}<span class="lbl">${label}</span>${cost}</button>`;
 };
 
 export class Hud {
@@ -115,7 +215,12 @@ export class Hud {
     this.canvas = renderer.canvas;
     this.ratio = clamp(Number(app.settings.ratio) || 0.3, 0.01, 1);
     this.listeners = [];
-    this.mouse = { cx: -1, cy: -1, inside: false, inWin: false, down: -1, ox: 0, oy: 0, lx: 0, ly: 0, drag: false };
+    this.mouse = { cx: -1, cy: -1, inside: false, inWin: false, down: -1, ox: 0, oy: 0, lx: 0, ly: 0, drag: false, box: false, boxAdd: false };
+    this.econMark = { leader: -2, stage: 0 };
+    this.sentProps = new Map();
+    this.camKey = '';
+    this.noteAt = 0;
+    this.feedKey = '';
     this.keyPan = { l: 0, r: 0, u: 0, d: 0 };
     this.cards = new Map();
     this.rows = new Map();
@@ -131,9 +236,10 @@ export class Hud {
     this.endWait = 0;
     this.lastMsg = { text: '', at: 0, el: null, n: 1 };
     this.boatCache = { key: '', v: null };
-    this.timers = { top: 0, dock: 0, panel: 0, board: 0, cards: 0, modal: 0, tip: 0 };
+    this.timers = { top: 0, dock: 0, panel: 0, board: 0, cards: 0, modal: 0, tip: 0, ui: 1 };
     this.r.mode = null;
     this.r.selection = null;
+    this.r.box = null;
     this.r.hoverTile = -1;
     this.r.keys.x = 0;
     this.r.keys.y = 0;
@@ -161,6 +267,7 @@ export class Hud {
     this.unsub = null;
     this.r.mode = null;
     this.r.selection = null;
+    this.r.box = null;
     this.r.hoverTile = -1;
     this.r.keys.x = 0;
     this.r.keys.y = 0;
@@ -195,9 +302,27 @@ export class Hud {
     $('speed-ctrl').hidden = !this.session.speeds.length;
     $('research-list').innerHTML = '';
     $('countries-body').innerHTML = '';
+    this.initTitles();
     this.setRatio(this.ratio, true);
     this.updateSpeed();
     this.updateDockHeight();
+  }
+
+  initTitles() {
+    for (const type of BUILDING_KEYS) {
+      const def = BUILDINGS[type], el = $('tool-' + type);
+      if (!el) continue;
+      const req = def.req ? ` Нужно исследование «${RESEARCH[def.req[0]].name}» ${ROMAN[def.req[1]] || def.req[1]}.` : '';
+      el.title = `${def.name}: ${def.desc}.${req} Клавиша ${def.hotkey}`;
+    }
+    for (const kind of Object.keys(STRIKES)) {
+      const def = STRIKES[kind], el = $('tool-' + kind);
+      if (!el) continue;
+      const desc = def.desc ? def.desc.replace(/\.$/, '') + '.' : '';
+      el.title = `${def.name}: ${desc} Запуск: ${SRC_NAME[def.src]}, исследование «${RESEARCH[def.req[0]].name}» ${ROMAN[def.req[1]] || def.req[1]}`;
+    }
+    $('tool-rail').title = 'Железная дорога между фабрикой, портом или жилым кварталом: поезд идёт вдвое быстрее грузовика и удваивает поток товаров с фабрики в порт. Клавиша 8';
+    $('btn-warship').title = 'Военный корабль: строится в выбранном или ближайшем порту. F — выбрать весь флот';
   }
 
   bind() {
@@ -207,6 +332,7 @@ export class Hud {
     this.listen(window, 'mouseup', (e) => this.onMouseUp(e));
     this.listen(c, 'wheel', (e) => this.onWheel(e), { passive: false });
     this.listen(c, 'contextmenu', (e) => { e.preventDefault(); this.onRightClick(e); });
+    this.listen(c, 'dblclick', (e) => this.onDoubleClick(e));
     this.listen(c, 'mouseleave', () => {
       this.mouse.inside = false;
       this.r.hoverTile = -1;
@@ -237,6 +363,7 @@ export class Hud {
       $('board').classList.toggle('collapsed', on);
       this.app.settings.boardCollapsed = on;
       this.app.saveSettings();
+      this.feedKey = '';
       play('toggle');
     };
     $('board-list').onclick = (e) => {
@@ -418,7 +545,28 @@ export class Hud {
     while (log.children.length > 7) log.firstElementChild.remove();
     setTimeout(() => el.remove(), 12000);
     this.lastMsg = { text: html ? '' : text, at: now, el, n: 1 };
+    this.fitFeed();
     if (kind === 'danger') play('alert');
+  }
+
+  feedTop() {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 15;
+    const board = $('board');
+    if (board && board.offsetParent !== null) {
+      const r = board.getBoundingClientRect();
+      if (r.height > 0) return r.bottom + rem * 0.6;
+    }
+    return $('hud-top').getBoundingClientRect().bottom + rem * 0.6;
+  }
+
+  fitFeed() {
+    const feed = $('feed'), log = $('log');
+    if (!feed || feed.offsetParent === null) return;
+    const avail = Math.max(0, feed.getBoundingClientRect().bottom - this.feedTop());
+    feed.style.maxHeight = Math.floor(avail) + 'px';
+    const chat = $('chat-form');
+    const extra = chat.hidden ? 0 : chat.offsetHeight + 6;
+    while (log.children.length > 1 && log.offsetHeight + extra > avail) log.firstElementChild.remove();
   }
 
   logChat(c) {
@@ -450,6 +598,42 @@ export class Hud {
     this.timers.panel = 0.05;
     this.timers.dock = 0.05;
     this.tipDirty = true;
+    this.queuedNote();
+    return true;
+  }
+
+  queuedNote() {
+    const ses = this.session;
+    if (!this.s || this.s.phase === 'over') return;
+    const held = ses.paused || ses.waiting > 0;
+    if (!held) return;
+    const now = performance.now();
+    if (now - this.noteAt < 2500) return;
+    this.noteAt = now;
+    this.toast(ses.paused ? 'Игра на паузе: команда выполнится, когда игра продолжится' : 'Команда выполнится, когда все игроки загрузятся', 'info');
+  }
+
+  markProposal(to, type) {
+    this.sentProps.set(to + ':' + type, this.s.tick);
+  }
+
+  proposalPending(to, type) {
+    const s = this.s, me = this.pid;
+    if (s.requests.some((r) => r.from === me && r.to === to && r.type === type)) {
+      this.sentProps.delete(to + ':' + type);
+      return true;
+    }
+    const at = this.sentProps.get(to + ':' + type);
+    if (at === undefined) return false;
+    if (s.tick - at <= PENDING_TICKS) return true;
+    this.sentProps.delete(to + ':' + type);
+    return false;
+  }
+
+  propose(to, type) {
+    if (!this.send({ c: 'propose', to, type })) return false;
+    this.markProposal(to, type);
+    play('click');
     return true;
   }
 
@@ -464,6 +648,8 @@ export class Hud {
     if ((T.board -= dt) <= 0) { T.board = 0.5; this.updateBoard(); }
     if ((T.cards -= dt) <= 0) { T.cards = 0.2; this.updateCards(); }
     if ((T.modal -= dt) <= 0) { T.modal = 0.4; this.updateModals(); }
+    if ((T.ui -= dt) <= 0) { T.ui = 2.5; if (this.app.checkUi) this.app.checkUi(); }
+    this.trackCamera();
     T.tip -= dt;
     if (T.tip <= 0 || (this.tipDirty && performance.now() - this.tipAt > 50)) {
       T.tip = 0.25;
@@ -471,6 +657,16 @@ export class Hud {
     }
     this.updateHint();
     this.checkEnd(dt);
+  }
+
+  trackCamera() {
+    const c = this.r.cam;
+    const key = c.x.toFixed(3) + ',' + c.y.toFixed(3) + ',' + c.z.toFixed(4) + ',' + this.r.viewW + ',' + this.r.viewH;
+    if (key === this.camKey) return;
+    this.camKey = key;
+    if (!this.mouse.inside) return;
+    if (this.mouse.box) this.updateBox();
+    this.updateHover();
   }
 
   applyPan() {
@@ -492,6 +688,25 @@ export class Hud {
     const dock = $('hud-bottom');
     const h = dock.hidden ? 0 : dock.offsetHeight;
     if (h > 0 || dock.hidden) $('screen-game').style.setProperty('--dock-h', h + 'px');
+    this.fitFeed();
+  }
+
+  safeInsets() {
+    const rect = (id) => {
+      const el = $(id);
+      if (!el || el.hidden || el.offsetParent === null) return null;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 ? r : null;
+    };
+    const top = rect('hud-top'), dock = rect('hud-bottom'), board = rect('board');
+    const pad = 8;
+    return {
+      t: top ? top.bottom + pad : 0,
+      b: dock ? window.innerHeight - dock.top + pad : 0,
+      l: board ? board.right + pad : 0,
+      r: 0,
+      bh: board ? board.bottom + pad : 0,
+    };
   }
 
   updateSpawn() {
@@ -579,15 +794,39 @@ export class Hud {
       const need = v.economyMinutes * 60 * TICKS_PER_SEC;
       const L = s.econLeader, t = L >= 0 ? s.econLeadTicks : 0;
       const lp = L >= 0 ? s.players[L] : null;
-      const who = L === me.id ? 'Вы' : lp ? lp.name : 'Нет лидера';
       const bar = $('g-econ-bar');
       bar.style.width = clamp((t / need) * 100, 0, 100).toFixed(1) + '%';
       bar.style.background = lp ? safeColor(lp.color) : '';
-      setText($('g-econ-v'), lp ? `${who} · ${fmtSec(t / TICKS_PER_SEC)} / ${fmtSec(need / TICKS_PER_SEC)}` : `${who} · цель ${fmtSec(need / TICKS_PER_SEC)}`);
-      toggle($('g-econ'), 'done', L === me.id);
+      const view = econGoalText(lp ? L : -1, L === me.id, t / TICKS_PER_SEC, need / TICKS_PER_SEC);
+      setText($('g-econ-t'), view.text);
+      const dot = $('g-econ-dot');
+      show(dot, !!lp);
+      if (lp) dot.style.background = safeColor(lp.color);
+      toggle($('g-econ'), 'done', view.done);
+      toggle($('g-econ'), 'rival', !!lp && L !== me.id);
+      const left = fmtSec((need - t) / TICKS_PER_SEC);
+      $('g-econ').title = !lp
+        ? `Экономическое лидерство: нужен самый большой чистый доход с отрывом от второго места не меньше 15%, без перерыва ${fmtSec(need / TICKS_PER_SEC)}. Сейчас лидера нет`
+        : `Лидер по доходу: ${L === me.id ? 'вы' : lp.name}. Держит лидерство ${fmtSec(t / TICKS_PER_SEC)} из ${fmtSec(need / TICKS_PER_SEC)}, до победы ${left}`;
+      this.econWarn(L, lp, t / need, left);
     }
     show($('g-surv'), !v.territory && !v.economy);
     setText($('g-surv-v'), `Осталось стран: ${alive.length}`);
+  }
+
+  econWarn(L, lp, progress, left) {
+    const M = this.econMark;
+    if (L !== M.leader) {
+      M.leader = L;
+      M.stage = 0;
+    }
+    if (!lp || !this.me || this.s.phase !== 'play') return;
+    const k = econMarkStage(progress);
+    if (k <= M.stage) return;
+    M.stage = k;
+    if (L === this.pid) this.log(`Экономическое лидерство за вами: до победы ${left}`, 'good');
+    else if (this.game.isAllied(this.pid, L)) this.log(`Союзник ${lp.name} близок к экономической победе: осталось ${left}`, 'info');
+    else this.log(`${lp.name} близок к экономической победе: осталось ${left}. Обгоните его по доходу`, k >= ECON_MARKS.length ? 'danger' : 'warn');
   }
 
   updateBoard() {
@@ -610,6 +849,11 @@ export class Hud {
       setText(li.querySelector('.pct'), fmtShare((p.tiles * 100) / land));
       li.title = `${p.name}: ${fmtNum(p.troops)} войск`;
     });
+    const key = `${ol.children.length}|${$('board').classList.contains('collapsed')}|${window.innerHeight}|${$('log').children.length}`;
+    if (key !== this.feedKey) {
+      this.feedKey = key;
+      this.fitFeed();
+    }
   }
 
   updateCards() {
@@ -688,11 +932,19 @@ export class Hud {
       ic = 'pause';
       text = ses.canControl ? 'Пауза — нажмите Пробел, чтобы продолжить' : 'Хост поставил игру на паузу';
       cancel = false;
+    } else if (this.mouse.box && this.r.box) {
+      const n = this.r.box.n || 0;
+      ic = 'ship';
+      text = n ? `В рамке ${n} ${plural(n, SHIP_FORMS)} — отпустите кнопку, чтобы выбрать` : 'Выделите рамкой свои военные корабли';
+      cancel = false;
     } else if (this.r.selection && this.r.selection.kind === 'ship') {
-      const u = this.game.unitById(this.r.selection.id);
-      if (u && u.owner === this.pid && u.type === 'warship') {
+      const n = this.shipSel().length;
+      if (n > 1) {
         ic = 'ship';
-        text = 'Корабль выбран: ПКМ по воде — задать курс';
+        text = `Выбрано: ${n} ${plural(n, SHIP_FORMS)} · ПКМ по воде — курс строем · Ctrl+клик — добавить или убрать`;
+      } else if (n === 1) {
+        ic = 'ship';
+        text = 'Корабль выбран: ПКМ по воде — курс · Shift+рамка или F — выбрать несколько';
       }
     }
     const key = ic + '|' + text + '|' + cancel;
@@ -743,6 +995,10 @@ export class Hud {
   updateDock() {
     const g = this.game, me = this.me, pid = this.pid;
     if (!me) return;
+    const nws = countUnits(g, pid, 'warship');
+    const cws = $('cnt-warships');
+    show(cws, nws > 0);
+    setText(cws, nws);
     setText($('atk-troops'), fmtNum(Math.floor(me.troops * this.ratio)));
     for (const type of BUILDING_KEYS) {
       const el = $('tool-' + type);
@@ -761,9 +1017,11 @@ export class Hud {
       const resOk = me.research[def.req[0]] >= def.req[1];
       const src = g.buildingsOf(pid, def.src).filter((b) => g.buildingActive(b));
       const ready = src.filter((b) => !(b.cd > 0));
-      setText($('cost-' + kind), fmtInt(def.cost));
-      toggle(el, 'locked', !resOk || !src.length);
-      toggle(el, 'poor', resOk && src.length > 0 && me.gold < def.cost);
+      const cost = strikeCost(g, pid, kind);
+      setText($('cost-' + kind), fmtInt(cost));
+      const spent = !!def.perGame && megasUsed(me) >= def.perGame;
+      toggle(el, 'locked', !resOk || !src.length || spent);
+      toggle(el, 'poor', resOk && src.length > 0 && !spent && me.gold < cost);
       toggle(el, 'on', this.modeIs('strike', kind));
       const cnt = $('cnt-' + kind);
       show(cnt, resOk && src.length > 0);
@@ -863,6 +1121,7 @@ export class Hud {
     if (!this.needPlay()) return;
     const def = BUILDINGS[type], me = this.me;
     if (def.req && me.research[def.req[0]] < def.req[1]) {
+      if (this.r.mode) this.setMode(null);
       this.toast(`Нужно исследование «${RESEARCH[def.req[0]].name}» ${def.req[1]} ур.`);
       return;
     }
@@ -898,6 +1157,7 @@ export class Hud {
     const def = STRIKES[kind], me = this.me, g = this.game;
     if (me.research[def.req[0]] < def.req[1]) return `Нужно исследование «${RESEARCH[def.req[0]].name}» ${def.req[1]} ур.`;
     if (!g.buildingsOf(this.pid, def.src).some((b) => g.buildingActive(b))) return SRC_NEED[def.src];
+    if (def.perGame && megasUsed(me) >= def.perGame) return 'Мегабомба уже применена: она одна на партию';
     return null;
   }
 
@@ -910,6 +1170,7 @@ export class Hud {
     if (!this.needPlay()) return;
     const lock = this.strikeLock(kind);
     if (lock) {
+      if (this.r.mode) this.setMode(null);
       this.toast(lock);
       return;
     }
@@ -1062,6 +1323,142 @@ export class Hud {
     this.updateHover();
   }
 
+  shipSel() {
+    const sel = this.r.selection;
+    if (!sel || sel.kind !== 'ship' || !this.s) return [];
+    const g = this.game, out = [];
+    for (const id of sel.ids || [sel.id]) {
+      const u = g.unitById(id);
+      if (u && u.owner === this.pid && u.type === 'warship' && u.hp > 0) out.push(u);
+    }
+    return out;
+  }
+
+  selectShips(ids, quiet = false) {
+    const list = [...new Set(ids)];
+    if (!list.length) {
+      this.clearSelection();
+      return;
+    }
+    this.r.selection = { kind: 'ship', id: list[0], ids: list };
+    this.timers.panel = 0;
+    this.hintKey = '';
+    this.tipDirty = true;
+    if (!quiet) play('select');
+  }
+
+  toggleShip(u) {
+    const ids = this.shipSel().map((v) => v.id);
+    const k = ids.indexOf(u.id);
+    if (k >= 0) ids.splice(k, 1);
+    else ids.push(u.id);
+    if (ids.length) this.selectShips(ids);
+    else this.clearSelection();
+  }
+
+  ownWarships(onScreen = false) {
+    const out = [];
+    for (const u of this.s.units) {
+      if (u.owner !== this.pid || u.type !== 'warship' || u.hp <= 0) continue;
+      if (onScreen) {
+        const [x, y] = this.r.unitPos(u);
+        if (!this.visible(x, y)) continue;
+      }
+      out.push(u);
+    }
+    return out;
+  }
+
+  selectFleet() {
+    if (this.s.phase !== 'play') return;
+    const all = this.ownWarships();
+    if (!all.length) {
+      this.toast('У вас нет военных кораблей: постройте их в порту', 'info');
+      return;
+    }
+    if (this.r.mode) this.setMode(null);
+    const cur = new Set(this.shipSel().map((u) => u.id));
+    if (cur.size === all.length && all.every((u) => cur.has(u.id))) {
+      this.focusShips(all);
+      return;
+    }
+    this.selectShips(all.map((u) => u.id));
+  }
+
+  focusShips(list) {
+    if (!list.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const u of list) {
+      const [x, y] = this.r.unitPos(u);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    const span = Math.max(x1 - x0, y1 - y0, 1);
+    const fit = Math.min(this.r.viewW, this.r.viewH) / this.r.dpr / (span + 24);
+    this.r.focus((x0 + x1) / 2, (y0 + y1) / 2, clamp(fit, 1.5, Math.max(this.r.zoom, 6)));
+    play('click');
+  }
+
+  shipsInBox(b) {
+    if (!b) return [];
+    const pad = 4 * this.r.dpr, out = [];
+    for (const u of this.ownWarships()) {
+      const [x, y] = this.r.unitPos(u);
+      const sx = this.r.sx(x), sy = this.r.sy(y);
+      if (sx >= b.x0 - pad && sx <= b.x1 + pad && sy >= b.y0 - pad && sy <= b.y1 + pad) out.push(u);
+    }
+    return out;
+  }
+
+  updateBox() {
+    const m = this.mouse, r = this.r;
+    const [ax, ay] = r.canvasPoint(m.ox, m.oy), [bx, by] = r.canvasPoint(m.cx, m.cy);
+    const b = { x0: Math.min(ax, bx), y0: Math.min(ay, by), x1: Math.max(ax, bx), y1: Math.max(ay, by), n: 0 };
+    b.n = this.shipsInBox(b).length;
+    r.box = b;
+  }
+
+  finishBox() {
+    const list = this.shipsInBox(this.r.box);
+    const add = this.mouse.boxAdd;
+    this.r.box = null;
+    this.hintKey = '';
+    if (!list.length) {
+      this.toast('В рамке нет ваших военных кораблей', 'info');
+      return;
+    }
+    const ids = list.map((u) => u.id);
+    this.selectShips(add ? this.shipSel().map((u) => u.id).concat(ids) : ids);
+  }
+
+  orderFleet(ships, x, y) {
+    const plan = fleetOrders(this.game, this.pid, ships.map((u) => u.id), x, y);
+    let ok = 0;
+    for (const cmd of plan.cmds) if (this.session.send(cmd).ok) ok++;
+    const n = ships.length, bad = plan.failed.length;
+    if (ok) {
+      play('click');
+      if (typeof this.r.markOrders === 'function') this.r.markOrders(plan.points);
+      this.queuedNote();
+    }
+    if (bad) {
+      if (!ok) this.toast(n > 1 ? 'Корабли туда не доплывут' : 'Корабль туда не доплывёт');
+      else this.toast(`${bad} из ${n} ${plural(n, SHIP_FORMS)} не доплывут: они в другом море`, 'info');
+    }
+    this.timers.panel = 0.05;
+    this.tipDirty = true;
+  }
+
+  onDoubleClick(e) {
+    if (this.r.mode || !this.s || this.s.phase !== 'play') return;
+    const [sx, sy] = this.r.canvasPoint(e.clientX, e.clientY);
+    const u = this.pickUnit(sx, sy, true);
+    if (!u) return;
+    const ids = this.ownWarships(true).map((v) => v.id);
+    if (!ids.includes(u.id)) ids.push(u.id);
+    const add = e.ctrlKey || e.metaKey || e.shiftKey;
+    this.selectShips(add ? this.shipSel().map((v) => v.id).concat(ids) : ids);
+  }
+
   onMouseDown(e) {
     this.app.unlockAudio();
     if (e.button === 0 || e.button === 1) {
@@ -1070,6 +1467,8 @@ export class Hud {
       m.ox = m.lx = e.clientX;
       m.oy = m.ly = e.clientY;
       m.drag = false;
+      m.box = e.button === 0 && e.shiftKey && !this.r.mode && !!this.s && this.s.phase === 'play';
+      m.boxAdd = e.ctrlKey || e.metaKey;
       if (e.button === 1) e.preventDefault();
     }
     if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
@@ -1084,10 +1483,13 @@ export class Hud {
     if (m.down >= 0) {
       if (!m.drag && Math.hypot(e.clientX - m.ox, e.clientY - m.oy) > 5) {
         m.drag = true;
-        this.canvas.style.cursor = 'grabbing';
+        if (!m.box) this.canvas.style.cursor = 'grabbing';
         $('tip').hidden = true;
       }
-      if (m.drag) this.r.pan((e.clientX - m.lx) * this.r.dpr, (e.clientY - m.ly) * this.r.dpr);
+      if (m.drag) {
+        if (m.box) this.updateBox();
+        else this.r.pan((e.clientX - m.lx) * this.r.dpr, (e.clientY - m.ly) * this.r.dpr);
+      }
       m.lx = e.clientX;
       m.ly = e.clientY;
     }
@@ -1097,11 +1499,18 @@ export class Hud {
   onMouseUp(e) {
     const m = this.mouse;
     if (m.down < 0) return;
-    const was = m.down, drag = m.drag;
+    const was = m.down, drag = m.drag, box = m.box;
     m.down = -1;
     m.drag = false;
     this.canvas.style.cursor = '';
-    if (was === 0 && e.button === 0 && !drag && e.target === this.canvas) this.onLeftClick(e);
+    if (box && drag) {
+      this.finishBox();
+      m.box = false;
+    } else {
+      m.box = false;
+      this.r.box = null;
+      if (was === 0 && e.button === 0 && !drag && e.target === this.canvas) this.onLeftClick(e);
+    }
     this.updateHover();
   }
 
@@ -1139,7 +1548,7 @@ export class Hud {
       if (src && src.id !== mode.from) mode.from = src.id;
     }
     if (!mode && m.down < 0 && this.s.phase === 'play' && (this.pickUnit(sx, sy, true) || this.pickBuilding(sx, sy, 'own'))) cursor = 'pointer';
-    if (m.drag) cursor = 'grabbing';
+    if (m.drag) cursor = m.box ? 'crosshair' : 'grabbing';
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
     if (i !== this.hoverIndex) this.tipDirty = true;
     else if (!$('tip').hidden) this.placeTip();
@@ -1171,11 +1580,14 @@ export class Hud {
       this.onModeClick(mode, sx, sy, i, x, y, shift);
       return;
     }
+    const multi = e.ctrlKey || e.metaKey || e.shiftKey;
     const u = this.pickUnit(sx, sy, true);
     if (u) {
-      this.select('ship', u.id);
+      if (multi && this.shipSel().length) this.toggleShip(u);
+      else this.selectShips([u.id]);
       return;
     }
+    if (multi && this.shipSel().length) return;
     const b = this.pickBuilding(sx, sy, 'own');
     if (b) {
       this.select('building', b.id);
@@ -1220,7 +1632,7 @@ export class Hud {
             this.toast(v.error);
             return;
           }
-          this.app.confirm('Мегабомба «Судный день»', `Запустить мегабомбу за ${fmtInt(STRIKES.mega.cost)} золота? Боеголовки поразят все враждебные страны, кроме ваших союзников и партнёров по пакту.`, 'Запустить', () => {
+          this.app.confirm('Мегабомба «Судный день»', `Запустить мегабомбу за ${fmtInt(strikeCost(this.game, this.pid, 'mega'))} золота? Она одна на партию. Сотни боеголовок выжгут почти всю территорию всех враждебных стран; ваша земля, союзники и партнёры по пакту не пострадают.`, 'Запустить', () => {
             if (this.send(cmd)) this.setMode(null);
           });
           return;
@@ -1289,13 +1701,11 @@ export class Hud {
     const i = r.tileAtScreen(sx, sy);
     if (i < 0 || s.phase !== 'play') return;
     const [x, y] = this.tileXY(i);
-    const sel = r.selection;
-    if (sel && sel.kind === 'ship' && !g.isLandTile(i)) {
-      const u = g.unitById(sel.id);
-      if (u && u.owner === this.pid && u.type === 'warship') {
-        if (this.send({ c: 'moveShip', id: u.id, x: x + 0.5, y: y + 0.5 })) play('click');
-        return;
-      }
+    const ships = this.shipSel();
+    if (ships.length && !g.isLandTile(i)) {
+      const [wx, wy] = r.screenToTile(sx, sy);
+      this.orderFleet(ships, wx, wy);
+      return;
     }
     if (!g.isLandTile(i)) return;
     const o = g.tileOwner(i);
@@ -1348,16 +1758,18 @@ export class Hud {
     const type = rel ? rel.type : 'none';
     for (const t of ['alliance', 'pact', 'trade']) {
       const b = $('ctx-' + t);
-      const hide = !p || type === 'alliance' || type === t;
+      const hide = !p || type === 'alliance' || (t === 'pact' && type === 'pact') || (t === 'trade' && !!rel.trade);
       b.hidden = hide;
       if (hide) continue;
-      const err = proposeError(g, me, o, t);
+      const pending = this.proposalPending(o, t);
+      const err = pending ? 'Предложение отправлено, ждём ответа' : proposeError(g, me, o, t);
       b.disabled = !!err;
-      b.title = err || '';
+      b.title = err || PROPOSE_TITLE[t];
+      setText($('ctx-' + t + '-hint'), pending ? 'отправлено' : '');
     }
     const br = $('ctx-break');
-    br.hidden = !p || type === 'none';
-    if (!br.hidden) labelNode(br).textContent = BREAK_TEXT[type] || 'Разорвать договор';
+    br.hidden = !p || (type === 'none' && !(rel && rel.trade));
+    if (!br.hidden) labelNode(br).textContent = breakLabel(rel);
     const em = $('ctx-embargo');
     em.hidden = !p;
     if (p) {
@@ -1413,7 +1825,7 @@ export class Hud {
       case 'alliance':
       case 'pact':
       case 'trade':
-        if (this.send({ c: 'propose', to: c.pid, type: act })) play('click');
+        this.propose(c.pid, act);
         break;
       case 'break':
         this.breakWith(c.pid);
@@ -1439,7 +1851,8 @@ export class Hud {
       doIt();
       return;
     }
-    this.app.confirm('Разорвать договор?', `${rel.type === 'alliance' ? 'Союз' : 'Пакт о ненападении'} с «${p ? p.name : '?'}» будет разорван. Вы станете предателем, и другие страны долго не будут вам доверять.`, 'Разорвать', doIt);
+    const what = rel.type === 'alliance' ? 'Союз' : rel.trade ? 'Пакт о ненападении и торговый договор' : 'Пакт о ненападении';
+    this.app.confirm('Разорвать договор?', `${what} с «${p ? p.name : '?'}» ${rel.type === 'pact' && rel.trade ? 'будут разорваны' : 'будет разорван'}. Вы станете предателем, и другие страны долго не будут вам доверять.`, 'Разорвать', doIt);
   }
 
   relText(q) {
@@ -1451,9 +1864,11 @@ export class Hud {
     const rel = g.relation(me, q);
     const parts = [];
     if (rel.type === 'alliance') parts.push('Союз');
-    else if (rel.type === 'pact') parts.push(`Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}`);
-    else if (rel.type === 'trade') parts.push('Торговый договор');
-    else parts.push(this.atWar(me, q) ? 'Война' : 'Нет договора');
+    else {
+      if (rel.type === 'pact') parts.push(`Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}`);
+      if (rel.trade) parts.push(rel.type === 'pact' ? 'торговля' : 'Торговый договор');
+      if (!parts.length) parts.push(this.atWar(me, q) ? 'Война' : 'Нет договора');
+    }
     if (rel.embargo) parts.push('эмбарго');
     if (p.traitorUntil > s.tick) parts.push('предатель');
     return parts.join(' · ');
@@ -1516,7 +1931,10 @@ export class Hud {
       if (unit.maxHp > 1) rows.push(['Прочность', `${fmtInt(unit.hp)} / ${fmtInt(unit.maxHp)}`]);
       if (unit.type === 'transport') rows.push(['Десант', fmtNum(unit.troops)]);
       if (unit.type === 'trade') rows.push(['Груз', fmtInt(unit.cargo)]);
-      if (unit.owner === me && unit.type === 'warship') act = this.tipAct('ok', 'target', 'ЛКМ — выбрать корабль');
+      if (unit.owner === me && unit.type === 'warship') {
+        const picked = this.shipSel().some((u) => u.id === unit.id);
+        act = this.tipAct('ok', 'target', picked ? 'Выбран · Ctrl+клик — убрать из выбора' : 'ЛКМ — выбрать · Ctrl+клик — добавить к выбору');
+      }
       return head + this.tipRows(rows) + act;
     }
     if (land) {
@@ -1565,7 +1983,7 @@ export class Hud {
       }
       if (m.kind === 'strike') {
         const v = m.from ? val({ c: 'strike', kind: m.strike, from: m.from, x, y }) : { ok: false, error: SRC_NEED[STRIKES[m.strike].src] };
-        return v.ok ? this.tipAct('strike', m.strike, `ЛКМ — ${STRIKE_SHORT[m.strike]} · ${fmtInt(STRIKES[m.strike].cost)}`) : this.tipAct('bad', 'alert', v.error);
+        return v.ok ? this.tipAct('strike', m.strike, `ЛКМ — ${STRIKE_SHORT[m.strike]} · ${fmtInt(strikeCost(g, me, m.strike))}`) : this.tipAct('bad', 'alert', v.error);
       }
       if (m.kind === 'boat') {
         const v = this.boatValid(x, y);
@@ -1583,12 +2001,10 @@ export class Hud {
       }
       return '';
     }
-    const sel = this.r.selection;
     if (!land) {
-      if (sel && sel.kind === 'ship') {
-        const u = g.unitById(sel.id);
-        if (u && u.owner === me && u.type === 'warship') return this.tipAct('ok', 'ship', 'ПКМ — плыть сюда');
-      }
+      const n = this.shipSel().length;
+      if (n > 1) return this.tipAct('ok', 'ship', `ПКМ — курс строем · ${n} ${plural(n, SHIP_FORMS)}`);
+      if (n === 1) return this.tipAct('ok', 'ship', 'ПКМ — плыть сюда');
       return '';
     }
     if (o === me) {
@@ -1619,14 +2035,31 @@ export class Hud {
       return;
     }
     const g = this.game;
-    const obj = sel.kind === 'building' ? g.buildingById(sel.id) : g.unitById(sel.id);
-    if (!obj) {
-      this.r.selection = null;
-      show(panel, false);
-      this.hintKey = '';
-      return;
+    let d;
+    if (sel.kind === 'ship') {
+      const ships = this.shipSel();
+      if (!ships.length) {
+        this.r.selection = null;
+        show(panel, false);
+        this.hintKey = '';
+        return;
+      }
+      if (ships.length !== (sel.ids || [sel.id]).length) {
+        sel.ids = ships.map((u) => u.id);
+        sel.id = sel.ids[0];
+        this.hintKey = '';
+      }
+      d = ships.length > 1 ? this.fleetPanel(ships) : this.unitPanel(ships[0]);
+    } else {
+      const obj = sel.kind === 'building' ? g.buildingById(sel.id) : g.unitById(sel.id);
+      if (!obj) {
+        this.r.selection = null;
+        show(panel, false);
+        this.hintKey = '';
+        return;
+      }
+      d = sel.kind === 'building' ? this.buildingPanel(obj) : this.unitPanel(obj);
     }
-    const d = sel.kind === 'building' ? this.buildingPanel(obj) : this.unitPanel(obj);
     setHTML($('panel-icon'), icon(d.icon));
     setText($('panel-title'), d.title);
     setHTML($('panel-sub'), d.sub);
@@ -1650,14 +2083,16 @@ export class Hud {
         rows.push(['Доход', `+${fmtInt(ECON.houseIncome * lvl)}/с`]);
         break;
       case 'factory': {
-        rows.push(['Груз', fmtInt(ECON.cargoPerLevel * lvl) + ' золота']);
-        rows.push(['Отправка', `каждые ${Math.round(factoryInterval(lvl) / TICKS_PER_SEC)} с`]);
-        const port = nearestPort(g, b.owner, b.x, b.y);
-        if (!port) rows.push(['Порт', `нет · +${fmtInt(ECON.factoryDirect * lvl)}/с`]);
-        else {
-          const route = railRoute(g, b.owner, b.id, port.id);
-          rows.push(['Доставка', route ? 'поездом (×2 быстрее)' : 'грузовиком']);
-          rows.push(['До порта', `${Math.round(Math.hypot(port.x - b.x, port.y - b.y))} кл.`]);
+        const f = factoryOutlook(g, b);
+        if (f.type === 'direct') {
+          rows.push(['Доставка', 'нет доступного порта']);
+          rows.push(['Доход', `+${fmtInt(f.perSec)}/с напрямую`]);
+        } else {
+          rows.push(['Доставка', f.type === 'train' ? 'поездом по ж/д' : 'грузовиком']);
+          rows.push(['Груз за рейс', fmtInt(f.cargo) + ' золота']);
+          rows.push(['Рейс', `${Math.round(f.len)} кл. · раз в ${Math.round(f.cycle / TICKS_PER_SEC)} с`]);
+          rows.push(['Поток в порт', `+${fmtInt(f.perMin)}/мин`]);
+          if (f.railPerMin > 0.5) rows.push(['С ж/д', `+${fmtInt(f.perMin + f.railPerMin)}/мин`]);
         }
         break;
       }
@@ -1702,19 +2137,35 @@ export class Hud {
         acts.push(btn('ship', 'Военный корабль', { icon: 'ship', full: true, cost: fmtInt(shipCost(g, me)), disabled: !!err && !/золота$/.test(err), title: err || 'Спустить на воду военный корабль' }));
       }
       if (RAIL_TYPES[b.type]) acts.push(btn('rail', 'Проложить ж/д отсюда', { icon: 'rail', full: true, disabled: !g.buildingActive(b), title: 'Соединить с другим зданием железной дорогой' }));
-      if (PANEL_STRIKES[b.type]) {
-        for (const kind of PANEL_STRIKES[b.type]) {
-          const sd = STRIKES[kind];
-          const resOk = this.me.research[sd.req[0]] >= sd.req[1];
-          acts.push(btn('strike', STRIKE_SHORT[kind], {
-            icon: kind, cost: fmtInt(sd.cost), data: { kind }, disabled: !resOk || !g.buildingActive(b),
-            title: resOk ? sd.name : `Нужно исследование «${RESEARCH[sd.req[0]].name}» ${sd.req[1]} ур.`,
-            cls: kind === 'mega' ? 'danger' : '',
-          }));
+      if (b.type === 'factory') {
+        const f = factoryOutlook(g, b);
+        if (f.type === 'truck' && f.railPerMin > 0.5 && f.port) {
+          const v = g.validate(me, { c: 'rail', a: b.id, b: f.port.id });
+          if (v.ok || /золота$/.test(v.error || '')) {
+            acts.push(btn('rail-port', 'Ж/д до порта', {
+              icon: 'rail', full: true, data: { port: f.port.id }, cost: fmtInt(Math.round(ECON.railCostPerTile * Math.hypot(f.port.x - b.x, f.port.y - b.y))),
+              title: `Проложить железную дорогу до порта: поток товаров вырастет до +${fmtInt(f.perMin + f.railPerMin)}/мин`,
+            }));
+          }
         }
       }
       body += `<div class="sec-title">Действия</div><div class="panel-actions">${acts.join('')}</div>`;
+      if (PANEL_STRIKES[b.type]) {
+        const strikes = [];
+        for (const kind of PANEL_STRIKES[b.type]) {
+          const sd = STRIKES[kind];
+          const resOk = this.me.research[sd.req[0]] >= sd.req[1];
+          const spent = !!sd.perGame && megasUsed(this.me) >= sd.perGame;
+          strikes.push(btn('strike', sd.name.replace(/ «.*»$/, ''), {
+            icon: kind, cost: fmtInt(strikeCost(g, me, kind)), data: { kind }, full: true, disabled: !resOk || !g.buildingActive(b) || spent,
+            title: spent ? 'Мегабомба уже применена: она одна на партию' : resOk ? `${sd.name}: ${sd.desc || ''}` : `Нужно исследование «${RESEARCH[sd.req[0]].name}» ${sd.req[1]} ур.`,
+            cls: kind === 'mega' ? 'danger' : '',
+          }));
+        }
+        body += `<div class="sec-title">Удары</div><div class="panel-actions">${strikes.join('')}</div>`;
+      }
       if (b.type === 'port') body += '<p class="note">Порт сам отправляет торговые суда в порты других стран.</p>';
+      if (b.type === 'factory') body += '<p class="note">Новый груз фабрика отправляет, когда предыдущий доставлен. Поезд по ж/д идёт вдвое быстрее грузовика и удваивает поток товаров.</p>';
     } else if (!mine) {
       body += '<p class="note">Чужое здание: ПКМ по нему — удар камикадзе или крылатой ракетой.</p>';
     }
@@ -1749,7 +2200,11 @@ export class Hud {
       rows.push(['Направление', to ? esc(to.name) : '?']);
     }
     body += kv(rows);
-    if (mine && u.type === 'warship') body += '<p class="note">ПКМ по воде — задать курс. Корабль сам атакует враждебные суда поблизости.</p>';
+    if (mine && u.type === 'warship') {
+      const total = this.ownWarships().length;
+      if (total > 1) body += `<div class="panel-actions">${btn('fleet-all', `Весь флот · ${total}`, { icon: 'ship', full: true, title: 'Выбрать все свои военные корабли (F)' })}</div>`;
+      body += '<p class="note">ПКМ по воде — задать курс. Корабль сам атакует враждебные суда поблизости. Ctrl+клик по другим кораблям, Shift+рамка или F — выбрать несколько.</p>';
+    }
     return {
       icon: UNIT_ICONS[u.type] || 'ship',
       title: UNIT_NAMES[u.type] || u.type,
@@ -1758,13 +2213,52 @@ export class Hud {
     };
   }
 
+  fleetPanel(ships) {
+    const me = this.me, n = ships.length;
+    let hp = 0, max = 0, moving = 0, chasing = 0;
+    for (const u of ships) {
+      hp += u.hp;
+      max += u.maxHp;
+      if (u.order) moving++;
+      else if (u.chase >= 0) chasing++;
+    }
+    const k = max > 0 ? hp / max : 0;
+    let body = pbar('Прочность флота', `${fmtInt(hp)} / ${fmtInt(max)}`, k * 100, k < 0.35 ? 'danger' : 'hp');
+    body += kv([
+      ['Выбрано', `${n} из ${this.ownWarships().length}`],
+      ['Урон за залп', fmtInt(warshipDamage(me ? me.research.naval : 0) * n)],
+      ['Идут по курсу', moving],
+      ['Преследуют цель', chasing],
+      ['Ожидают приказа', n - moving - chasing],
+    ]);
+    body += `<div class="panel-actions">${btn('fleet-all', 'Весь флот', { icon: 'ship', title: 'Выбрать все свои военные корабли (F)' })}${btn('fleet-show', 'Показать', { icon: 'target', title: 'Показать выбранные корабли на карте' })}</div>`;
+    body += '<p class="note">ПКМ по воде — курс строем для всех выбранных. Ctrl+клик по кораблю — добавить или убрать, Shift+перетаскивание — рамка, двойной клик по кораблю — все корабли на экране, F — весь флот.</p>';
+    return {
+      icon: 'ship',
+      title: 'Флот',
+      sub: `<span>${n} ${plural(n, SHIP_FORMS)} выбрано</span>`,
+      body,
+    };
+  }
+
   onPanelAction(e) {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
     const g = this.game, sel = this.r.selection;
+    if (b.dataset.act === 'fleet-all') {
+      this.selectFleet();
+      return;
+    }
+    if (b.dataset.act === 'fleet-show') {
+      this.focusShips(this.shipSel());
+      return;
+    }
     const bd = sel && sel.kind === 'building' ? g.buildingById(sel.id) : null;
     if (!bd) return;
     switch (b.dataset.act) {
+      case 'rail-port':
+        if (this.send({ c: 'rail', a: bd.id, b: Number(b.dataset.port) })) play('build');
+        break;
       case 'upgrade':
         if (this.send({ c: 'upgrade', id: bd.id })) play('build');
         break;
@@ -1795,8 +2289,9 @@ export class Hud {
   }
 
   onKeyDown(e) {
-    if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const code = e.code, rep = e.repeat;
+    if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space') e.preventDefault();
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const pan = { KeyW: 'u', ArrowUp: 'u', KeyS: 'd', ArrowDown: 'd', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' }[code];
     if (pan) {
       this.keyPan[pan] = 1;
@@ -1819,6 +2314,7 @@ export class Hud {
       case 'KeyV': this.toggleAA(); return true;
       case 'KeyT': this.app.toggleTheme(); return true;
       case 'KeyB': this.toggleBoat(); return true;
+      case 'KeyF': this.selectFleet(); return true;
       case 'Space': e.preventDefault(); this.togglePause(); return true;
       case 'Minus':
       case 'NumpadSubtract': this.stepSpeed(-1); return true;
@@ -1827,10 +2323,8 @@ export class Hud {
       case 'Home': e.preventDefault(); this.focusHome(); return true;
       case 'Enter':
       case 'NumpadEnter':
-        if (this.session.mode !== 'offline') {
-          e.preventDefault();
-          $('chat-input').focus();
-        }
+        e.preventDefault();
+        if (this.session.mode !== 'offline') $('chat-input').focus();
         return true;
       default:
         return false;
@@ -1848,6 +2342,8 @@ export class Hud {
     this.r.keys.y = 0;
     this.mouse.down = -1;
     this.mouse.drag = false;
+    this.mouse.box = false;
+    this.r.box = null;
   }
 
   onEscape() {
@@ -1969,7 +2465,8 @@ export class Hud {
       if (act === 'break') this.breakWith(q);
       else if (act === 'embargo') {
         if (this.send({ c: 'embargo', with: q, on: !embargoBy(g, this.pid, q) })) play('click');
-      } else if (this.send({ c: 'propose', to: q, type: act })) play('click');
+      } else this.propose(q, act);
+      this.renderCountries(false);
       setTimeout(() => { if (!$('modal-countries').hidden) this.renderCountries(false); }, 150);
       return;
     }
@@ -2058,17 +2555,17 @@ export class Hud {
     for (const b of acts.querySelectorAll('.dip')) {
       const t = b.dataset.dip;
       if (t === 'alliance' || t === 'pact' || t === 'trade') {
-        const hide = rel.type === 'alliance' || rel.type === t || (t === 'pact' && rel.type === 'alliance');
+        const hide = rel.type === 'alliance' || (t === 'pact' && rel.type === 'pact') || (t === 'trade' && !!rel.trade);
         show(b, !hide);
         if (hide) continue;
-        const pending = s.requests.some((r) => r.from === me && r.to === st.id && r.type === t);
+        const pending = this.proposalPending(st.id, t);
         const err = proposeError(g, me, st.id, t);
         toggle(b, 'pending', pending);
-        b.disabled = !!err;
-        b.title = pending ? 'Предложение отправлено, ждём ответа' : err || { alliance: 'Предложить союз', pact: 'Предложить пакт о ненападении на 10 минут', trade: 'Предложить торговый договор' }[t];
+        b.disabled = pending || !!err;
+        b.title = pending ? 'Предложение отправлено, ждём ответа' : err || PROPOSE_TITLE[t];
       } else if (t === 'break') {
-        show(b, rel.type !== 'none');
-        b.title = BREAK_TEXT[rel.type] || 'Разорвать договор';
+        show(b, rel.type !== 'none' || !!rel.trade);
+        b.title = breakLabel(rel);
       } else if (t === 'embargo') {
         const on = embargoBy(g, me, st.id);
         toggle(b, 'on', on);
@@ -2083,10 +2580,11 @@ export class Hud {
     const rel = g.relation(me, st.id);
     const out = [];
     if (rel.type === 'alliance') out.push('<span class="rel alliance">Союз</span>');
-    else if (rel.type === 'pact') out.push(`<span class="rel pact">Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}</span>`);
-    else if (rel.type === 'trade') out.push('<span class="rel trade">Торговля</span>');
-    else if (this.atWar(me, st.id)) out.push('<span class="rel war">Война</span>');
-    else out.push('<span class="rel none">Нейтралитет</span>');
+    else {
+      if (rel.type === 'pact') out.push(`<span class="rel pact">Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}</span>`);
+      if (rel.trade) out.push('<span class="rel trade">Торговля</span>');
+      if (!out.length) out.push(this.atWar(me, st.id) ? '<span class="rel war">Война</span>' : '<span class="rel none">Нет договора</span>');
+    }
     if (rel.embargo) out.push(`<span class="rel embargo">${embargoBy(g, me, st.id) ? 'Ваше эмбарго' : 'Эмбарго'}</span>`);
     if (st.traitor) out.push('<span class="rel traitor">Предатель</span>');
     return out.join('');

@@ -57,6 +57,11 @@ function allAllied(game, alive) {
   return true;
 }
 
+export function coalitionWins(game, alive = game.s.players.filter((p) => p.alive)) {
+  if (alive.length < 2 || alive.length >= game.s.players.length) return false;
+  return allAllied(game, alive);
+}
+
 function leaderByTiles(alive) {
   let best = alive[0];
   for (const p of alive) if (p.tiles > best.tiles) best = p;
@@ -101,7 +106,7 @@ export function tickVictory(game) {
   if (s.players.length > 1) {
     if (!alive.length) { finish(game, -1, 'survivor'); return; }
     if (alive.length === 1) { finish(game, alive[0].id, 'survivor'); return; }
-    if (allAllied(game, alive)) { finish(game, leaderByTiles(alive), 'survivor'); return; }
+    if (coalitionWins(game, alive)) { finish(game, leaderByTiles(alive), 'survivor'); return; }
   }
   const v = s.settings.victory;
   if (v.territory && game.map.landCount > 0) {
