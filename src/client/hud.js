@@ -1,11 +1,12 @@
 import {
   BUILDINGS, BUILDING_KEYS, RESEARCH, RESEARCH_KEYS, STRIKES, SHIPS, TERRAIN, TICKS_PER_SEC, WIN_REASONS, TRADE,
-  ECON, SAM, DIPLO, RAIL_TYPES, researchCost, researchTicks, siloReload, airbaseReload, interceptChance,
+  ECON, SAM, DIPLO, RAIL_TYPES, RELATIONS, researchCost, researchTicks, siloReload, airbaseReload, interceptChance,
 } from '../core/config.js';
-import { buildCost, upgradeCost, demolishRefund, factoryOutlook } from '../core/buildings.js';
+import { buildCost, upgradeCost, demolishRefund, factoryOutlook, railCost } from '../core/buildings.js';
 import { shipCost, portShips, portShipCap, countUnits, warshipDamage, buildShipError, clearWater } from '../core/units.js';
 import { strikeTarget, strikeRange, strikeCost, megasUsed } from '../core/strikes.js';
-import { proposeError, embargoBy } from '../core/diplomacy.js';
+import { proposeError, embargoBy, hasTreaty, treaties, breakMakesTraitor } from '../core/diplomacy.js';
+import { coalitionWins } from '../core/victory.js';
 import { spawnTicks } from '../core/territory.js';
 import { NAV_SCALE, NAV_SEARCH, nearestOceanTile } from '../core/nav.js';
 import { fmtNum } from './render.js';
@@ -110,6 +111,18 @@ export function breakLabel(rel) {
   return rel.trade ? 'Разорвать торговлю' : 'Разорвать договор';
 }
 
+export function treatyParts(rel, tick, short = false) {
+  const out = [];
+  if (!rel) return out;
+  if (rel.type === 'alliance') {
+    out.push(['alliance', 'Союз']);
+    return out;
+  }
+  if (rel.type === 'pact') out.push(['pact', `Пакт · ${fmtSec((rel.until - tick) / TICKS_PER_SEC)}`]);
+  if (rel.trade) out.push(['trade', short ? 'Торговля' : RELATIONS.trade]);
+  return out;
+}
+
 export function econGoalText(leader, isMe, leadSec, needSec) {
   if (leader < 0) return { text: `цель ${fmtSec(needSec)}`, done: false };
   return { text: `${fmtSec(leadSec)} / ${fmtSec(needSec)}`, done: isMe };
@@ -201,7 +214,7 @@ const kv = (rows) => `<div class="kv">${rows.map(([k, v]) => `<span>${k}</span><
 const pbar = (label, value, pct, cls = '') => `<div class="pbar-block"><div class="pbar-label"><span>${label}</span><b>${value}</b></div><div class="pbar${cls ? ' ' + cls : ''}"><span style="width:${clamp(pct, 0, 100).toFixed(1)}%"></span></div></div>`;
 const btn = (act, label, extra = {}) => {
   const attrs = Object.entries(extra.data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
-  const cls = ['btn', 'sm', extra.cls || '', extra.full ? 'full' : ''].filter(Boolean).join(' ');
+  const cls = ['btn', 'sm', extra.cls || '', extra.full ? 'full' : '', extra.stack ? 'stack' : ''].filter(Boolean).join(' ');
   const cost = extra.cost !== undefined ? `<span class="cost">${extra.cost}</span>` : '';
   return `<button class="${cls}" data-act="${act}"${attrs}${extra.disabled ? ' disabled' : ''}${extra.title ? ` title="${esc(extra.title)}"` : ''}>${extra.icon ? icon(extra.icon) : ''}<span class="lbl">${label}</span>${cost}</button>`;
 };
@@ -508,7 +521,7 @@ export class Hud {
           break;
         case 'victory': {
           const g = this.game;
-          const won = e.pid === me || (e.pid >= 0 && this.me && this.me.alive && g.isAllied(me, e.pid));
+          const won = e.pid === me || (e.pid >= 0 && e.reason === 'survivor' && !!this.me && this.me.alive && coalitionWins(g));
           play(won ? 'victory' : 'defeat');
           break;
         }
@@ -941,10 +954,10 @@ export class Hud {
       const n = this.shipSel().length;
       if (n > 1) {
         ic = 'ship';
-        text = `Выбрано: ${n} ${plural(n, SHIP_FORMS)} · ПКМ по воде — курс строем · Ctrl+клик — добавить или убрать`;
+        text = `Выбрано ${n} ${plural(n, SHIP_FORMS)} · ПКМ по воде — курс строем`;
       } else if (n === 1) {
         ic = 'ship';
-        text = 'Корабль выбран: ПКМ по воде — курс · Shift+рамка или F — выбрать несколько';
+        text = 'Корабль выбран · ПКМ по воде — курс · F — весь флот';
       }
     }
     const key = ic + '|' + text + '|' + cancel;
@@ -1751,14 +1764,15 @@ export class Hud {
       const src = this.bestSource(kind, target.x + 0.5, target.y + 0.5);
       const v = src ? g.validate(me, { c: 'strike', kind, from: src.id, x: target.x, y: target.y }) : { ok: false, error: SRC_NEED[def.src] };
       b.disabled = !v.ok;
-      b.title = v.ok ? `${BUILDINGS[target.type].name}: ${fmtInt(def.cost)} золота` : v.error;
-      setText($('ctx-' + kind + '-hint'), v.ok ? fmtInt(def.cost) : this.shortErr(v.error));
+      const cost = strikeCost(g, me, kind);
+      b.title = v.ok ? `${BUILDINGS[target.type].name}: ${fmtInt(cost)} золота` : v.error;
+      setText($('ctx-' + kind + '-hint'), v.ok ? fmtInt(cost) : this.shortErr(v.error));
     }
-    const rel = p ? g.relation(me, o) : null;
+    const rel = p ? treaties(g, me, o) : null;
     const type = rel ? rel.type : 'none';
     for (const t of ['alliance', 'pact', 'trade']) {
       const b = $('ctx-' + t);
-      const hide = !p || type === 'alliance' || (t === 'pact' && type === 'pact') || (t === 'trade' && !!rel.trade);
+      const hide = !p || type === 'alliance' || (t === 'pact' && type === 'pact') || (t === 'trade' && rel.trade);
       b.hidden = hide;
       if (hide) continue;
       const pending = this.proposalPending(o, t);
@@ -1768,7 +1782,7 @@ export class Hud {
       setText($('ctx-' + t + '-hint'), pending ? 'отправлено' : '');
     }
     const br = $('ctx-break');
-    br.hidden = !p || (type === 'none' && !(rel && rel.trade));
+    br.hidden = !p || !hasTreaty(g, me, o);
     if (!br.hidden) labelNode(br).textContent = breakLabel(rel);
     const em = $('ctx-embargo');
     em.hidden = !p;
@@ -1843,9 +1857,9 @@ export class Hud {
 
   breakWith(q) {
     const g = this.game, me = this.pid, s = g.s;
-    const rel = g.relation(me, q);
+    const rel = treaties(g, me, q);
     const p = s.players[q];
-    const traitor = rel.type === 'alliance' || (rel.type === 'pact' && rel.until > s.tick);
+    const traitor = breakMakesTraitor(g, me, q);
     const doIt = () => { if (this.send({ c: 'break', with: q })) play('click'); };
     if (!traitor) {
       doIt();
@@ -1861,14 +1875,9 @@ export class Hud {
     if (!p) return '';
     if (q === me) return 'Это вы';
     if (!p.alive) return 'Выбыл';
-    const rel = g.relation(me, q);
-    const parts = [];
-    if (rel.type === 'alliance') parts.push('Союз');
-    else {
-      if (rel.type === 'pact') parts.push(`Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}`);
-      if (rel.trade) parts.push(rel.type === 'pact' ? 'торговля' : 'Торговый договор');
-      if (!parts.length) parts.push(this.atWar(me, q) ? 'Война' : 'Нет договора');
-    }
+    const rel = treaties(g, me, q);
+    const parts = treatyParts(rel, s.tick).map(([, t]) => t);
+    if (!parts.length) parts.push(this.atWar(me, q) ? 'Война' : RELATIONS.none);
     if (rel.embargo) parts.push('эмбарго');
     if (p.traitorUntil > s.tick) parts.push('предатель');
     return parts.join(' · ');
@@ -2129,9 +2138,9 @@ export class Hud {
       const acts = [];
       if (lvl < def.max) {
         const err = b.build > 0 ? (b.up ? 'Здание уже улучшается' : 'Здание ещё строится') : null;
-        acts.push(btn('upgrade', 'Улучшить', { icon: 'upgrade', cost: fmtInt(upgradeCost(g, b)), disabled: !!err, title: err || `Улучшить до ур. ${lvl + 1}` }));
+        acts.push(btn('upgrade', 'Улучшить', { icon: 'upgrade', stack: true, cost: fmtInt(upgradeCost(g, b)), disabled: !!err, title: err || `Улучшить до ур. ${lvl + 1}` }));
       } else acts.push(btn('noop', 'Макс. уровень', { icon: 'check', disabled: true }));
-      acts.push(btn('demolish', 'Снести', { icon: 'trash', cls: 'danger', cost: '+' + fmtInt(demolishRefund(b)), title: 'Снести здание и вернуть 25% затрат' }));
+      acts.push(btn('demolish', 'Снести', { icon: 'trash', cls: 'danger', stack: true, cost: '+' + fmtInt(demolishRefund(b)), title: 'Снести здание и вернуть 25% затрат' }));
       if (b.type === 'port') {
         const err = buildShipError(g, me, b.id);
         acts.push(btn('ship', 'Военный корабль', { icon: 'ship', full: true, cost: fmtInt(shipCost(g, me)), disabled: !!err && !/золота$/.test(err), title: err || 'Спустить на воду военный корабль' }));
@@ -2143,7 +2152,7 @@ export class Hud {
           const v = g.validate(me, { c: 'rail', a: b.id, b: f.port.id });
           if (v.ok || /золота$/.test(v.error || '')) {
             acts.push(btn('rail-port', 'Ж/д до порта', {
-              icon: 'rail', full: true, data: { port: f.port.id }, cost: fmtInt(Math.round(ECON.railCostPerTile * Math.hypot(f.port.x - b.x, f.port.y - b.y))),
+              icon: 'rail', full: true, data: { port: f.port.id }, cost: fmtInt(railCost(Math.hypot(f.port.x - b.x, f.port.y - b.y))),
               title: `Проложить железную дорогу до порта: поток товаров вырастет до +${fmtInt(f.perMin + f.railPerMin)}/мин`,
             }));
           }
@@ -2551,11 +2560,11 @@ export class Hud {
     const showActs = !self && st.alive && this.me && this.me.alive;
     show(acts, showActs);
     if (!showActs) return;
-    const rel = g.relation(me, st.id);
+    const rel = treaties(g, me, st.id);
     for (const b of acts.querySelectorAll('.dip')) {
       const t = b.dataset.dip;
       if (t === 'alliance' || t === 'pact' || t === 'trade') {
-        const hide = rel.type === 'alliance' || (t === 'pact' && rel.type === 'pact') || (t === 'trade' && !!rel.trade);
+        const hide = rel.type === 'alliance' || (t === 'pact' && rel.type === 'pact') || (t === 'trade' && rel.trade);
         show(b, !hide);
         if (hide) continue;
         const pending = this.proposalPending(st.id, t);
@@ -2564,7 +2573,7 @@ export class Hud {
         b.disabled = pending || !!err;
         b.title = pending ? 'Предложение отправлено, ждём ответа' : err || PROPOSE_TITLE[t];
       } else if (t === 'break') {
-        show(b, rel.type !== 'none' || !!rel.trade);
+        show(b, hasTreaty(g, me, st.id));
         b.title = breakLabel(rel);
       } else if (t === 'embargo') {
         const on = embargoBy(g, me, st.id);
@@ -2577,14 +2586,9 @@ export class Hud {
   relHTML(st, g, s, me) {
     if (st.id === me) return '<span class="rel self">Это вы</span>';
     if (!st.alive) return '<span class="rel dead">Выбыл</span>';
-    const rel = g.relation(me, st.id);
-    const out = [];
-    if (rel.type === 'alliance') out.push('<span class="rel alliance">Союз</span>');
-    else {
-      if (rel.type === 'pact') out.push(`<span class="rel pact">Пакт · ${fmtSec((rel.until - s.tick) / TICKS_PER_SEC)}</span>`);
-      if (rel.trade) out.push('<span class="rel trade">Торговля</span>');
-      if (!out.length) out.push(this.atWar(me, st.id) ? '<span class="rel war">Война</span>' : '<span class="rel none">Нет договора</span>');
-    }
+    const rel = treaties(g, me, st.id);
+    const out = treatyParts(rel, s.tick, true).map(([c, t]) => `<span class="rel ${c}">${esc(t)}</span>`);
+    if (!out.length) out.push(this.atWar(me, st.id) ? '<span class="rel war">Война</span>' : `<span class="rel none">${RELATIONS.none}</span>`);
     if (rel.embargo) out.push(`<span class="rel embargo">${embargoBy(g, me, st.id) ? 'Ваше эмбарго' : 'Эмбарго'}</span>`);
     if (st.traitor) out.push('<span class="rel traitor">Предатель</span>');
     return out.join('');
@@ -2615,13 +2619,17 @@ export class Hud {
     const g = this.game, s = g.s, me = this.pid, P = s.players;
     const win = s.winner;
     const mine = P[me];
-    const ally = win >= 0 && win !== me && mine && mine.alive && g.isAllied(me, win);
-    const won = !dead && (win === me || ally);
+    const alive = P.filter((p) => p.alive);
+    const coalition = win >= 0 && s.winReason === 'survivor' && coalitionWins(g, alive);
+    const inCoalition = coalition && !!mine && mine.alive;
+    const allyWon = !coalition && win >= 0 && win !== me && !!mine && mine.alive && g.isAllied(me, win);
+    const won = !dead && (win === me || inCoalition);
     toggle($('end-hero'), 'lose', !won);
-    $('end-icon').innerHTML = icon(won ? 'trophy' : dead ? 'flag' : win < 0 ? 'globe' : 'flag');
-    $('end-title').textContent = dead ? 'Вы выбыли' : win < 0 ? 'Игра окончена' : won ? (ally ? 'Победа коалиции!' : 'Победа!') : 'Поражение';
+    $('end-icon').innerHTML = icon(won ? 'trophy' : allyWon ? 'ally' : dead ? 'flag' : win < 0 ? 'globe' : 'flag');
+    $('end-title').textContent = dead ? 'Вы выбыли' : win < 0 ? 'Игра окончена' : inCoalition ? 'Победа коалиции!' : won ? 'Победа!' : allyWon ? 'Победил ваш союзник' : 'Поражение';
     let reason = '';
     if (dead) reason = mine && mine.stats && s.tick && this.surrendered ? 'Вы сдались' : 'Ваша страна потеряла всю территорию';
+    else if (coalition) reason = `Остались только союзники: ${alive.map((p) => p.name).join(', ')}`;
     else reason = WIN_REASONS[s.winReason] || '';
     $('end-reason').textContent = reason;
     const wp = win >= 0 ? P[win] : null;

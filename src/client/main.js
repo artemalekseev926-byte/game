@@ -213,7 +213,9 @@ class App {
     const b = $('help-buildings');
     if (b) b.innerHTML = BUILDING_KEYS.map((k) => li(`${BUILDINGS[k].short} (${BUILDINGS[k].hotkey})`, BUILDINGS[k].desc)).join('');
     const st = $('help-strikes');
-    if (st) st.innerHTML = STRIKE_KEYS.map((k) => li(STRIKES[k].name, STRIKES[k].desc || '')).join('');
+    if (st) st.innerHTML = STRIKE_KEYS.filter((k) => k !== 'mega').map((k) => li(STRIKES[k].name, STRIKES[k].desc || '')).join('');
+    const mg = $('help-mega');
+    if (mg && STRIKES.mega && STRIKES.mega.desc) mg.innerHTML = `<b>Опустошает всю карту врагов.</b> ${esc(STRIKES.mega.desc)}.`;
     const r = $('help-research');
     if (r) r.textContent = RESEARCH_KEYS.map((k, i) => (i ? RESEARCH[k].name.toLowerCase() : RESEARCH[k].name)).join(', ');
   }

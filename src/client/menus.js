@@ -2,7 +2,7 @@ import { MAPS, generateMap, parseCustomMap } from '../core/map.js';
 import { PLAYER_COLORS, DIFFICULTY } from '../core/config.js';
 import { THEMES } from './theme.js';
 import { HostLobby, ClientLobby, randomSeed, cleanName } from './lobby.js';
-import { SteamTransport, LanHostTransport, LanClientTransport, hasNative, DEFAULT_PORT } from './net.js';
+import { SteamTransport, LanHostTransport, LanClientTransport, hasNative, DEFAULT_PORT, NET_VERSION } from './net.js';
 import { play } from './audio.js';
 import { $, esc, tpl, setRangeFill, safeColor, fmtPct } from './hud.js';
 
@@ -47,6 +47,52 @@ function mapMeta(map) {
   return { W: map.W, H: map.H, landCount: map.landCount, land: (map.landCount * 100) / (map.W * map.H), name: map.name };
 }
 
+const FLAT = [2, 3, 4, 7];
+const FLAT_IDX = Int8Array.from({ length: 8 }, (_, t) => FLAT.indexOf(t));
+
+export function smoothBiomes(ter, w, h, r = 3) {
+  const N = w * h, area = (2 * r + 1) * (2 * r + 1);
+  const cnt = FLAT.map(() => new Uint8Array(N));
+  const row = new Uint8Array(N);
+  for (let c = 0; c < FLAT.length; c++) {
+    const cls = FLAT[c], out = cnt[c];
+    for (let y = 0; y < h; y++) {
+      const o = y * w;
+      let sum = 0;
+      for (let x = 0; x <= r && x < w; x++) if (ter[o + x] === cls) sum++;
+      for (let x = 0; x < w; x++) {
+        row[o + x] = sum;
+        const a = x - r, b = x + r + 1;
+        if (a >= 0 && ter[o + a] === cls) sum--;
+        if (b < w && ter[o + b] === cls) sum++;
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let y = 0; y <= r && y < h; y++) sum += row[y * w + x];
+      for (let y = 0; y < h; y++) {
+        out[y * w + x] = sum;
+        const a = y - r, b = y + r + 1;
+        if (a >= 0) sum -= row[a * w + x];
+        if (b < h) sum += row[b * w + x];
+      }
+    }
+  }
+  const res = ter.slice();
+  const c0 = cnt[0], c1 = cnt[1], c2 = cnt[2], c3 = cnt[3];
+  for (let i = 0; i < N; i++) {
+    const k = FLAT_IDX[ter[i]];
+    if (k < 0) continue;
+    const v0 = c0[i], v1 = c1[i], v2 = c2[i], v3 = c3[i];
+    let best = 0, bv = v0;
+    if (v1 > bv) { best = 1; bv = v1; }
+    if (v2 > bv) { best = 2; bv = v2; }
+    if (v3 > bv) { best = 3; bv = v3; }
+    if (best !== k && bv > cnt[k][i] && v0 + v1 + v2 + v3 >= area * 0.6) res[i] = FLAT[best];
+  }
+  return res;
+}
+
 export function sampleMap(map, w, h, fit = 'contain') {
   const W = map.W, H = map.H;
   const scale = fit === 'cover' ? Math.max(w / W, h / H) : Math.min(w / W, h / H);
@@ -56,7 +102,8 @@ export function sampleMap(map, w, h, fit = 'contain') {
   const y0 = fit === 'cover' ? (H - h / scale) / 2 : 0;
   const K = Math.max(1, Math.min(3, Math.round(1 / scale)));
   const n = ow * oh * K * K;
-  const ter = new Uint8Array(n), elev = new Uint8Array(n), lake = new Uint8Array(n);
+  let ter = new Uint8Array(n);
+  const elev = new Uint8Array(n), lake = new Uint8Array(n);
   const t = map.terrain, el = map.elev, wb = map.waterBody, ob = map.oceanBodies;
   const step = 1 / (scale * K);
   let k = 0;
@@ -76,6 +123,7 @@ export function sampleMap(map, w, h, fit = 'contain') {
       }
     }
   }
+  if (K === 1 && ow * oh >= 40000) ter = smoothBiomes(ter, ow, oh, Math.max(2, Math.round(3 * scale)));
   return { w: ow, h: oh, K, ter, elev, lake, meta: mapMeta(map) };
 }
 
@@ -101,50 +149,106 @@ export function paintSamples(S, themeName) {
     }
   }
   const N = w * h;
-  const rgb = new Float32Array(N * 3), ae = new Float32Array(N), lf = new Float32Array(N);
+  const lc = new Float32Array(N * 3), wc = new Float32Array(N * 3), ae = new Float32Array(N), lf = new Float32Array(N);
   let k = 0;
   for (let p = 0; p < N; p++) {
-    let r = 0, g = 0, b = 0, e = 0, l = 0;
+    let r = 0, g = 0, b = 0, e = 0, l = 0, wr = 0, wg = 0, wb = 0;
     for (let q = 0; q < KK; q++, k++) {
       const tt = ter[k];
-      let o;
       if (tt >= 2) {
-        o = (tt * 256 + elev[k]) * 3;
+        const o = (tt * 256 + elev[k]) * 3;
         r += land[o]; g += land[o + 1]; b += land[o + 2];
         e += elev[k];
         l++;
       } else if (lake[k]) {
-        r += th.lake[0]; g += th.lake[1]; b += th.lake[2];
+        wr += th.lake[0]; wg += th.lake[1]; wb += th.lake[2];
       } else {
-        o = elev[k] * 3;
-        r += water[o]; g += water[o + 1]; b += water[o + 2];
+        const o = elev[k] * 3;
+        wr += water[o]; wg += water[o + 1]; wb += water[o + 2];
       }
     }
-    rgb[p * 3] = r / KK;
-    rgb[p * 3 + 1] = g / KK;
-    rgb[p * 3 + 2] = b / KK;
-    ae[p] = l ? e / l : 0;
+    const nw = KK - l, o = p * 3;
+    if (l) {
+      lc[o] = r / l; lc[o + 1] = g / l; lc[o + 2] = b / l;
+      ae[p] = e / l;
+    }
+    if (nw) {
+      wc[o] = wr / nw; wc[o + 1] = wg / nw; wc[o + 2] = wb / nw;
+    }
     lf[p] = l / KK;
   }
+  const cov = K === 1 ? coastCoverage(lf, w, h) : lf;
   const out = new Uint8ClampedArray(N * 4);
   const shadeK = 0.011 * (th.shade || 1.4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const p = y * w + x;
-      let m = 1;
-      if (lf[p] > 0) {
-        const q = y > 0 && x > 0 ? p - w - 1 : p;
-        const d = lf[q] > 0 ? ae[q] - ae[p] : 0;
-        m = 1 + Math.max(-0.24, Math.min(0.24, d * shadeK)) * lf[p];
-        if (lf[p] < 1 && lf[p] > 0) m *= 0.92 + 0.08 * lf[p];
+      const p = y * w + x, o = p * 3;
+      const a = cov[p];
+      let r, g, b;
+      if (a <= 0) {
+        r = wc[o]; g = wc[o + 1]; b = wc[o + 2];
+      } else {
+        let m = 1;
+        if (lf[p] > 0) {
+          const q = y > 0 && x > 0 ? p - w - 1 : p;
+          const d = lf[q] > 0 ? ae[q] - ae[p] : 0;
+          m = 1 + Math.max(-0.24, Math.min(0.24, d * shadeK)) * lf[p];
+        }
+        if (a < 1) m *= 0.92 + 0.08 * a;
+        let lr = lc[o], lg = lc[o + 1], lb = lc[o + 2];
+        if (!(lf[p] > 0)) [lr, lg, lb] = neighborColor(lc, lf, w, h, x, y, true) || [th.beach[0], th.beach[1], th.beach[2]];
+        lr *= m; lg *= m; lb *= m;
+        if (a >= 1) {
+          r = lr; g = lg; b = lb;
+        } else {
+          let wr = wc[o], wg = wc[o + 1], wb = wc[o + 2];
+          if (!(lf[p] < 1)) [wr, wg, wb] = neighborColor(wc, lf, w, h, x, y, false) || [th.shallow[0], th.shallow[1], th.shallow[2]];
+          r = wr + (lr - wr) * a;
+          g = wg + (lg - wg) * a;
+          b = wb + (lb - wb) * a;
+        }
       }
-      out[p * 4] = rgb[p * 3] * m;
-      out[p * 4 + 1] = rgb[p * 3 + 1] * m;
-      out[p * 4 + 2] = rgb[p * 3 + 2] * m;
+      out[p * 4] = r;
+      out[p * 4 + 1] = g;
+      out[p * 4 + 2] = b;
       out[p * 4 + 3] = 255;
     }
   }
   return out;
+}
+
+function coastCoverage(lf, w, h) {
+  const N = w * h, cov = new Float32Array(N);
+  for (let y = 0; y < h; y++) {
+    const ya = y > 0 ? y - 1 : y, yb = y < h - 1 ? y + 1 : y;
+    for (let x = 0; x < w; x++) {
+      const xa = x > 0 ? x - 1 : x, xb = x < w - 1 ? x + 1 : x;
+      const p = y * w + x;
+      const sf = (lf[ya * w + xa] + 2 * lf[ya * w + x] + lf[ya * w + xb]
+        + 2 * lf[y * w + xa] + 4 * lf[p] + 2 * lf[y * w + xb]
+        + lf[yb * w + xa] + 2 * lf[yb * w + x] + lf[yb * w + xb]) / 16;
+      const s = smooth(0.3, 0.7, sf);
+      cov[p] = lf[p] >= 1 ? 0.55 + 0.45 * s : lf[p] <= 0 ? 0.45 * s : lf[p];
+    }
+  }
+  return cov;
+}
+
+function neighborColor(col, lf, w, h, x, y, wantLand) {
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    const yy = y + dy;
+    if (yy < 0 || yy >= h) continue;
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx;
+      if (xx < 0 || xx >= w || (!dx && !dy)) continue;
+      const q = yy * w + xx;
+      if (wantLand ? !(lf[q] > 0) : !(lf[q] < 1)) continue;
+      r += col[q * 3]; g += col[q * 3 + 1]; b += col[q * 3 + 2];
+      n++;
+    }
+  }
+  return n ? [r / n, g / n, b / n] : null;
 }
 
 export function landMask(map, mw, mh) {
@@ -341,8 +445,9 @@ class MenuBg {
     this.cv = $('menu-bg');
     this.res = null;
     this.mask = null;
-    this.mw = 600;
-    this.mh = 240;
+    this.mw = 1000;
+    this.mh = 400;
+    this.rate = Math.max(1, Math.round((4 * this.mw * this.mh) / (600 * 240)));
     this.owner = null;
     this.front = [];
     this.layer = null;
@@ -408,7 +513,7 @@ class MenuBg {
     if (!this.owner) return;
     for (let c = 0; c < this.front.length; c++) {
       const f = this.front[c];
-      const n = (3 + ((c * 7) % 5)) * 4;
+      const n = (3 + ((c * 7) % 5)) * this.rate;
       for (let k = 0; k < n && f.length; k++) {
         const r = (Math.random() * f.length) | 0;
         const i = f[r];
@@ -432,13 +537,22 @@ class MenuBg {
         continue;
       }
       const x = i % W;
-      const edge = (x > 0 && own[i - 1] !== o) || (x < W - 1 && own[i + 1] !== o) || (i >= W && own[i - W] !== o) || (i < W * (H - 1) && own[i + W] !== o);
+      const l = x > 0 ? own[i - 1] === o : true, r = x < W - 1 ? own[i + 1] === o : true;
+      const u = i >= W ? own[i - W] === o : true, b = i < W * (H - 1) ? own[i + W] === o : true;
+      const same = l + r + u + b;
       const c = this.colors[o];
-      const k = edge ? 0.62 : 1;
+      if (same === 4) {
+        d[p] = c[0];
+        d[p + 1] = c[1];
+        d[p + 2] = c[2];
+        d[p + 3] = 150;
+        continue;
+      }
+      const k = same >= 2 ? 0.62 : 0.7;
       d[p] = c[0] * k;
       d[p + 1] = c[1] * k;
       d[p + 2] = c[2] * k;
-      d[p + 3] = edge ? 235 : 150;
+      d[p + 3] = same >= 3 ? 235 : same === 2 ? 200 : 120;
     }
     this.layer.getContext('2d').putImageData(this.img, 0, 0);
   }
@@ -863,26 +977,29 @@ class Multiplayer {
     if (!this.steamOk) return;
     ul.innerHTML = '<li class="empty">Поиск лобби…</li>';
     try {
-      const res = typeof SteamTransport.scan === 'function' ? await SteamTransport.scan() : { list: await SteamTransport.list(), shared: this.steamShared };
+      const res = await SteamTransport.scan();
       const list = res.list || [];
       const shared = !!res.shared || this.steamShared;
       ul.innerHTML = '';
       if (!list.length) {
         ul.innerHTML = shared
-          ? '<li class="empty">Открытых лобби не найдено. На тестовом AppID 480 Steam показывает только часть лобби, поэтому список часто пуст: попросите друга пригласить вас через Steam (Shift+Tab) или введите ID лобби выше.</li>'
-          : '<li class="empty">Открытых лобби нет. Создайте своё лобби или войдите по приглашению либо по ID.</li>';
+          ? '<li class="empty">Лобби не найдены. С тестовым AppID 480 (Spacewar) Steam показывает только ближайшие лобби всех игр на этом AppID, поэтому лобби друзей в списке обычно не видно — входите по приглашению Steam (Shift+Tab → «Пригласить») или по ID лобби (хост нажимает «Копировать ID»).</li>'
+          : '<li class="empty">Открытых лобби нет. Создайте своё лобби или войдите по приглашению Steam либо по ID лобби.</li>';
         return;
       }
       for (const l of list) {
         const li = tpl('tpl-steam-lobby');
+        const old = !!l.ver && l.ver !== String(NET_VERSION);
         li.querySelector('.lobby-name').textContent = l.name;
-        li.querySelector('.tag').textContent = `${l.members} / ${l.max}`;
+        li.querySelector('.lobby-name').title = l.name;
+        li.querySelector('.tag').textContent = old ? 'другая версия' : `${l.members} / ${l.max}`;
         const b = li.querySelector('.btn');
         b.dataset.lobby = l.id;
-        b.disabled = l.members >= l.max;
+        b.disabled = old || l.members >= l.max;
+        if (old) b.title = 'Лобби создано в другой версии игры';
         ul.appendChild(li);
       }
-      if (shared) ul.insertAdjacentHTML('beforeend', '<li class="empty">Нет лобби друга? На тестовом AppID 480 список неполный — войдите по приглашению или по ID.</li>');
+      if (shared) ul.insertAdjacentHTML('beforeend', '<li class="empty">Нет лобби друга? С тестовым AppID 480 список неполный — входите по приглашению Steam или по ID лобби.</li>');
     } catch (e) {
       ul.innerHTML = `<li class="empty">${esc(e.message)}</li>`;
     }
@@ -1034,7 +1151,7 @@ class LobbyView {
     $('lobby-connect').innerHTML = info;
     $('lobby-hint').textContent = t.kind === 'steam'
       ? (this.app.multiplayer.steamShared
-        ? 'Пригласите друзей кнопкой «Пригласить друзей» или отправьте им ID лобби. На тестовом AppID 480 лобби может не появиться в списке открытых лобби.'
+        ? 'Пригласите друзей кнопкой «Пригласить друзей» или отправьте им ID лобби. С тестовым AppID 480 лобби обычно не видно в списке открытых, а «Присоединиться» из списка друзей Steam запускает Spacewar, если Pixel Conquest у друга не открыт: пусть он сначала запустит игру.'
         : 'Друзья могут войти по приглашению Steam, по ID лобби или найти его в списке открытых лобби.')
       : isHost ? 'Игроки в той же сети (или через Radmin VPN, Hamachi, проброс порта) подключаются по этому адресу.' : 'Ожидайте, пока хост настроит партию и начнёт игру.';
     $('lobby-slots').innerHTML = '';
